@@ -1,7 +1,26 @@
 # Current Task
 
-**Phase:** Phase 0 backend: B1–B4 done. **B5a inventory core is done.** Next: **B5b** transfers, adjustments, counts, block/recall, quarantine, disposal; then **B5c** alerts, suggestions, reconciliation.
+**Phase:** Phase 0 backend: B1–B4 done. **B5 inventory is done** (B5a core, B5b operations, B5c alerts and reconciliation). Next: **B6 Purchasing**.
 **Last updated:** 2026-11-20
+
+## B5c Alerts, suggestions, reconciliation: done (2026-11-20)
+| Item | Status |
+|---|---|
+| Migration 0040: item_levels (store override), stock_alerts, purchase_suggestions, stock_reconciliations, reconcile_stock_balances, reconcile_all_tenants (ledger_writer, exposed) | done |
+| "Needs attention" on each store's stock page; real stock alerts on the Admin dashboard (demo panel removed); Admin → Stock → Reorder (suggested purchases + ledger check) | done |
+| `POST /api/cron/stock` nightly reconciliation (secret-gated; scheduling with hosting) | done |
+| Checks | DB 66/66 · **inventory end-to-end (B5a+b+c) 52/52** incl. tampered balance repaired by the nightly job · all earlier journeys pass · typecheck/lint/build ✓ · posture ✓ |
+| Not yet | editing per-store levels on screen (database supports it); alert notifications (B9) |
+
+## B5b Stock operations: done (2026-11-20)
+| Item | Status |
+|---|---|
+| Migrations 0035–0039: stock_transfers (+items, lines), stock_adjustments (+lines), stock_counts (+lines), stock_disposals (+lines), batch_status_history; request/decide/dispatch/receive_transfer, post_stock_adjustment, start/record/post/cancel count, set_batch_status, post_disposal (all ledger_writer, exposed in the posture allow-list) | done |
+| Stock page: per-lot Adjust / Block-Recall-Unblock / To quarantine; Dispose panel on the quarantine store; Add a store | done |
+| Transfers page (new transfer, approve/reject, send, receive with loss, cancel); Stock count page (blind count sheet, post/cancel) | done |
+| Checks | DB 62/62 (transfers with transit loss, adjustments, counts during sales, block/recall, disposal, isolation) · **B5a+B5b end-to-end 46/46** (incl. accounts inventory = stock ledger value) · all earlier journeys pass · typecheck/lint/build ✓ · posture ✓ |
+| Bugs found & fixed by the tests | permission check ran without rights to read permissions (0036); **every stock decrease failed** in the balance trigger (0037); over-draw not mapped to "not enough stock" (0038); nothing could be moved into quarantine (0039) |
+| Not yet | B5c alerts/suggestions/reconciliation; partial transfer receipt; "found stock" screen (database supports it) |
 
 ## B5a Inventory core: done (2026-11-20)
 | Item | Status |

@@ -674,6 +674,43 @@ Cr OPENING_EQUITY. FEFO (`allocate_stock`) skips expired, blocked/recalled and s
 
 ---
 
+## B5b Stock operations (2026-11-20)
+
+**D-90 Transfers are request → (approve) → send → receive, with no partial receipt.** Approval
+only when `transfer_approval_required`; approving needs `approve_transfers` + Manage on the
+source. Sending takes FEFO sellable lots, or a named lot; only sellable lots may enter a
+sellable store, while expired/blocked lots may go to quarantine. Receiving must account for
+every unit as received or lost (with a reason); transit is posted Dr INVENTORY_IN_TRANSIT /
+Cr INVENTORY, receipt Dr INVENTORY, loss Dr INV_LOSS, so transit always nets to zero. Any
+store can send to quarantine (it isn't "receiving" for purchases or opening stock).
+"To quarantine" on a lot runs request, send and receive in one click.
+
+**D-91 Adjustments, counts, block and disposal as built:** adjustments need a reason (losses
+negative only, "found" positive and may create a lot) and post to INV_LOSS / INV_GAIN. Counts
+record each lot with the ledger quantity at that moment, so sales during a count don't make
+false differences; one open count per store; blind by default; optional rule that someone
+other than the counter posts. Block/recall applies in every store with a reason and history.
+Disposal only from quarantine, with method and witness, posted to INV_LOSS. Stock posting
+needs A2, the permission key, and Manage on the store; sending and receiving need Operate.
+
+---
+
+## B5c Stock alerts and reconciliation (2026-11-20)
+
+**D-92 Alerts and purchase suggestions are computed on demand, not stored.** `stock_alerts()`
+returns expired lots, blocked/recalled lots on hand, near-expiry lots (critical inside the
+critical window) and critically-low / reorder stock per store (a store's own levels in
+`store_item_levels` override the item's); quarantine never alerts. `purchase_suggestions()`
+orders up to the maximum (else the reorder quantity) in whole purchase units at the latest lot
+cost; B6 purchase orders start from it. Push/email notification of alerts comes with B9.
+
+**D-93 Nightly reconciliation:** `reconcile_stock_balances()` compares every balance with
+Σ stock_movements, rebuilds any difference from the ledger, records the run in
+`stock_reconciliations` and writes an audit row (outcome = error) when something was repaired.
+`POST /api/cron/stock` (x-cron-secret) runs it for every clinic; Admin → Reorder can run it now.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |

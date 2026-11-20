@@ -3,7 +3,12 @@
 // These are the invariants from security.md §4/§11/§12 that a migration could silently break.
 
 /** Functions owned by ledger_writer that service_role may EXECUTE. Grows with document RPCs (B4+). */
-export const EXPOSED_POSTING_FUNCTIONS = new Set(["check_in_visit", "post_opening_stock"]);
+export const EXPOSED_POSTING_FUNCTIONS = new Set([
+  "check_in_visit", "post_opening_stock",
+  "request_transfer", "decide_transfer", "dispatch_transfer", "receive_transfer", "post_stock_adjustment",
+  "start_stock_count", "record_count", "post_stock_count", "cancel_stock_count", "set_batch_status", "post_disposal",
+  "reconcile_stock_balances", "reconcile_all_tenants",
+]);
 
 const LEDGER_TABLES = ["postings", "ledger_entries", "document_sequences", "ledger_accounts"];
 const APPEND_ONLY = ["audit_log", "postings", "ledger_entries"];

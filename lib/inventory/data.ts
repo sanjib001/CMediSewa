@@ -141,3 +141,92 @@ export async function stockInStore(tenantId: string, storeId: string): Promise<B
   if (error) throw new Error(`stock: ${error.message}`);
   return ((data ?? []) as BatchStock[]).map((b) => ({ ...b, qty_on_hand: Number(b.qty_on_hand), unit_cost_base: Number(b.unit_cost_base), mrp_base: b.mrp_base === null ? null : Number(b.mrp_base), sale_price_base: Number(b.sale_price_base) }));
 }
+
+// ── B5b: transfers and counts ────────────────────────────────────────────────
+export type TransferRow = {
+  id: string; transfer_no: string; status: string; from_store_id: string; to_store_id: string; note: string | null; requested_at: string; decision_reason: string | null;
+  items: { item: string; qty: number; unit: string; batch_no: string | null }[];
+  lines: { id: string; item: string; batch_no: string; dispatched: number; received: number | null; loss: number | null; unit: string }[];
+};
+export async function listTransfers(tenantId: string): Promise<TransferRow[]> {
+  const db = serviceClient();
+  const t = rows<{ id: string; transfer_no: string; status: string; from_store_id: string; to_store_id: string; note: string | null; requested_at: string; decision_reason: string | null }>(
+    await db.from("stock_transfers").select("id, transfer_no, status, from_store_id, to_store_id, note, requested_at, decision_reason").eq("tenant_id", tenantId).order("requested_at", { ascending: false }).limit(60), "transfers");
+  if (!t.length) return [];
+  const ids = t.map((x) => x.id);
+  const [ti, tl] = await Promise.all([
+    db.from("stock_transfer_items").select("transfer_id, item_id, unit_id, requested_qty, batch_id").eq("tenant_id", tenantId).in("transfer_id", ids),
+    db.from("stock_transfer_lines").select("id, transfer_id, item_id, batch_id, dispatched_base_qty, received_base_qty, loss_base_qty").eq("tenant_id", tenantId).in("transfer_id", ids),
+  ]);
+  const its = rows<{ transfer_id: string; item_id: string; unit_id: string; requested_qty: number; batch_id: string | null }>(ti, "transfer items");
+  const lns = rows<{ id: string; transfer_id: string; item_id: string; batch_id: string; dispatched_base_qty: number; received_base_qty: number | null; loss_base_qty: number | null }>(tl, "transfer lines");
+  const itemIds = [...new Set([...its.map((x) => x.item_id), ...lns.map((x) => x.item_id)])];
+  const batchIds = [...new Set([...its.map((x) => x.batch_id).filter(Boolean), ...lns.map((x) => x.batch_id)])] as string[];
+  const [inv, un, bt] = await Promise.all([
+    db.from("inventory_items").select("id, name").in("id", itemIds),
+    db.from("item_units").select("id, item_id, name, is_base").in("item_id", itemIds),
+    batchIds.length ? db.from("item_batches").select("id, batch_no").in("id", batchIds) : Promise.resolve({ data: [], error: null }),
+  ]);
+  const nm = (id: string) => ((inv.data ?? []) as { id: string; name: string }[]).find((x) => x.id === id)?.name ?? "";
+  const units = (un.data ?? []) as { id: string; item_id: string; name: string; is_base: boolean }[];
+  const bno = (id: string | null) => (id ? ((bt.data ?? []) as { id: string; batch_no: string }[]).find((x) => x.id === id)?.batch_no ?? null : null);
+  return t.map((x) => ({
+    ...x,
+    items: its.filter((i) => i.transfer_id === x.id).map((i) => ({ item: nm(i.item_id), qty: Number(i.requested_qty), unit: units.find((u) => u.id === i.unit_id)?.name ?? "", batch_no: bno(i.batch_id) })),
+    lines: lns.filter((l) => l.transfer_id === x.id).map((l) => ({ id: l.id, item: nm(l.item_id), batch_no: bno(l.batch_id) ?? "", dispatched: Number(l.dispatched_base_qty),
+      received: l.received_base_qty === null ? null : Number(l.received_base_qty), loss: l.loss_base_qty === null ? null : Number(l.loss_base_qty),
+      unit: units.find((u) => u.item_id === l.item_id && u.is_base)?.name ?? "" })),
+  }));
+}
+
+export async function getOpenCount(tenantId: string, storeId: string) {
+  const db = serviceClient();
+  const { data: k } = await db.from("stock_counts").select("id, count_no, blind, started_at, started_by").eq("tenant_id", tenantId).eq("store_id", storeId).eq("status", "counting").maybeSingle();
+  if (!k) return null;
+  const { data: ls } = await db.from("stock_count_lines").select("batch_id, counted_qty_base, system_qty_at_count, variance, counted_by").eq("count_id", (k as { id: string }).id);
+  return { ...(k as { id: string; count_no: string; blind: boolean; started_at: string; started_by: string }),
+    lines: ((ls ?? []) as { batch_id: string; counted_qty_base: number; system_qty_at_count: number; variance: number; counted_by: string }[])
+      .map((l) => ({ ...l, counted_qty_base: Number(l.counted_qty_base), system_qty_at_count: Number(l.system_qty_at_count), variance: Number(l.variance) })) };
+}
+
+// ── B5c: alerts, purchase suggestions, reconciliation ────────────────────────
+export type StockAlert = {
+  kind: "expired" | "blocked" | "near_expiry" | "critical_stock" | "low_stock"; severity: "critical" | "warning";
+  store_id: string; store: string; item_id: string; item: string; batch_no: string | null; expiry_date: string | null; qty: string; level: string | null; days_left: number | null;
+};
+const ALERT_ORDER = { expired: 0, blocked: 1, critical_stock: 2, near_expiry: 3, low_stock: 4 } as const;
+export async function getAlerts(tenantId: string, storeId: string | null = null): Promise<StockAlert[]> {
+  const db = serviceClient();
+  const { data, error } = await db.rpc("stock_alerts", { p_tenant: tenantId, p_store: storeId });
+  if (error) throw new Error(`alerts: ${error.message}`);
+  const raw = (data ?? []) as { kind: StockAlert["kind"]; severity: StockAlert["severity"]; store_id: string; item_id: string; batch_no: string | null; expiry_date: string | null; qty_base: number; level: number | null; days_left: number | null }[];
+  if (!raw.length) return [];
+  const [items, { stores }] = await Promise.all([listItems(tenantId), listStores(tenantId)]);
+  return raw.map((a) => {
+    const it = items.find((i) => i.id === a.item_id);
+    const units = it?.units ?? [];
+    return {
+      kind: a.kind, severity: a.severity, store_id: a.store_id, store: stores.find((s) => s.id === a.store_id)?.name ?? "", item_id: a.item_id, item: it?.name ?? "",
+      batch_no: a.batch_no, expiry_date: a.expiry_date, qty: packText(Number(a.qty_base), units), level: a.level === null ? null : packText(Number(a.level), units), days_left: a.days_left,
+    };
+  }).sort((x, y) => (x.severity === y.severity ? 0 : x.severity === "critical" ? -1 : 1) || ALERT_ORDER[x.kind] - ALERT_ORDER[y.kind] || x.item.localeCompare(y.item));
+}
+
+export type Suggestion = { store: string; item: string; item_id: string; on_hand: string; reorder_at: string | null; units: number; unit: string; est_cost: number };
+export async function getSuggestions(tenantId: string): Promise<Suggestion[]> {
+  const { data, error } = await serviceClient().rpc("purchase_suggestions", { p_tenant: tenantId, p_store: null });
+  if (error) throw new Error(`suggestions: ${error.message}`);
+  const raw = (data ?? []) as { store_id: string; item_id: string; on_hand: number; reorder_level: number | null; suggested_units: number; purchase_unit: string; est_cost: number }[];
+  if (!raw.length) return [];
+  const [items, { stores }] = await Promise.all([listItems(tenantId), listStores(tenantId)]);
+  return raw.map((s) => {
+    const it = items.find((i) => i.id === s.item_id);
+    return { store: stores.find((x) => x.id === s.store_id)?.name ?? "", item: it?.name ?? "", item_id: s.item_id, on_hand: packText(Number(s.on_hand), it?.units ?? []),
+      reorder_at: s.reorder_level === null ? null : packText(Number(s.reorder_level), it?.units ?? []), units: Number(s.suggested_units), unit: s.purchase_unit, est_cost: Number(s.est_cost) };
+  }).sort((a, b) => a.item.localeCompare(b.item));
+}
+
+export async function lastReconciliation(tenantId: string) {
+  const { data } = await serviceClient().from("stock_reconciliations").select("ran_at, checked, mismatches").eq("tenant_id", tenantId).order("ran_at", { ascending: false }).limit(1).maybeSingle();
+  return data as { ran_at: string; checked: number; mismatches: number } | null;
+}

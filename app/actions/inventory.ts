@@ -98,3 +98,152 @@ export async function setStoreAccess(input: { storeId: string; memberId: string;
   revalidatePath("/admin/stock");
   return { ok: true };
 }
+
+// ── B5b: transfers, adjustments, counts, block/recall, disposal, stores ──────
+const MORE_ERRORS: [RegExp, string][] = [
+  [/INSUFFICIENT_STOCK/, "Not enough stock for that."],
+  [/LOT_NOT_SELLABLE/, "That lot is expired or blocked, so it can only go to quarantine."],
+  [/TRANSFER_NOT_APPROVED/, "This transfer needs approval before it can be sent."],
+  [/TRANSFER_NOT_DISPATCHED/, "This transfer hasn't been sent yet."],
+  [/TRANSFER_NOT_OPEN/, "This transfer has already been handled."],
+  [/RECEIVE_MUST_MATCH/, "Received plus lost must equal what was sent for every line."],
+  [/LOSS_REASON_REQUIRED/, "Give a reason for anything lost in transit."],
+  [/NO_PERMISSION/, "You don't have permission for this."],
+  [/COUNT_ALREADY_OPEN/, "A count is already open for this store."],
+  [/COUNT_NOT_OPEN/, "This count is closed."],
+  [/COUNT_OUTDATED/, "Stock moved since this lot was counted. Count it again."],
+  [/OTHER_MEMBER_MUST_POST/, "Someone other than the counter must post this count (clinic setting)."],
+  [/DISPOSE_FROM_QUARANTINE/, "Stock is disposed from the quarantine store. Move it there first."],
+  [/LOT_REQUIRED/, "Choose the lot."],
+  [/REASON_REQUIRED/, "Give a reason."],
+  [/stores_tenant_id_code_key|stores_code/, "A store with that code already exists."],
+];
+function friendlier(e: { message?: string; code?: string } | null): string {
+  const text = `${e?.code ?? ""} ${e?.message ?? ""}`;
+  for (const [re, msg] of MORE_ERRORS) if (re.test(text)) return msg;
+  return friendly(e);
+}
+type R = { ok: true; message?: string } | Fail;
+const stockOp = () => requireTenant({ operation: "stock.operate", permission: "view_stock", allowPendingTenant: true, next: "/admin/stock" });
+const stockPost = (permission: "manage_stock" | "block_batches" | "dispose_stock") =>
+  requireTenant({ operation: "stock.post", permission, allowPendingTenant: true, next: "/admin/stock" });
+const refresh = () => { revalidatePath("/admin/stock"); revalidatePath("/admin/stock/transfers"); revalidatePath("/admin/stock/counts"); revalidatePath("/admin/medicines"); };
+const rpc = async (fn: string, args: Record<string, unknown>): Promise<{ ok: true; data: unknown } | Fail> => {
+  const { data, error } = await serviceClient().rpc(fn, args);
+  return error ? { ok: false, error: friendlier(error) } : { ok: true, data };
+};
+
+export type TransferItem = { item_id: string; unit_id: string; qty: number | string; batch_id?: string | null };
+export async function requestTransfer(input: { fromStoreId: string; toStoreId: string; items: TransferItem[]; note?: string }): Promise<R & { id?: string }> {
+  const ctx = await stockOp();
+  const r = await rpc("request_transfer", { p_tenant: ctx.tenantId, p_by: ctx.memberId, p_from: input.fromStoreId, p_to: input.toStoreId, p_items: (input.items ?? []).slice(0, 100), p_note: String(input.note ?? "").slice(0, 300) });
+  if (!r.ok) return r;
+  refresh();
+  return { ok: true, id: r.data as string, message: "Transfer created." };
+}
+export async function decideTransfer(input: { id: string; action: "approve" | "reject" | "cancel"; reason?: string }): Promise<R> {
+  const ctx = input.action === "cancel" ? await stockOp() : await stockPost("manage_stock");
+  const r = await rpc("decide_transfer", { p_tenant: ctx.tenantId, p_by: ctx.memberId, p_transfer: input.id, p_action: input.action, p_reason: input.reason ?? null });
+  if (!r.ok) return r;
+  refresh();
+  return { ok: true };
+}
+export async function dispatchTransfer(input: { id: string; idempotencyKey: string }): Promise<R> {
+  const ctx = await stockOp();
+  const r = await rpc("dispatch_transfer", { p_tenant: ctx.tenantId, p_idempotency_key: input.idempotencyKey, p_transfer: input.id, p_by: ctx.memberId, p_session_level: ctx.level, p_device: ctx.deviceId });
+  if (!r.ok) return r;
+  refresh();
+  return { ok: true, message: "Sent." };
+}
+export async function receiveTransfer(input: { id: string; idempotencyKey: string; lines?: { line_id: string; received_base_qty: number; loss_base_qty: number; loss_reason?: string }[] }): Promise<R> {
+  const ctx = await stockOp();
+  const r = await rpc("receive_transfer", { p_tenant: ctx.tenantId, p_idempotency_key: input.idempotencyKey, p_transfer: input.id, p_lines: input.lines ?? null, p_by: ctx.memberId, p_session_level: ctx.level, p_device: ctx.deviceId });
+  if (!r.ok) return r;
+  refresh();
+  return { ok: true, message: "Received." };
+}
+/** One click for the common case: move a lot into quarantine (request, send and receive). */
+export async function moveToQuarantine(input: { fromStoreId: string; batchId: string; itemId: string; unitId: string; qtyBase: number; quarantineId: string }): Promise<R> {
+  const created = await requestTransfer({ fromStoreId: input.fromStoreId, toStoreId: input.quarantineId, items: [{ item_id: input.itemId, unit_id: input.unitId, qty: input.qtyBase, batch_id: input.batchId }], note: "Moved to quarantine" });
+  if (!created.ok || !created.id) return created;
+  const sent = await dispatchTransfer({ id: created.id, idempotencyKey: crypto.randomUUID() });
+  if (!sent.ok) return { ok: false, error: `${sent.error} The transfer was created; finish it in Transfers.` };
+  const got = await receiveTransfer({ id: created.id, idempotencyKey: crypto.randomUUID() });
+  if (!got.ok) return { ok: false, error: `Sent, but not yet received in quarantine: ${got.error}` };
+  return { ok: true, message: "Moved to quarantine." };
+}
+
+export type AdjustLine = { batch_id?: string; qty_base?: number; item_id?: string; unit_id?: string; qty?: number | string; batch_no?: string; expiry_date?: string; unit_cost?: number | string };
+export async function adjustStock(input: { idempotencyKey: string; storeId: string; reason: string; note?: string; lines: AdjustLine[] }): Promise<R> {
+  const ctx = await stockPost("manage_stock");
+  const r = await rpc("post_stock_adjustment", { p_tenant: ctx.tenantId, p_idempotency_key: input.idempotencyKey, p_store: input.storeId, p_reason: input.reason,
+    p_note: String(input.note ?? "").slice(0, 300), p_lines: (input.lines ?? []).slice(0, 100), p_by: ctx.memberId, p_session_level: ctx.level, p_device: ctx.deviceId });
+  if (!r.ok) return r;
+  refresh();
+  return { ok: true, message: "Adjustment posted." };
+}
+
+export async function setBatchStatus(input: { batchId: string; status: "active" | "blocked" | "recalled"; reason: string }): Promise<R> {
+  const ctx = await stockPost("block_batches");
+  const r = await rpc("set_batch_status", { p_tenant: ctx.tenantId, p_by: ctx.memberId, p_batch: input.batchId, p_status: input.status, p_reason: String(input.reason ?? "").slice(0, 300), p_session_level: ctx.level });
+  if (!r.ok) return r;
+  refresh();
+  return { ok: true, message: input.status === "active" ? "Unblocked." : input.status === "recalled" ? "Marked recalled in every store." : "Blocked in every store." };
+}
+
+export async function startCount(input: { storeId: string; blind: boolean }): Promise<R & { id?: string }> {
+  const ctx = await stockOp();
+  const r = await rpc("start_stock_count", { p_tenant: ctx.tenantId, p_by: ctx.memberId, p_store: input.storeId, p_blind: input.blind, p_note: null });
+  if (!r.ok) return r;
+  refresh();
+  return { ok: true, id: r.data as string };
+}
+export async function recordCount(input: { countId: string; batchId: string; countedBase: number; reason?: string }): Promise<R> {
+  const ctx = await stockOp();
+  const r = await rpc("record_count", { p_tenant: ctx.tenantId, p_by: ctx.memberId, p_count: input.countId, p_batch: input.batchId, p_counted: input.countedBase, p_reason: input.reason ?? null });
+  return r.ok ? { ok: true } : r;
+}
+export async function finishCount(input: { countId: string; action: "post" | "cancel"; idempotencyKey: string }): Promise<R> {
+  const ctx = input.action === "post" ? await stockPost("manage_stock") : await stockOp();
+  const r = input.action === "post"
+    ? await rpc("post_stock_count", { p_tenant: ctx.tenantId, p_idempotency_key: input.idempotencyKey, p_count: input.countId, p_by: ctx.memberId, p_session_level: ctx.level, p_device: ctx.deviceId })
+    : await rpc("cancel_stock_count", { p_tenant: ctx.tenantId, p_by: ctx.memberId, p_count: input.countId });
+  if (!r.ok) return r;
+  refresh();
+  return { ok: true, message: input.action === "post" ? "Count posted. Differences are now in stock and the accounts." : "Count cancelled." };
+}
+
+export async function disposeStock(input: { idempotencyKey: string; storeId: string; method: string; contractor?: string; witness: string; note?: string; lines: { batch_id: string; qty_base: number }[] }): Promise<R> {
+  const ctx = await stockPost("dispose_stock");
+  const r = await rpc("post_disposal", { p_tenant: ctx.tenantId, p_idempotency_key: input.idempotencyKey, p_store: input.storeId, p_method: input.method,
+    p_contractor: input.contractor ?? null, p_witness: input.witness, p_note: input.note ?? null, p_lines: input.lines, p_by: ctx.memberId, p_session_level: ctx.level, p_device: ctx.deviceId });
+  if (!r.ok) return r;
+  refresh();
+  return { ok: true, message: "Disposal recorded." };
+}
+
+export async function createStore(fd: FormData): Promise<{ ok: true; message: string } | Fail> {
+  const ctx = await requireTenant({ operation: "settings.change", permission: "manage_settings", allowPendingTenant: true, next: "/admin/stock" });
+  const kind = String(fd.get("kind") ?? "");
+  const name = String(fd.get("name") ?? "").trim();
+  const code = String(fd.get("code") ?? "").trim().toUpperCase();
+  if (!["main", "emergency", "department", "branch"].includes(kind)) return { ok: false, error: "Choose the kind of store." };
+  if (name.length < 2 || !/^[A-Z0-9-]{1,12}$/.test(code)) return { ok: false, error: "Give a name and a short code (letters, numbers, -)." };
+  const { data: bp } = await serviceClient().from("billing_profiles").select("id").eq("tenant_id", ctx.tenantId).eq("is_default", true).maybeSingle<{ id: string }>();
+  const { error } = await serviceClient().from("stores").insert({ tenant_id: ctx.tenantId, name, code, kind, billing_profile_id: bp?.id ?? null,
+    is_sellable: fd.get("is_sellable") === "on", is_dispensing: fd.get("is_sellable") === "on", is_receiving: true });
+  if (error) return { ok: false, error: friendlier(error) };
+  await audit({ tenantId: ctx.tenantId, actorKind: "member", actorId: ctx.memberId, sessionLevel: ctx.level, action: "store.create", detail: { name, code, kind } });
+  refresh();
+  return { ok: true, message: `${name} added.` };
+}
+
+/** Check every balance against the stock ledger now (the nightly job does the same). */
+export async function runReconciliation(): Promise<{ ok: true; message: string } | Fail> {
+  const ctx = await requireTenant({ operation: "stock.post", permission: "manage_stock", allowPendingTenant: true, next: "/admin/stock/reorder" });
+  const { data, error } = await serviceClient().rpc("reconcile_stock_balances", { p_tenant: ctx.tenantId, p_by: ctx.memberId });
+  if (error) return { ok: false, error: friendly(error) };
+  const r = data as { checked: number; mismatches: number };
+  revalidatePath("/admin/stock/reorder");
+  return { ok: true, message: r.mismatches ? `${r.mismatches} balance(s) differed from the ledger and were repaired (logged for review).` : `All ${r.checked} balances match the stock ledger.` };
+}

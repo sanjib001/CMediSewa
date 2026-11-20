@@ -1,5 +1,7 @@
 import Link from "next/link";
-import { DEMO_STOCK_ALERTS, DEMO_TODAY, npr } from "@/lib/demo";
+import { DEMO_TODAY, npr } from "@/lib/demo";
+import { getAlerts } from "@/lib/inventory/data";
+import { AlertList } from "@/components/inventory/alert-list";
 import { getDeskSetup, getToday, todayIn } from "@/lib/desk/data";
 import { DemoNotice, PageHeader, Panel, ButtonLink } from "@/components/ui/primitives";
 import { Icon } from "@/components/ui/icon";
@@ -10,12 +12,6 @@ import { GoLiveButton } from "@/components/platform/go-live-button";
 
 export const metadata = { title: "Dashboard" };
 
-const ALERT_STYLE = {
-  expired: { cls: "text-alert", label: "Expired" },
-  near_expiry: { cls: "text-warn", label: "Near expiry" },
-  low: { cls: "text-ink-soft", label: "Low stock" },
-} as const;
-
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
@@ -25,7 +21,7 @@ export default async function AdminDashboard() {
   const setupDone = SETUP.filter((s) => s.done).length;
   const pending = ctx.tenantStatus === "pending";
   const today = todayIn();
-  const [{ doctors }, board] = await Promise.all([getDeskSetup(ctx.tenantId), getToday(ctx.tenantId, today)]);
+  const [{ doctors }, board, alerts] = await Promise.all([getDeskSetup(ctx.tenantId), getToday(ctx.tenantId, today), getAlerts(ctx.tenantId)]);
   const live = board.visits.filter((v) => v.status !== "cancelled");
   const flow = {
     booked: board.appointments.filter((a) => !["cancelled"].includes(a.status)).length,
@@ -94,20 +90,10 @@ export default async function AdminDashboard() {
             </ul>
           </Panel>
 
-          <DemoNotice>Stock and pharmacy figures below are demo data until inventory (B5) and pharmacy sales (B7) are built.</DemoNotice>
           <Panel title="Stock that needs attention" aside={<Link className="text-sm font-medium text-pine hover:underline" href="/admin/stock">Stock & stores</Link>} flush>
-            <ul className="divide-y divide-line">
-              {DEMO_STOCK_ALERTS.map((a) => (
-                <li key={a.item} className="flex gap-4 px-5 py-3">
-                  <span className={cn("w-24 shrink-0 text-sm font-medium", ALERT_STYLE[a.kind].cls)}>{ALERT_STYLE[a.kind].label}</span>
-                  <div className="min-w-0">
-                    <div className="font-medium">{a.item}</div>
-                    <div className="text-sm text-ink-faint">{a.detail}</div>
-                  </div>
-                </li>
-              ))}
-            </ul>
+            <AlertList alerts={alerts} showStore limit={8} />
           </Panel>
+          <DemoNotice>Pharmacy sales figures on this page are demo data until pharmacy sales (B7) are built.</DemoNotice>
         </div>
 
         <div className="space-y-6">
