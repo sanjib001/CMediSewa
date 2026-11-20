@@ -1,7 +1,15 @@
 # Current Task
 
-**Phase:** Phase 0 backend: B1–B6 done. **B7 Sales & billing done** (B7a counter + B7b returns, void, dues). Next: **B8** (expenses, finance and reports per the roadmap).
+**Phase:** Phase 0 backend: B1–B7 done. **B8 Finance & reports in progress:** B8a finance done. Next: **B8b** stock, expiry, purchase, vendor and sales reports.
 **Last updated:** 2026-11-20
+
+## B8a Finance: done (2026-11-21)
+| Item | Status |
+|---|---|
+| Migration 0046: expenses, other_income, finance_openings, finance_checks; record_expense, record_other_income, reverse_finance_entry, post_finance_opening; finance_range, account_balance, posting_reversed; finance_report, profit_and_loss, daily_summary; verify_finance_integrity; nightly job checks the books too | done |
+| Admin Expenses (record, other income, cancel with reason, cancelled stay listed) and Finance (periods, day at a glance, P&L whole clinic or per store, balances start/end, money in and out by cause, online by channel, expenses by category, books check, opening cash and bank) | done |
+| Checks | DB 87/87 · fresh replay of all 46 migrations ✓ · **end-to-end purchasing → counter → returns → finance 97/97**, books check clean across all of it · dev clinics pass the books check · all earlier journeys ✓ · typecheck/lint/build ✓ · posture ✓ |
+| Not yet | opening patient dues (D-109); CSV exports (A3, with B8b reports) |
 
 ## B7b Returns, void, dues: done (2026-11-21)
 | Item | Status |

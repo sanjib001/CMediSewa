@@ -815,6 +815,34 @@ anyone with `manage_billing` or `pharmacy_sell`.
 
 ---
 
+## B8a Finance (2026-11-21)
+
+**D-108 Expenses and other income as built:** recorded as of now (no back-dating), cash/online
+split, optional store tag (expenses). Other income needs `manage_expenses` and a password
+session. A mistake is never edited: it is cancelled by a reversal posting (`manage_expenses`
++ password in the last 5 minutes) and stays listed as cancelled; the right one is recorded
+anew. "Cancelled" is derived (a posting that reverses it exists), never a stored flag.
+
+**D-109 Opening balances:** opening cash and bank once per clinic (Dr CASH/BANK, Cr
+OPENING_EQUITY), with an as-of date not in the future. Opening stock (B5a) and vendor
+balances (B6a) keep their own screens. Opening patient dues are deferred: they need an
+invoice-like document so dues collection can allocate to them.
+
+**D-110 Reports read the journal:** finance report, profit and loss and the daily summary are
+SQL functions over business days (clinic time zone, `day_closing_hour`). Balances at the
+start of a period are Σ before it, so a period always opens where the previous one closed.
+Money in/out is grouped by the document that caused it; a reversal counts under the
+document it reverses. The store P&L includes only entries tagged to that store.
+
+**D-111 Books check (`verify_finance_integrity`):** what patients owe (Σ bills' outstanding),
+stock value (Σ stock movements), cash and bank (every receipt, refund, purchase, vendor
+payment and refund, expense, other income, opening) recomputed from the documents and
+compared with the journal. Rs. 1 of rounding is allowed on stock value (bill lines round cost
+to the paisa). Differences are logged and shown, never repaired. Runs nightly with the stock
+and payables checks and on demand.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |
