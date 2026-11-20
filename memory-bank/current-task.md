@@ -1,7 +1,15 @@
 # Current Task
 
-**Phase:** Phase 0 backend: B1–B5 done. **B6 purchasing is done** (B6a + B6b). Next: **B7 Sales & billing** (pharmacy counter, dispensing, returns, dues).
+**Phase:** Phase 0 backend: B1–B6 done. **B7 Sales & billing in progress:** B7a pharmacy counter done. Next: **B7b** bill void (same day), sales returns, collecting dues.
 **Last updated:** 2026-11-20
+
+## B7a Pharmacy counter: done (2026-11-21)
+| Item | Status |
+|---|---|
+| Migration 0044: external_prescriptions, invoice store/phone/outside-Rx, item lines (unit, base qty, cost, Rx item, substitution), invoice_line_allocations; issue_counter_sale; dispensing_queue | done |
+| Pharmacy page (Employee): Dispense (queue with allergies, Dispense and bill), Sale (search, units, discount, batch preview earliest-expiry first, chosen batch, link patient, outside prescription, cash/online, dues), Bills (recent bills, stock alerts); store switch; printable bill | done |
+| Checks | DB 80/80 · **end-to-end purchasing + counter 60/60**, incl. COGS = lot costs and inventory in the accounts = stock ledger · all earlier journeys pass · typecheck/lint/build ✓ · posture ✓ |
+| Not yet (B7b) | voiding a bill, sales returns, collecting dues later; partial quantity of a single prescription item stays "dispensed"; barcode scan at the counter |
 
 ## B6b Purchase orders, returns, payable check: done (2026-11-21)
 | Item | Status |

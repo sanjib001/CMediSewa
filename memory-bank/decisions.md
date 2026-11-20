@@ -769,6 +769,29 @@ Vendors. It runs nightly with the stock check (`/api/cron/stock`) and on demand.
 
 ---
 
+## B7a Pharmacy counter (2026-11-21)
+
+**D-102 Counter sale as built:** one bill line per item; each line takes stock from one or
+more lots (earliest expiry first, or a chosen lot with `override_batch`), each lot at its
+own sale price, recorded in `invoice_line_allocations`. The bill shows the average rate.
+Cost of goods = the lots' own cost, so COGS and INVENTORY in the accounts always equal the
+stock ledger. Stock out, the bill, the receipt and both journal postings happen in one
+transaction (`issue_counter_sale`), retry-safe by idempotency key. Dues need a linked
+patient, the clinic's credit setting and `allow_credit`, within the credit limit.
+
+**D-103 Prescription medicines at the counter:** a prescription-only item is sold either
+against an issued internal prescription for the same patient (`dispense_prescription`,
+a verified pharmacist) or with an outside prescription recorded on the bill (prescriber,
+NMC no., facility, date; `sell_prescription_only`). Controlled and narcotic items are
+refused until P-22. A prescription item counts as dispensed once a non-void bill line
+references it; items not yet dispensed keep the prescription in the queue.
+
+**D-104 Dispensing queue (C7):** issued prescriptions of the last 14 days with something
+left to dispense, showing only the prescription items and the patient's allergies (never
+notes or diagnosis). Only verified pharmacists see it; every read is audited.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |
