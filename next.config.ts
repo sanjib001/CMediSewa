@@ -1,8 +1,8 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  // Self-hosted on Coolify as a container (deployment.md §8).
-  output: "standalone",
+  // Development runs locally and on Vercel against the dev database (D-64). Add
+  // `output: "standalone"` back only when the self-hosted (Coolify) deployment is set up.
   // `pg` is used server-side by the realtime LISTEN bus (B9) and must not be bundled
   // (HRestroSewa lesson: bundling breaks its dynamic requires silently).
   serverExternalPackages: ["pg"],

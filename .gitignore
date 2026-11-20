@@ -18,3 +18,6 @@ Thumbs.db
 
 # local supabase
 supabase/.temp/
+
+# local dev credentials written by scripts/seed-dev.mjs
+*.local.json

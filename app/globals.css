@@ -1,13 +1,89 @@
 @import "tailwindcss";
 
-/* Design tokens arrive in Phase 1 (U1, ui-ux.md). Body background is explicit so dark-mode
-   browsers never force a colour scheme on the placeholder pages. */
-:root {
-  --background: #ffffff;
-  --foreground: #0f172a;
+/* ─────────────────────────────────────────────────────────────────────────────
+   CMediSewa design tokens (U1). memory-bank/ui-ux.md §12 explains every choice.
+   NOTE: never write `@theme inline` here. In HRestroSewa it froze the utilities to
+   literal hex values and made theme overrides inert.
+   ───────────────────────────────────────────────────────────────────────────── */
+@theme {
+  /* Surfaces & ink: cool, clinical off-white, never cream. */
+  --color-canvas: #f5f8f7;
+  --color-surface: #ffffff;
+  --color-sunken: #eef3f1;
+  --color-line: #dbe4e0;
+  --color-line-strong: #c3d0cb;
+  --color-ink: #15232b;
+  --color-ink-soft: #46565f;
+  --color-ink-faint: #74848c;
+
+  /* Pine: the working colour (actions, active navigation, focus). */
+  --color-pine: #0f5c4d;
+  --color-pine-deep: #0a4237;
+  --color-pine-tint: #e2efea;
+
+  /* Marigold (sayapatri): the ONE bold accent, reserved for tokens / queue numbers. */
+  --color-marigold: #e9a514;
+  --color-marigold-tint: #fcf1d4;
+  --color-marigold-ink: #5e3f00;
+
+  /* Meaning only: allergy/expired/void, warnings/near-expiry, done/paid. */
+  --color-alert: #b3322b;
+  --color-alert-tint: #fbe8e6;
+  --color-warn: #9a5b0c;
+  --color-warn-tint: #fbefdc;
+  --color-ok: #2c7548;
+  --color-ok-tint: #e2f1e7;
+
+  --font-sans: var(--font-mukta), "Noto Sans Devanagari", system-ui, -apple-system, "Segoe UI", sans-serif;
+
+  --radius-control: 0.5rem;
+  --radius-panel: 0.875rem;
 }
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: system-ui, -apple-system, "Segoe UI", "Noto Sans Devanagari", sans-serif;
+  background: var(--color-canvas);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-size: 1rem;
+  line-height: 1.5;
+  /* Money, quantities, tokens and times line up in columns. */
+  font-variant-numeric: tabular-nums;
+}
+
+/* Keyboard focus is always visible, everywhere. */
+:focus-visible {
+  outline: 2px solid var(--color-pine);
+  outline-offset: 2px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* ── The OPD ticket: CMediSewa's one signature element ─────────────────────────
+   A token slip with punched notches on both sides and a perforation line,
+   the paper ticket a Nepali OPD hands over at registration. */
+.opd-ticket {
+  --notch: 0.7rem;
+  position: relative;
+  background: var(--color-marigold-tint);
+  color: var(--color-marigold-ink);
+  border-radius: 0.75rem;
+  mask:
+    radial-gradient(circle var(--notch) at 0 var(--ticket-cut, 62%), #0000 98%, #000) left / 51% 100% no-repeat,
+    radial-gradient(circle var(--notch) at 100% var(--ticket-cut, 62%), #0000 98%, #000) right / 51% 100% no-repeat;
+}
+.opd-ticket__perforation {
+  position: absolute;
+  left: calc(var(--notch) + 0.4rem);
+  right: calc(var(--notch) + 0.4rem);
+  top: var(--ticket-cut, 62%);
+  border-top: 2px dashed color-mix(in srgb, var(--color-marigold-ink) 30%, transparent);
 }

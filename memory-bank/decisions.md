@@ -470,6 +470,91 @@ DB test suite.
 
 ---
 
+**D-64 Development runs locally and on Vercel against the hosted dev database; self-hosting,
+PWA, mail and similar infrastructure come later. Accepted (owner, 2026-11-20).** The
+Coolify/self-hosted plan (D-15, deployment.md) stays as the production target, but nothing
+in it is built yet. Consequences: `output: "standalone"` is removed until self-hosting; the
+Vercel project uses the same env names as `.env.local` (set in the Vercel dashboard by the
+owner); **Vercel functions cannot hold the long-lived LISTEN connection + SSE stream** of
+D-09, so realtime (B9) either runs its fallback poll on Vercel or waits for the self-hosted
+server. That will be decided at B9. Cron jobs on Vercel would use Vercel Cron rather than
+pg_cron → route, also decided when the jobs are built.
+
+**D-65 Phase 1 UI outline (U1) started before backend B1, by owner direction.** The screens
+are laid out with clearly labelled **demo data** (`lib/demo.ts`). Every outline screen shows
+a demo notice, and no form submits. Each screen is wired to real Server Actions when its
+backend milestone lands (B1 sign-in, B3 setup, B4 registrar/OPD, B5–B7 pharmacy, B8 finance).
+This keeps the D-55 rule that UI must not invent its own data paths.
+
+**D-66 Visual identity (U1).** Cool off-white canvas, **pine** (#0f5c4d) as the working
+colour, **marigold** (#e9a514) as the single bold accent reserved for tokens and queue
+numbers, and red, amber and green used only for meaning. **Mukta** is the only typeface,
+because it is designed for Devanagari and Latin together. The signature element is the
+**OPD ticket** (a punched token slip). Deliberately avoided: a dark sidebar, all-caps eyebrow
+labels, and identical KPI-card grids. Details are in ui-ux.md §12.
+
+---
+
+## B1 Identity & access (2026-11-20, owner: "use your recommended defaults")
+**Accepted (owner):** P-11, P-18, P-19, P-30 resolved with the recommended defaults (below).
+
+**D-67 PIN quick access mints a normal session server-side (P-23 resolved).** After
+`verify_pin` succeeds in SQL, the server calls `auth.admin.generateLink(magiclink)` and
+`verifyOtp({ token_hash })` on the cookie-bound client. The spike on the dev project (2026-11-20)
+showed: about 240 ms; works for username accounts' internal addresses with no email sent; the
+token is single-use; the session is `aal1`, refreshes normally and signs out locally. The
+fallback (PIN-as-unlock only) is not needed. The session is recorded as **A1** in
+`session_assurance`.
+
+**D-68 B1 implementation choices.**
+- (a) Permissions, modules and role templates are generated into SQL catalog tables from
+  `lib/permissions.ts` / `lib/modules.ts` (migration 0009, `scripts/gen-permission-catalog.mjs`),
+  with a TS/SQL parity unit test. `effective_permissions()` / `effective_modules()` in SQL
+  mirror the TS.
+- (b) `resolve_request_context()` returns membership, tenant, permissions, modules and session
+  assurance in one round trip.
+- (c) PIN hashes are bcrypt (pgcrypto) in `member_pins`, and service_role cannot read them. The
+  lockout is 5 → 15 min per member and 20 failures per hour per device, judged by the DB
+  clock.
+- (d) Trusted devices are cookie tokens whose HMAC (`AUTH_HMAC_SECRET`) alone is stored.
+- (e) App-level password lockout: 10 failures in 15 min. Logins are hashed with HMAC and never
+  stored raw.
+- (f) A step-up re-checks the password on a throwaway client and raises the CURRENT session's
+  level (no second session).
+- (g) Tenant slugs that would shadow app routes are reserved in the DB (migration 0013).
+- (h) Username accounts use internal auth addresses `m-<member_id>@users.cmedisewa.internal`.
+- (i) Development seed: `scripts/seed-dev.mjs` creates the demo clinic `arogya-demo`, with
+  credentials written only to gitignored `scripts/dev-users.local.json`.
+
+---
+
+## B2 Platform (2026-11-20)
+
+**D-69 Without email (D-64), onboarding uses review + one-time links.** Applications are not
+email-verified. The platform admin reviews (and phones) each one, protected by a honeypot,
+5 per IP per day, and one open application per email. The tenant admin invite is a **one-time
+link** (HMAC-hashed, 7 days) shown once to the platform admin to share. Accepting it creates
+the auth account, links it in one DB step (deleting the account again on failure), and goes
+straight to 2FA. Email verification and emailed invites replace these when mail is set up.
+
+**D-70 Subscriptions are append-only periods; "paid until" follows the chain of back-to-back
+periods.** Renewals added in advance count immediately, and a gap breaks the chain. The
+expiry job (`suspend_expired_tenants`, `POST /api/cron/subscriptions` with `x-cron-secret`)
+suspends only ACTIVE clinics, with reason `subscription_expired`. A new period re-activates only
+those. Manual suspensions stay until a platform admin changes them. Scheduling the job
+(pg_cron or Vercel Cron) comes with hosting.
+
+**D-71 Platform invoices and payments are separate from clinic money.** Numbered
+`CMS-<FY>-NNNN` (gapless per Nepali fiscal year), payments can't exceed the balance, the
+balance is derived, and only SECURITY DEFINER functions write them. Plan features
+(`plans.features`) now feed `effective_modules()` (lab etc.).
+
+**D-72 Provisioning creates the clinic's first stores** (`stores` table introduced early in
+B2): **Pharmacy** (sellable, dispensing, receiving) and **Quarantine** (never sellable), per D-58.
+B5 adds lots, balances and store members on top.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |
@@ -484,15 +569,15 @@ DB test suite.
 | **P-08** | Tax & IRD billing compliance; Rx format rules | see `security.md` §10 | keep `tax_category`, `fiscal_year` fields; get counsel opinion | before go-live |
 | **P-09** | Data residency | foreign VPS / Nepal hosting | depends on counsel reading of privacy & cyber policy | before go-live |
 | **P-10** | Retention & deletion periods; consent text | — | soft delete only; placeholder 10 years; counsel to set | before go-live |
-| **P-11** | MFA scope | Super Admin only / + Clinic Admin / + doctors / everyone | mandatory: Super Admin + Clinic Admin + doctors; optional others | B1 |
+| ~~P-11~~ | MFA scope | **Resolved (owner, recommended default):** mandatory for platform admins, tenant admins and doctors; optional for others (`mfaRequired()`) | — | — |
 | **P-12** | Online payments (subscriptions & patients) | manual recording / eSewa / Khalti / Fonepay | manual in MVP; gateway in P2 | P2 |
 | **P-13** | Language | English only / bilingual from MVP | i18n-ready MVP, English UI; Nepali public site P2 | no |
 | **P-14** | Plans & pricing | per clinic / per doctor / tiered features | per-clinic tiers with doctor caps (schema supports either) | before go-live |
 | **P-15** | Diagnosis coding | free text / ICD-10 / ICD-11 | free text + optional ICD-10 field | no |
 | **P-16** | Multi-tenant membership in MVP UI | hidden / tenant switcher | hidden in MVP (model supports it, D-24) | no |
 | ~~P-17~~ | Pilot go-live point | **Resolved by D-58**: one pilot gate at the end of Phase 1 (clinic + pharmacy) | — | — |
-| **P-18** | Employees without personal email | require email / allow tenant-scoped usernames (admin-managed recovery) | allow usernames for `tenant_member`; require email for `tenant_admin` | B1 |
-| **P-19** | PIN length | 4 digits (HRestroSewa) / 6 digits | **6 digits**, plus device-bound use and lockout | B1 |
+| ~~P-18~~ | Employees without personal email | **Resolved (owner, recommended default):** usernames allowed for staff (clinic link required); email required for tenant admins (DB CHECK) | — | — |
+| ~~P-19~~ | PIN length | **Resolved (owner, recommended default):** 6 digits; repeated digits and sequences refused | — | — |
 | **P-20** | Patient account sign-in method | email OTP / SMS OTP / password | email OTP in MVP; SMS OTP with P-05; no patient passwords | B4 |
 | ~~P-21~~ | Business types at launch | **Resolved by D-58**: `clinic_pharmacy` at launch; clinic-only and pharmacy-only later | — | — |
 | **P-22** | Drug classes & dispensing rules | — | model `schedule_class`; enforce Rx-required for prescription-only and controlled items; counsel/DDA to confirm categories, narcotics register and pharmacist requirements | B7 |
@@ -501,8 +586,8 @@ DB test suite.
 | **P-26** | Finance engine | double-entry journal + reconciliation (D-43) / pure derivation from documents (HRestroSewa) | journal | **B0** (posting core in foundation) |
 | **P-27** | Tax on medicines and services | all exempt / VAT on some items / per-item tax category | per-item and per-service `tax_category`; counsel to confirm (with P-08) | before go-live |
 | **P-28** | Restocking customer returns | allow sealed packs / quarantine only / never | sealed, unexpired, non-cold-chain → sellable; else quarantine (pharmacist confirms) | B7 |
-| **P-23** | Session minting after PIN | `auth.admin.generateLink` + `verifyOtp` server-side / custom JWT / PIN-as-unlock only | spike the first in Phase 0; fall back to PIN-as-unlock only | B1 |
+| ~~P-23~~ | Session minting after PIN | **Resolved by D-67:** generateLink + verifyOtp, proven by spike | — | — |
 | ~~P-29~~ | Billing entities | **Resolved by D-58**: same PAN, one billing profile (multi-profile capability kept) | — | — |
-| **P-30** | Credential verifier in single-admin tenants | Super Admin verifies / allow self-verification with notification / external council lookup | Super Admin verifies (no PHI involved) | B1 |
+| ~~P-30~~ | Credential verifier in single-admin tenants | **Resolved (owner, recommended default):** another tenant admin, or a platform admin; never the holder (`verify_member_credential`) | — | — |
 | ~~P-31~~ | Consultation-fee billing point | **Resolved by D-58**: at registration (check-in), by the registrar | — | — |
 | **P-32** | Super Admin IP allow-list | none / allow-list / VPN only | allow-list once ops IPs are stable; TOTP mandatory regardless | B2 |

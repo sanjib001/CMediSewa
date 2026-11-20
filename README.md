@@ -19,8 +19,9 @@ Internal users sign in with **email + password** (MFA for sensitive roles). Empl
 also use HRestroSewa-style **tenant link + PIN quick access on trusted devices**. A PIN never
 opens medical records on its own (see `memory-bank/permissions.md` §2–3).
 
-> **Status: Phase 0 (database & backend) in progress. B0 Foundation is done locally; next
-> is B1 Identity & access.** Phase 1 builds the UI outline and MVP; lab is Phase 3. See
+> **Status: B0 Foundation (database & backend) is done locally. Phase 1 UI outline (U1) is in
+> progress: every area has a layout with demo data.** Development runs locally and on Vercel
+> against the dev database. Hosting, PWA and mail come later. Lab is Phase 3. See
 > `memory-bank/current-task.md`.
 
 ## Getting started (development)

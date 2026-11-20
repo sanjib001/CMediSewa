@@ -50,6 +50,9 @@ uses synthetic fixtures (`scripts/seed-demo.mjs`).
 | `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | public | Supabase's new-format publishable key (replaces the legacy anon key). It holds **no table grants** (D-18) |
 | `SUPABASE_SECRET_KEY` | server | new-format secret key (acts as `service_role`; replaces the legacy service-role key). Server-only; CI greps the client bundle for it |
 | `SUPABASE_DB_URL` (+ `REALTIME_DB_URL` from B9) | server | Postgres connection for migrations, DB tests and the LISTEN bus. **Quoted**, with the password URL-encoded (`@` → `%40`) |
+| `AUTH_HMAC_SECRET` | server | HMAC key for trusted-device tokens and login-attempt hashes (B1). Rotating it un-trusts every device |
+| `CRON_SECRET` | server | `x-cron-secret` for `/api/cron/*` (B2 subscription expiry), compared in constant time; 404 without it |
+| `NEXT_PUBLIC_APP_URL` | public | base URL for invite links |
 | `DB_SSL` | tooling | `"false"` only for a plain local/CI Postgres; omitted elsewhere |
 | `NEXT_PUBLIC_APP_URL` | public | canonical URL for links in messages |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | mixed | web-push |

@@ -1,9 +1,58 @@
 # Current Task
 
-**Phase:** **Phase 0 (database & backend) in progress. B0 Foundation is complete locally;
-next is B1 Identity & access.** Planning docs are at Revision 5. Decisions D-60 to D-63
-record the B0 implementation choices.
+**Phase:** Phase 0 backend: **B2 Platform is done** (with its U2 Super Admin + marketing screens). B1 done, U1 outline done. Next: **B3 Tenant setup**.
 **Last updated:** 2026-11-20
+
+## B2 Platform: done (2026-11-20)
+| Item | Status |
+|---|---|
+| Migrations 0014–0017: plans, subscription periods, platform invoices/payments/sequences, applications, invites, stores (Pharmacy + Quarantine), provision_tenant, accept/reissue invite, expiry job, status changes; plan features in effective_modules; chained paid-until; invite status columns | done |
+| Marketing: `/register` (honeypot, rate limits, no email enumeration), live pricing from public plans | done |
+| Super Admin: Applications (approve → one-time invite link / reject with reason), Clinics list + detail (subscription periods, invoices, payments, admin invite re-issue, status with reason), Plans; overview shows waiting registrations and platform activity | done |
+| `/invite/[token]`: owner sets password → linked as clinic admin → 2FA step | done |
+| `/api/cron/subscriptions` (secret-gated); `CRON_SECRET`, `NEXT_PUBLIC_APP_URL` added | done (not scheduled yet: hosting) |
+| Demo clinic: demo plan + 1-year complimentary period, stores added | done |
+| Checks | typecheck ✓ lint ✓ build ✓ · unit 16/16 · DB 30/30 · posture ✓ · **B2 end-to-end 35/35** (registration incl. honeypot/no-enumeration → Super Admin password+TOTP → plan → approve → invite → owner account → billing → status → cron) · B1 end-to-end 20/20 still passing · no secrets in client bundles |
+| Bugs found & fixed by the tests | posture: platform_payments tenant key (0015); paid-until ignored renewals added in advance (0016); clinic page 500 on member_invites permission (0017); test-harness FormData encoding |
+| Left in the dev DB by tests | closed clinics named "E2E test clinic … (safe to ignore)", inactive e2e plans, deactivated throwaway e2e operators |
+| Not yet | email verification/emailed invites (needs mail), CAPTCHA (needs Turnstile keys), scheduled expiry job (needs hosting), clinic-admin "Go live" from the setup checklist (B3), support desk (P2) |
+
+## B1 Identity & access: done (2026-11-20)
+| Item | Status |
+|---|---|
+| Migrations 0009–0013: permission/module/template catalog (generated), members, roles, overrides, credentials, PINs, trusted devices, attempts, session assurance, functions (effective_permissions/modules, resolve_request_context, PIN, devices, lockout, credential verification), reserved slugs | done |
+| Defaults: P-11 MFA (platform admin, clinic admin, doctors) · P-18 usernames (clinic link) · P-19 6-digit PIN · P-30 credential verifier | applied |
+| P-23 PIN → session spike | proven, adopted (D-67) |
+| Server: `lib/auth/{context,guards,session,hmac,shell-props}.ts`, `app/actions/staff-auth.ts` (password, MFA, PIN, step-up, set PIN, trust/revoke device, sign-out), `proxy.ts` (staff redirects + remembered clinic) | done |
+| Screens wired: `/login`, `/login/[slug]` (trusted device → staff picker + PIN; else password), `/login/mfa`, `/login/verify`, `/employee/pin`, `/admin/devices`; Admin/Employee layouts guarded; sidebar and workspaces filtered by permissions | done |
+| Dev seed: demo clinic `arogya-demo` (admin, registrar, doctor, pharmacy), credentials in gitignored `scripts/dev-users.local.json` | done |
+| Checks | typecheck ✓ lint ✓ build ✓ · unit 16/16 (incl. TS↔SQL parity) · DB 22/22 · posture ✓ · **end-to-end against the running app 20/20** (wrong password, username rules, registrar/pharmacy sign-in and desks, admin/doctor held at 2FA, PIN picker only on trusted devices, wrong/right PIN, A1 cannot enter Admin or change PIN) · no secrets in client bundles |
+| Not verified by me | completing the authenticator step for the clinic admin/doctor (needs a person with an authenticator app) and a visual check in a browser |
+| Deferred | idle-lock screen UI (U-phase), admin screens for staff/roles/credentials (U3 on B3), notification of other admins on credential changes (needs B9 notifications), clean empty-DB replay since 0008 (CI job not run yet) |
+
+## Super Admin sign-in + dashboard: first real B1/U2 slice (2026-11-20)
+| Item | Status |
+|---|---|
+| `platform_admins` (migration 0008) + `scripts/create-platform-admin.mjs` | done; Super Admin `cmedicare@gmail.com` exists on dev |
+| `proxy.ts` (session refresh, signed-out redirect only), `lib/supabase/{server,service}.ts`, `lib/auth/{current-user,guards}.ts`, `lib/audit.ts` | done |
+| L1 flow: `/superadmin/login` (password; non-admins get the same generic error and are signed out) → `/superadmin/login/mfa` (first time: QR enrolment; then 6-digit code) → aal2 → `/superadmin` | done; every step audited (`auth.superadmin_*`) |
+| Guard `requireSuperAdmin()` = session + active platform_admins row (live) + aal2, in the layout and every page | done |
+| Dashboard `/superadmin`: real clinic counts/list (empty state until B2), platform activity from audit_log, platform facts. No tenant patient/stock/money data (D-08) | done |
+| Sign out (local scope) | done |
+| Checks | typecheck ✓ lint ✓ build ✓ unit 10/10 ✓ DB 13/13 ✓ posture ✓ · signed-out redirects ✓ · MFA probe on the dev project (password → aal1 → TOTP → aal2, wrong code rejected; ES256 tokens verified locally) ✓ · no secret key in client bundles ✓ |
+| **Not yet verified** | the full click-through in a browser (Chrome cannot reach localhost from this setup). Owner to sign in at `/superadmin/login` with an authenticator app ready |
+| Not yet built | app-level lockout (Supabase Auth's own rate limit applies), account recovery for platform admins, IP allow-list (P-32), clinic approval/provisioning (B2) |
+
+## U1 Design system & shells: status (2026-11-20)
+| Item | Status |
+|---|---|
+| Tokens, Mukta typeface, focus/reduced-motion floor (`app/globals.css`, `app/layout.tsx`) | done |
+| Primitives: Button, StatusChip, PageHeader, Panel, DemoNotice, AllergyBanner, Icon; **OPD ticket** | done |
+| Shells: Admin (sidebar), Employee (workspace tabs + phone bottom bar), Super Admin (ink bar), tenant bar | done |
+| Screens (demo data, inert forms): marketing landing · `/login` · `/login/[slug]` (trusted-device staff picker + 6-digit PIN pad, or password) · Admin dashboard (+ every menu item routed) · Registrar desk (register → OPD fee → token) · Doctor OPD (queue + consultation + e-Rx) · Pharmacy (dispensing queue + stock alerts) · Lab (Phase 3 note) · Super Admin clinics · public clinic site `/c/arogya-demo` | done |
+| Checks | typecheck ✓ · lint ✓ · build ✓ (14 routes) · HTTP smoke test of every route ✓ |
+| **Visual review in a browser** | **not done**: Chrome showed an error page for localhost:3000 although the server answered 200. Owner to review at `http://localhost:3000`, plus a phone-width check |
+| Next in Phase 1 | owner feedback on the look → U3 Admin screens / U4–U6 desks as their backend milestones land; B1 sign-in is needed before any real screen |
 
 ## Status
 - Project folder `Downloads/CMediSewa` (git remote `github.com/sanjib001/CMediSewa`).

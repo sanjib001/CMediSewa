@@ -189,3 +189,34 @@ SitePreviewFrame, PrintLayout (Rx, receipt, token slip, purchase GRN).
   clinical steps hidden from non-clinical roles).
 - **Suspended tenant banner** (W-33): read-only mode with an export button. The public site
   shows a contact page.
+
+## 12. Design system: implemented in U1 (2026-11-20, D-66)
+**Tokens** (`app/globals.css`, Tailwind v4 `@theme`, never `@theme inline`):
+| Token | Value | Use |
+|---|---|---|
+| canvas / surface / sunken | #f5f8f7 / #ffffff / #eef3f1 | page, panels, inset areas (cool, never cream) |
+| line / line-strong | #dbe4e0 / #c3d0cb | dividers / control borders |
+| ink / ink-soft / ink-faint | #15232b / #46565f / #74848c | text hierarchy |
+| pine / pine-deep / pine-tint | #0f5c4d / #0a4237 / #e2efea | actions, active navigation, focus ring |
+| marigold / -tint / -ink | #e9a514 / #fcf1d4 / #5e3f00 | **only** OPD tokens and queue numbers |
+| alert / warn / ok (+ tints) | #b3322b / #9a5b0c / #2c7548 | allergy/expired/void, warning/near-expiry, done/paid |
+**Type:** Mukta 400/500/600/700 (`next/font`, Latin + Devanagari subsets), tabular numerals
+on the body, 16px base. Headings 28/22/18px semibold with slight negative tracking. Group
+labels are in sentence case (no all-caps).
+**Shapes:** controls are 8px radius, panels 14px. Panels are bordered sections with a title
+row, not shadowed cards.
+**Signature:** `components/ui/opd-ticket.tsx` (CSS mask notches + perforation). It appears
+on the Registrar form preview, the marketing hero and the patient booking confirmation.
+**Shells:** `components/shell/*`:
+- Admin: light sidebar grouped Today / Clinic / Pharmacy & stock / Money / Setup, with a
+  `<details>` menu on mobile.
+- Employee: workspace tabs (Registrar · OPD · Pharmacy · Lab disabled until Phase 3) and a
+  phone bottom bar.
+- Super Admin: an ink top bar with no clinic branding.
+- Shared tenant bar: clinic name, BS + AD date, patient search, Admin ⇄ workspace switch.
+**Navigation config:** `lib/nav.ts` records the module and permission for every item, so B1
+can filter it (navigation = guards).
+**Quality floor:** visible focus ring everywhere, reduced-motion respected, 44px controls,
+responsive down to phone width, an allergy banner as `role="alert"`.
+**Not yet:** dark mode, the nonce CSP, and a visual review in a browser (the U1 check was
+HTTP-level only; see current-task.md).
