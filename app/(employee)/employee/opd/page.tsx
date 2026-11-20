@@ -1,89 +1,101 @@
-import { DEMO_DOCTORS, DEMO_QUEUE } from "@/lib/demo";
 import { requireTenant } from "@/lib/auth/context";
-import { AllergyBanner, Button, DemoNotice, PageHeader, Panel, StatusChip } from "@/components/ui/primitives";
-import { Icon } from "@/components/ui/icon";
+import { getToday, todayIn } from "@/lib/desk/data";
+import { clinicalWrite, openChart, type Chart } from "@/lib/clinical";
+import { ageText } from "@/lib/desk/data";
+import { serviceClient } from "@/lib/supabase/service";
+import { PageHeader, Panel } from "@/components/ui/primitives";
+import { QueueButtons } from "@/components/desk/queue-buttons";
+import { AllergyPanel, ConsultationEditor, PastVisits, VitalsPanel } from "@/components/clinical/consultation";
 import { cn } from "@/lib/cn";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "OPD" };
 
-const area = "w-full rounded-control border border-line-strong bg-surface px-3 py-2 text-ink placeholder:text-ink-faint";
+const CHIP: Record<string, [string, string]> = {
+  waiting: ["Waiting", "text-warn"], with_doctor: ["With you", "text-pine-deep"], awaiting_billing: ["To bill", "text-marigold-ink"],
+  closed: ["Done", "text-ok"], cancelled: ["Cancelled", "text-ink-faint"],
+};
 
+// The doctor's OPD (W-13/W-14). Clinical work needs a password session (A2) and doctors also
+// finish 2FA (P-11). The chart is read through open_chart (care relationship checked and the
+// opening logged); the consultation is the visit's draft encounter.
 export default async function OpdDesk() {
-  // Clinical work needs a password session (A2), and doctors also finish 2FA (P-11).
-  await requireTenant({ operation: "clinical.chart", permission: "write_consultation", next: "/employee/opd" });
-  const doctor = DEMO_DOCTORS[0]!;
-  const queue = DEMO_QUEUE.filter((v) => v.doctorId === doctor.id);
-  const current = queue.find((v) => v.status === "with_doctor")!;
+  const ctx = await requireTenant({ operation: "clinical.chart", permission: "write_consultation", next: "/employee/opd" });
+  const { data: profile } = await serviceClient().from("doctor_profiles").select("room, specialty").eq("tenant_id", ctx.tenantId).eq("member_id", ctx.memberId).maybeSingle<{ room: string | null; specialty: string | null }>();
+  if (!profile) {
+    return (
+      <>
+        <PageHeader title="OPD" />
+        <p className="rounded-panel border border-line bg-surface p-5 text-ink-soft">You aren&apos;t set up as an OPD doctor at this clinic. An admin adds you in Admin, Doctors &amp; schedules.</p>
+      </>
+    );
+  }
+  const { visits } = await getToday(ctx.tenantId, todayIn(), ctx.memberId);
+  const current = visits.find((v) => v.status === "with_doctor") ?? null;
+  const waiting = visits.filter((v) => v.status === "waiting");
+
+  let chart: Chart | { error: string } | null = null;
+  let encounterId: string | null = null;
+  if (current) {
+    // Opening (or reopening) the visit's draft is idempotent: one draft per visit.
+    const e = await clinicalWrite<string>(ctx, "start_encounter", { p_visit: current.id }, current.patient.id);
+    encounterId = e.ok ? e.data : null;
+    chart = await openChart(ctx, current.patient.id);
+  }
+  const ok = chart && !("error" in chart) ? chart : null;
+  const draft = ok?.encounters?.find((e) => e.id === encounterId) ?? null;
+  const past = ok?.encounters?.filter((e) => e.id !== encounterId) ?? [];
+  const renderedAt = new Date().getTime();
+
   return (
     <>
-      <PageHeader title="OPD" subtitle={`${doctor.name} · ${doctor.room}`} actions={<Button>Call next</Button>} />
-      <DemoNotice>Layout preview with demo data. In use, opening a patient&apos;s record asks for your password (a PIN session is not enough), and every opening is logged.</DemoNotice>
+      <PageHeader title="OPD" subtitle={[ctx.displayName, profile.room].filter(Boolean).join(", ")}
+        actions={<QueueButtons currentVisitId={current?.id ?? null} waiting={waiting.length} />} />
 
-      <div className="grid gap-6 lg:grid-cols-[17rem_1fr]">
-        <Panel title="My queue" flush>
-          <ul className="divide-y divide-line">
-            {queue.map((v) => (
-              <li key={v.token} className={cn("flex items-center gap-3 px-4 py-3", v.status === "with_doctor" && "bg-pine-tint")}>
-                <span className="inline-block min-w-9 rounded bg-marigold-tint px-2 text-center font-bold text-marigold-ink">{v.token}</span>
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate font-medium">{v.patient}</span>
-                  <span className="block text-sm text-ink-faint">{v.age}</span>
-                </span>
-                {v.status !== "waiting" ? <StatusChip status={v.status} /> : <span className="text-sm text-ink-faint">{v.waitMin} min</span>}
-              </li>
-            ))}
-          </ul>
+      <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
+        <Panel title="My queue today" aside={<span className="text-sm text-ink-faint">{waiting.length} waiting</span>} flush>
+          {visits.length === 0 ? <p className="px-4 py-4 text-ink-soft">No patients checked in yet.</p> : (
+            <ul className="divide-y divide-line">
+              {visits.map((v) => (
+                <li key={v.id} className={cn("flex items-center gap-3 px-4 py-3", v.status === "with_doctor" && "bg-pine-tint", ["closed", "cancelled"].includes(v.status) && "opacity-60")}>
+                  <span className="inline-block min-w-9 rounded bg-marigold-tint px-2 text-center font-bold text-marigold-ink">{v.token}</span>
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-medium">{v.patient.full_name}</span>
+                    <span className="block text-sm text-ink-faint">{v.patient.sex.charAt(0).toUpperCase()}, {v.patient.age}
+                      {v.status === "waiting" ? `, ${Math.max(0, Math.round((renderedAt - Date.parse(v.checkedInAt)) / 60000))} min` : ""}</span>
+                  </span>
+                  <span className={cn("text-sm", CHIP[v.status]?.[1])}>{CHIP[v.status]?.[0]}</span>
+                </li>
+              ))}
+            </ul>
+          )}
         </Panel>
 
-        <section aria-label="Consultation" className="space-y-5">
-          <div className="rounded-panel border border-line bg-surface p-5">
-            <div className="flex flex-wrap items-start justify-between gap-3">
-              <div>
-                <h2 className="text-xl font-semibold">{current.patient} <span className="font-normal text-ink-faint">{current.age}</span></h2>
-                <p className="text-sm text-ink-faint">MRN AR-2083-000213 (demo) · Token {current.token} · last visit 2083 Kartik 12</p>
+        <section aria-label="Current patient" className="min-w-0 space-y-5">
+          {!current ? (
+            <div className="rounded-panel border border-dashed border-line-strong p-8 text-center text-ink-soft">
+              {waiting.length ? `Token ${waiting[0]!.token} is next. Press "Call next" when you're ready.` : "Nobody is waiting. New check-ins appear here."}
+            </div>
+          ) : chart && "error" in chart ? (
+            <p role="alert" className="rounded-panel bg-alert-tint p-5 text-alert">{chart.error}</p>
+          ) : ok ? (
+            <>
+              <div className="rounded-panel border border-line bg-surface p-5">
+                <h2 className="text-xl font-semibold">{ok.patient.full_name} <span className="font-normal text-ink-faint">{ok.patient.sex}, {ageText(ok.patient.date_of_birth, ok.patient.age_years, ok.patient.created_at)}</span></h2>
+                <p className="mb-4 text-sm text-ink-faint">MRN {ok.patient.mrn}, token {current.token}{ok.patient.blood_group ? `, blood group ${ok.patient.blood_group}` : ""}</p>
+                <AllergyPanel patientId={ok.patient.id} allergies={ok.allergies} canEdit />
+                <div className="mt-4 border-t border-line pt-4">
+                  <VitalsPanel patientId={ok.patient.id} visitId={current.id} latest={ok.vitals[0] ?? null} canEdit />
+                </div>
               </div>
-              <AllergyBanner allergy="Sulfa drugs" />
-            </div>
-            <dl className="mt-4 flex flex-wrap gap-x-8 gap-y-2 border-t border-line pt-4 text-[0.95rem]">
-              {[["BP", "138/86"], ["Pulse", "78"], ["Temp", "37.1 °C"], ["SpO₂", "97%"], ["Weight", "68 kg"]].map(([k, v]) => (
-                <div key={k} className="flex items-baseline gap-2"><dt className="text-sm text-ink-faint">{k}</dt><dd className="font-medium">{v}</dd></div>
-              ))}
-            </dl>
-          </div>
-
-          <Panel title="Consultation">
-            <div className="grid gap-4 md:grid-cols-2">
-              {["Chief complaint", "History", "Examination", "Diagnosis"].map((label) => (
-                <label key={label} className="block">
-                  <span className="mb-1 block text-sm font-medium">{label}</span>
-                  <textarea rows={3} className={area} />
-                </label>
-              ))}
-              <label className="block md:col-span-2">
-                <span className="mb-1 block text-sm font-medium">Plan and advice</span>
-                <textarea rows={2} className={area} />
-              </label>
-            </div>
-          </Panel>
-
-          <Panel title="Prescription" aside={<span className="text-sm text-ink-faint">Sent to the pharmacy when you finalize</span>}>
-            <div className="space-y-3">
-              <div className="grid grid-cols-[1fr_auto] gap-3 rounded-control border border-line p-3 sm:grid-cols-[2fr_1.5fr_auto]">
-                <div><div className="font-medium">Amlodipine 5 mg tab</div><div className="text-sm text-ink-faint">In stock · pharmacy</div></div>
-                <div className="text-ink-soft max-sm:col-span-2 max-sm:row-start-2">1 tab once daily × 30 days · 30 tab</div>
-                <button type="button" className="self-start text-sm text-ink-faint hover:text-alert">Remove</button>
-              </div>
-              <label className="flex items-center gap-2 rounded-control border border-dashed border-line-strong px-3 py-2.5 text-ink-faint">
-                <Icon name="Search" />
-                <input className="w-full bg-transparent text-ink placeholder:text-ink-faint focus:outline-none" placeholder="Add a medicine by brand or generic name" />
-              </label>
-            </div>
-            <div className="mt-5 flex flex-wrap justify-end gap-2 border-t border-line pt-4">
-              <Button tone="secondary" type="button">Save draft</Button>
-              <Button type="button">Finalize and send to pharmacy</Button>
-            </div>
-          </Panel>
+              {draft && draft.status === "draft" ? <ConsultationEditor key={draft.id} encounter={draft} visitId={current.id} /> : (
+                <p className="rounded-panel border border-line bg-surface p-5 text-ink-soft">This consultation is finalized. Press &ldquo;Done&rdquo; to finish the visit.</p>
+              )}
+              <Panel title="Earlier consultations">
+                <PastVisits encounters={past} />
+              </Panel>
+            </>
+          ) : null}
         </section>
       </div>
     </>

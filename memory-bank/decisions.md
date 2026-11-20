@@ -555,6 +555,104 @@ B5 adds lots, balances and store members on top.
 
 ---
 
+## B3 Tenant setup (2026-11-20)
+
+**D-73 OPD schedules are weekly windows with effective dating, each either time slots or
+tokens** (P-03 "both"). Overlaps per doctor/weekday are impossible (exclusion constraint).
+Removing a window closes it yesterday instead of deleting history. Leave (whole or part day),
+extra OPD and changed-hours days are exceptions. `available_slots()` turns them into
+Kathmandu-time slots or token sessions; B4 subtracts bookings.
+
+**D-74 The public clinic page reads ONE allow-listed function, `public_clinic_profile(slug)`.**
+It returns data only for an active clinic with a published website. Doctors are listed only
+when public and holding a verified, unexpired doctor credential. Prices and registration
+numbers can be hidden by the clinic. Website content is plain text, never HTML.
+
+**D-75 Staff join by one-time invite links, like the clinic owner (D-69).** Username-only staff
+(P-18) get an internal auth address `m-<member_id>@users.cmedisewa.internal`. Admins and
+doctors go to 2FA after joining; other staff go straight to their workspace.
+
+**D-76 Assurance per screen action:** catalogue, schedules and website edits need the Admin
+area (A2). Settings and go-live need a password confirmed within 5 minutes. Staff, roles and
+credential verification need A3 (password + authenticator) within 5 minutes. Pages can be
+viewed without the step-up; saving asks for it.
+
+**D-77 Go-live is the clinic admin's step, gated by `go_live_blockers()`:** clinic phone,
+bill header legal name, and (by plan modules) a consultation service, a doctor with an OPD
+schedule, and a pharmacy store. Editing a credential's council or number clears its
+verification; custom roles are saved through the audited `save_role()`.
+
+---
+
+## B4a Front desk (2026-11-20)
+
+**D-78 B4 is delivered in three slices:** B4a front desk (patients, booking, check-in with the
+OPD fee, queue), B4b doctor (encounters, vitals, diagnoses, prescriptions, care predicate,
+audited reads), B4c public booking + manage link. OTP patient accounts wait for SMS/mail (D-64).
+
+**D-79 Appointments always carry a time range.** Slot mode: the slot. Token mode: the whole
+session, shared up to its capacity (counted under a transaction advisory lock). Exclusion
+constraints stop double-booking a slot and a patient holding two overlapping bookings.
+Tokens are issued at check-in (per doctor per day, row-locked counter), not at booking.
+A doctor can send a called patient back to the queue.
+
+**D-80 Check-in is ONE posting RPC (`check_in_visit`, owned by ledger_writer):** visit + token
++ OPD invoice + payment + both journal postings, or nothing. Idempotent on a client key
+(a double-click returns the first token). Fee = doctor_services override, else the
+doctor's consultation fee for a consultation service, else the service price. Desk discount
+is capped by `max_discount_pct_without_reauth`; dues only with `allow_credit` within the
+per-patient limit. Invoice/receipt numbers are gapless per billing profile per fiscal year.
+Money tables are read-only to the app role.
+
+**D-81 Patients:** MRN is a 6-digit per-clinic series stamped by trigger and immutable. A
+possible duplicate (same phone + first name, or same name + birth date) is flagged for the
+desk, never merged automatically. The app may update demographics only (column grants).
+
+---
+
+## Website booking and payments (user direction, 2026-11-20)
+
+**D-82 Website booking is a REQUEST, approved by staff (B4c, after B4b).** A patient on the
+clinic page can only send a booking request (name, phone or Gmail, preferred doctor and
+time). It appears to the Registrar and the Admin as a request. Staff contact the patient by
+the phone number or Gmail given, then approve (confirmed) or decline (with a reason). Online
+bookings are never auto-confirmed (`auto_confirm_online` is ignored for website requests).
+The requested time IS HELD while the request is open (other visitors see it taken);
+unreviewed requests are released once their time has passed. A request does not create a
+patient record: on approval the registrar links it to an existing patient (searched by phone)
+or registers a new one, which avoids junk and duplicate MRNs. The patient sees the status
+(requested / confirmed / declined) on their request link until SMS or mail exists.
+
+**D-83 No payment gateway integration.** No eSewa/Khalti/Fonepay/card gateway, and no online
+payment from the website. Online money is recorded by staff at the counter (channel +
+reference) as built in B4a.
+
+---
+
+## B4b Doctor (2026-11-20)
+
+**D-84 Clinical data is reachable ONLY through care-checked functions.** Stronger than
+security.md §4: the app role holds no privilege on encounters, vitals, diagnoses,
+prescriptions, allergies, addenda or grants. Every read/write goes through SECURITY DEFINER
+functions that evaluate `clinical_scope()` (permissions.md §6 C1–C6; C7 pharmacist arrives
+with dispensing in B7), refuse PIN sessions (A1), and audit. A refused READ is returned (not
+raised) so its audit row persists; a refused WRITE is logged by the app (`lib/clinical.ts`)
+because the database row rolls back with the call.
+
+**D-85 C3 is per clinic visit, not per doctor:** while a patient is waiting or with a doctor
+today, any doctor or nurse with a verified registration and `record_vitals` may record vitals
+and allergies (vitals scope; never notes or prescriptions). Notes are written only by the
+treating doctor; another doctor's unfinished draft is never shown.
+
+**D-86 Encounter lifecycle:** one draft per visit, opened when the doctor calls the patient.
+"Finalize" saves, issues the prescription (RX-000001, a per-clinic series), finalizes the note
+and closes the visit. Finalized notes, issued prescriptions, vitals and addenda are immutable
+by trigger (even for the owner role); corrections are addenda; an issued Rx can be cancelled
+with a reason. Prescription lines store the printed medicine text; the link to inventory items
+(`item_id`) is filled from B5.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |

@@ -1,7 +1,49 @@
 # Current Task
 
-**Phase:** Phase 0 backend: **B2 Platform is done** (with its U2 Super Admin + marketing screens). B1 done, U1 outline done. Next: **B3 Tenant setup**.
+**Phase:** Phase 0 backend: **B4 is done** (B4a front desk, B4b doctor, B4c website booking requests). B1–B3 done. Next: **B5 Inventory**.
 **Last updated:** 2026-11-20
+
+## B4c Website booking requests: done (2026-11-20, D-82, D-83)
+| Item | Status |
+|---|---|
+| Migrations 0031–0032: requester fields on appointments (patient optional only for open/declined website requests), public_booking_slots, request_booking (always 'requested', holds the time, 5/IP/day, max open per phone/email), public_booking_status, cancel_booking_by_token, approve_booking_request (+ atomic "as new patient"), expire_booking_requests; booking_enabled on by default | done |
+| Clinic page: "Book appointment" button + request form (doctor, day, time, name, phone or Gmail, age, sex, reason, consent, honeypot) → private status link (`/c/<slug>/booking/<token>`) with cancel | done |
+| Staff: "Website booking requests" on the Registrar desk and Admin → Appointments: call/email links, approve (link a matching patient by phone, or register new), decline with a message the requester sees | done |
+| Admin → Clinic website: "Take booking requests on the website" switch | done |
+| Checks | DB 53/53 · **B4c end-to-end 22/22** · B1, B3, B4a, B4b journeys pass · typecheck/lint/build ✓ · posture ✓ |
+| Bug found & fixed by the tests | a failed "approve as new patient" left a duplicate patient (0032) |
+| Not yet | SMS/email to the requester (needs mail/SMS); CAPTCHA (needs keys); scheduled expiry job (hosting) — expiry runs when the list is opened |
+
+## B4b Doctor: done (2026-11-20)
+| Item | Status |
+|---|---|
+| Migrations 0027–0030: encounters, addenda, diagnoses, vitals, prescriptions + items + counter, care_access_grants; clinical_scope (C1–C6), clinical_check/guard, open_chart (audited, refusals logged), start/save/finalize_encounter, add_addendum, record_vitals, set_allergy, save/issue/cancel_prescription, discard draft, break_glass; immutability triggers; app role has no clinical table access | done |
+| OPD page: allergies, vitals, consultation note, diagnoses (ICD-10 optional), prescription lines (frequency presets like 1-0-1), save draft, "Finalize, issue Rx and finish", earlier consultations with prescriptions and addenda | done |
+| Checks | DB 48/48 (care matrix, lifecycle, break-glass, no direct table access, isolation) · **B4b end-to-end 22/22** · B1, B3, B4a journeys pass · typecheck/lint/build ✓ · posture ✓ |
+| Bugs found & fixed by the tests | immutable trigger referenced a prescription column on encounters (0028); refused chart reads were never logged (0029) |
+| Not yet | prescription print layout, break-glass button + admin review screen, referral/share grant screen, nurse workspace screen, pharmacist C7 (B7) |
+
+## B4a Front desk: done (2026-11-20)
+| Item | Status |
+|---|---|
+| Migrations 0022–0026: patients (+allergies, MRN counter/trigger, duplicate flag, search), appointments (exclusions, status guard), visits + token counters, invoices/lines, payments/allocations, book_appointment, set_appointment_status, move_visit, **check_in_visit** (ledger_writer posting RPC, exposed in the posture allow-list); fixes: duplicate flag, channel check, service check, patient column grants, short-MRN search, midnight slot wrap, send-back transition | done |
+| Registrar desk: find/register patient, check in with fee (cash / online / mixed, discount, dues if allowed) → token ticket, book for later (slot picker), today's appointments (check in / cancel / no-show), every doctor's queue | done |
+| Doctor OPD: own queue, call next, done, back to queue, current patient + allergies | done (notes in B4b) |
+| Admin dashboard: real patient flow, OPD queues and OPD fees received (stock/pharmacy still demo) | done |
+| Checks | typecheck ✓ lint ✓ build ✓ · unit 16/16 · DB 44/44 (incl. two-connection booking race, isolation) · posture ✓ · **B4a end-to-end 34/34** · B1 20/20 · B3 37/37 · no secrets in bundles |
+| Not yet | refunds when a paid visit is cancelled (B7), checkout billing for `awaiting_billing` visits (B7), receipt/token print layout, editing patient details screen, no-show job (B9) |
+
+## B3 Tenant setup: done (2026-11-20)
+| Item | Status |
+|---|---|
+| Migrations 0018–0021: departments, services, doctor profiles/departments/services, OPD schedules + exceptions, available_slots, site settings/notices/FAQs, store members, public_clinic_profile, invite_member / reissue / set roles / set active, go_live_blockers + go_live, save_role, credential edit clears verification; invite_preview returns member_id | done |
+| Admin: Settings (clinic, bill header, operations), Departments & services, Doctors & schedules (+ per-doctor weekly OPD, leave, 7-day preview), Staff & roles (invite links, roles, permission editor, registrations + verify), Clinic website; dashboard setup checklist + Go live | done |
+| Super Admin: verify a clinic's registrations (P-30) on the clinic page | done |
+| Public `/c/[slug]`: real data via public_clinic_profile only | done |
+| Demo clinic: services, doctor profile + OPD, published site (`node scripts/seed-dev-setup.mjs`, no password changes) | done |
+| Checks | typecheck ✓ lint ✓ build ✓ · unit 16/16 · DB 37/37 (incl. two-clinic isolation suite) · posture ✓ · **B3 end-to-end 37/37** · B1 e2e 20/20 · B2 e2e passes except the registration rate limit (5/IP/day) tripped by repeated test runs from localhost, working as designed |
+| Bugs found & fixed by the tests | go_live_blockers array append (0019) |
+| Not yet | booking against slots (B4), store-member screens (B5), logo/photo uploads, Nepali-language site content |
 
 ## B2 Platform: done (2026-11-20)
 | Item | Status |
