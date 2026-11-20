@@ -3,6 +3,11 @@ import { notFound } from "next/navigation";
 import { requireTenant } from "@/lib/auth/context";
 import { getBill } from "@/lib/pharmacy/data";
 import { PrintButton } from "@/components/pharmacy/print-button";
+import { CollectDues, VoidBill } from "@/components/pharmacy/bill-corrections";
+import { can } from "@/lib/auth/context";
+import { Panel } from "@/components/ui/primitives";
+
+const SETTLED = { refund_cash: "cash refund", refund_online: "online refund", reduce_due: "taken off the due" } as const;
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Bill" };
@@ -50,8 +55,18 @@ export default async function Bill({ params }: { params: Promise<{ id: string }>
           <div className="text-base font-semibold">Total Rs. {n2(b.total)}</div>
           <div>Paid {n2(b.paid)}{b.total - b.paid > 0 ? `, due ${n2(b.total - b.paid)}` : ""}</div>
         </dl>
+        {b.returns.length ? <div className="mt-3 border-t border-line pt-2 text-sm">{b.returns.map((r) => <div key={r.return_no}>Return {r.return_no}: Rs. {n2(r.total)} ({SETTLED[r.settlement as keyof typeof SETTLED] ?? r.settlement})</div>)}</div> : null}
+        {b.status === "void" && b.void_reason ? <p className="mt-3 text-sm text-alert">Voided: {b.void_reason}</p> : null}
         <footer className="mt-4 text-center text-xs text-ink-faint">Issued by {b.by}.{b.profile.footer ? ` ${b.profile.footer}` : ""}</footer>
       </article>
+      {b.status === "issued" ? (
+        <div className="mt-6 space-y-5 print:hidden">
+          {b.outstanding > 0 && b.patient_id ? <Panel title={`Still owed: Rs. ${n2(b.outstanding)}`}><p className="mb-3 text-sm text-ink-soft">Payments clear this patient&apos;s oldest bill first.</p><CollectDues key={b.outstanding} patientId={b.patient_id} owed={b.outstanding} /></Panel> : null}
+          {can(ctx, "sale_returns") && b.lines.some((l) => l.lots) ? <Panel title="Return items"><p className="mb-3 text-sm text-ink-soft">Take back medicines from this bill, batch by batch, and refund or reduce what&apos;s owed.</p>
+            <Link href={`/employee/pharmacy/bills/${b.id}/return`} className="rounded-control border border-line-strong px-4 py-2">Return items</Link></Panel> : null}
+          {can(ctx, "void_invoices") && b.same_day && !b.returns.length ? <Panel title="Void this bill"><VoidBill id={b.id} /></Panel> : null}
+        </div>
+      ) : null}
     </div>
   );
 }

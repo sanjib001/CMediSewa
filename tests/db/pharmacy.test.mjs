@@ -164,3 +164,92 @@ test("ISOLATION: no sale can take another clinic's items, stores or prescription
     await asOwner(c);
   });
 });
+
+// ── B7b returns, void, dues ──
+const ret = (c, x, inv, lines, o = {}) => c.query(`select post_sale_return($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, null) r`,
+  [x.t, o.key ?? uuid(), inv, o.settlement ?? "refund_cash", o.channel ?? null, o.reason ?? "Customer brought it back", JSON.stringify(lines), o.by ?? x.admin, o.level ?? "A2", o.reauth === undefined ? new Date() : o.reauth]);
+const allocOf = async (c, inv, batch) => (await c.query(`select a.id from invoice_line_allocations a join invoice_lines l on l.id = a.invoice_line_id join item_batches ib on ib.id = a.batch_id where l.invoice_id = $1 and ib.batch_no = $2`, [inv, batch])).rows[0].id;
+const outstanding = async (c, inv) => Number((await c.query(`select invoice_outstanding($1) o`, [inv])).rows[0].o);
+
+test("returns: each lot at its own price, back to the shelf or quarantine, refund within what was paid; needs a fresh password", async () => {
+  await withTx(async (c) => {
+    const x = await counter(c);
+    await asApp(c);
+    const r = (await sell(c, x, [{ kind: "item", item_id: x.para, unit_id: x.u.strip, qty: 3 }], { cash: 65 })).rows[0].r;
+    await asOwner(c);
+    const late = await allocOf(c, r.invoice_id, "LATE"), soon = await allocOf(c, r.invoice_id, "SOON");
+    const before = await acct(c, x.t);
+    await asApp(c);
+    await expectError(c, `select post_sale_return($1, $2, $3, 'refund_cash', null, 'Wrong strength', $4, $5, 'A1', null, null)`, [x.t, uuid(), r.invoice_id, JSON.stringify([{ allocation_id: late, qty_base: 4, restock: "sellable" }]), x.pharmacist], /REAUTH_REQUIRED/);
+    const r1 = (await ret(c, x, r.invoice_id, [{ allocation_id: late, qty_base: 4, restock: "sellable" }])).rows[0].r;
+    assert.equal(Number(r1.total), 10, "4 tabs of the Rs. 2.5 lot");
+    assert.ok(r1.refund_receipt, "refund receipt issued");
+    await expectError(c, `select post_sale_return($1, $2, $3, 'refund_cash', null, 'Too many', $4, $5, 'A2', now(), null)`, [x.t, uuid(), r.invoice_id, JSON.stringify([{ allocation_id: soon, qty_base: 21, restock: "none" }]), x.admin], /MORE_THAN_SOLD/);
+    await expectError(c, `select post_sale_return($1, $2, $3, 'reduce_due', null, 'Nothing due', $4, $5, 'A2', now(), null)`, [x.t, uuid(), r.invoice_id, JSON.stringify([{ allocation_id: soon, qty_base: 5, restock: "quarantine" }]), x.admin], /MORE_THAN_DUE/);
+    await ret(c, x, r.invoice_id, [{ allocation_id: soon, qty_base: 5, restock: "quarantine" }]);
+    await expectError(c, `select void_invoice($1, $2, $3, 'Mistake', $4, 'A2', now(), null)`, [x.t, uuid(), r.invoice_id, x.admin], /HAS_RETURNS/);
+    await asOwner(c);
+    const q = async (store, batch) => Number((await c.query(`select coalesce(sum(b.qty_on_hand), 0)::numeric q from stock_balances b join item_batches ib on ib.id = b.batch_id where b.store_id = $1 and ib.batch_no = $2 and ib.item_id = $3`, [store, batch, x.para])).rows[0].q);
+    assert.deepEqual([await q(x.store, "LATE"), await q(x.quarantine, "SOON")], [44, 5], "4 back on the shelf (50 - 10 + 4), 5 in quarantine");
+    const after = await acct(c, x.t);
+    const delta = (k) => Math.round(((after[k] ?? 0) - (before[k] ?? 0)) * 100) / 100;
+    assert.deepEqual([delta("CASH"), delta("REV_PHARMACY"), delta("INVENTORY"), delta("COGS"), delta("AR_PATIENTS")], [-20, 20, 9.8, -9.8, 0], "refunds out of cash; restocked cost back into inventory");
+    assert.equal(await outstanding(c, r.invoice_id), 0);
+  });
+});
+
+test("void: same business day only, stock back to the same lots, payments refunded in their legs, accounts net to zero", async () => {
+  await withTx(async (c) => {
+    const x = await counter(c);
+    const before = await acct(c, x.t);
+    await asApp(c);
+    const r = (await c.query(`select issue_counter_sale($1, $2, $3, null, null, null, $4, null, 30, 35, 'esewa', null, $5, 'A1', null) r`,
+      [x.t, uuid(), x.store, JSON.stringify([{ kind: "item", item_id: x.para, unit_id: x.u.strip, qty: 3 }]), x.pharmacist])).rows[0].r;
+    await expectError(c, `select void_invoice($1, $2, $3, 'Mistake', $4, 'A2', now(), null)`, [x.t, uuid(), r.invoice_id, x.pharmacist], /NO_PERMISSION|REAUTH/);
+    await expectError(c, `select void_invoice($1, $2, $3, 'Mistake', $4, 'A2', now() - interval '10 minutes', null)`, [x.t, uuid(), r.invoice_id, x.admin], /REAUTH_REQUIRED/);
+    const key = uuid();
+    const v = (await c.query(`select void_invoice($1, $2, $3, 'Wrong customer', $4, 'A2', now(), null) r`, [x.t, key, r.invoice_id, x.admin])).rows[0].r;
+    assert.equal(Number(v.refunded), 65);
+    assert.equal((await c.query(`select void_invoice($1, $2, $3, 'Wrong customer', $4, 'A2', now(), null) r`, [x.t, key, r.invoice_id, x.admin])).rows[0].r.replayed, true, "retry safe");
+    await asOwner(c);
+    const after = await acct(c, x.t);
+    for (const k of ["CASH", "BANK", "REV_PHARMACY", "COGS", "INVENTORY", "AR_PATIENTS"]) assert.equal(Math.round(((after[k] ?? 0) - (before[k] ?? 0)) * 100) / 100, 0, `${k} back to where it was`);
+    const { rows: [{ q }] } = await c.query(`select sum(qty_on_hand)::numeric q from stock_balances b join item_batches ib on ib.id = b.batch_id where ib.item_id = $1 and ib.batch_no in ('SOON', 'LATE') and b.store_id = $2`, [x.para, x.store]);
+    assert.equal(Number(q), 70, "every tablet back in its lot");
+    const { rows: legs } = await c.query(`select cash_amount::numeric c, online_amount::numeric o, online_channel ch from payments where tenant_id = $1 and amount < 0`, [x.t]);
+    assert.deepEqual(legs.map((l) => [Number(l.c), Number(l.o), l.ch]), [[-30, -35, "esewa"]], "refund mirrors cash + eSewa");
+    await asApp(c);
+    const r2 = (await sell(c, x, [{ kind: "item", item_id: x.para, unit_id: x.u.tab, qty: 2 }], { cash: 4 })).rows[0].r;
+    await asOwner(c);
+    await c.query(`update invoices set issued_at = now() - interval '2 days' where id = $1`, [r2.invoice_id]);
+    await asApp(c);
+    await expectError(c, `select void_invoice($1, $2, $3, 'Late', $4, 'A2', now(), null)`, [x.t, uuid(), r2.invoice_id, x.admin], /NOT_SAME_DAY/);
+    await asOwner(c);
+  });
+});
+
+test("dues: credit sales, then collected oldest bill first; never more than owed", async () => {
+  await withTx(async (c) => {
+    const x = await counter(c);
+    await c.query(`update tenant_settings set allow_credit = true, credit_limit_per_patient = 1000 where tenant_id = $1`, [x.t]);
+    await asApp(c);
+    const credit = (qty) => c.query(`select issue_counter_sale($1, $2, $3, $4, null, null, $5, null, 0, 0, null, null, $6, 'A1', null) r`,
+      [x.t, uuid(), x.store, x.patient, JSON.stringify([{ kind: "item", item_id: x.para, unit_id: x.u.tab, qty }]), x.admin]);
+    const a = (await credit(20)).rows[0].r, b = (await credit(4)).rows[0].r;
+    assert.deepEqual([Number(a.due), Number(b.due)], [40, 10]);
+    const open = (await c.query(`select invoice_id, outstanding::numeric o from patient_open_bills($1, $2)`, [x.t, x.patient])).rows;
+    assert.deepEqual(open.map((o) => [o.invoice_id, Number(o.o)]), [[a.invoice_id, 40], [b.invoice_id, 10]]);
+    await expectError(c, `select collect_patient_dues($1, $2, $3, 60, 0, null, null, $4, 'A1', null)`, [x.t, uuid(), x.patient, x.pharmacist], /OVERPAYMENT/);
+    const p = (await c.query(`select collect_patient_dues($1, $2, $3, 25, 20, 'khalti', null, $4, 'A1', null) r`, [x.t, uuid(), x.patient, x.pharmacist])).rows[0].r;
+    assert.equal(p.bills, 2);
+    assert.deepEqual([await outstanding(c, a.invoice_id), await outstanding(c, b.invoice_id)], [0, 5], "oldest cleared first");
+    await asOwner(c);
+    const alloc = (await c.query(`select a.id from invoice_line_allocations a join invoice_lines l on l.id = a.invoice_line_id where l.invoice_id = $1`, [b.invoice_id])).rows[0].id;
+    await asApp(c);
+    await ret(c, x, b.invoice_id, [{ allocation_id: alloc, qty_base: 2, restock: "sellable" }], { settlement: "reduce_due" });
+    assert.equal(await outstanding(c, b.invoice_id), 0, "2 tabs returned against the Rs. 5 still owed");
+    await asOwner(c);
+    const ar = await acct(c, x.t);
+    assert.equal(Math.round((ar.AR_PATIENTS ?? 0) * 100) / 100, 0, "nothing owed in the accounts either");
+  });
+});

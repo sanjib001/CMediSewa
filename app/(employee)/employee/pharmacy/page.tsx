@@ -1,7 +1,8 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireTenant } from "@/lib/auth/context";
-import { counterServices, counterStock, counterStores, dispensingQueue, todaysBills } from "@/lib/pharmacy/data";
+import { counterServices, counterStock, counterStores, dispensingQueue, patientsWithDues, todaysBills } from "@/lib/pharmacy/data";
+import { CollectDues } from "@/components/pharmacy/bill-corrections";
 import { getAlerts } from "@/lib/inventory/data";
 import { ageText, type PatientLite } from "@/lib/desk/data";
 import { serviceClient } from "@/lib/supabase/service";
@@ -15,7 +16,7 @@ export const metadata = { title: "Pharmacy" };
 const npr = (n: number) => `Rs. ${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 const UUID = /^[0-9a-f-]{36}$/;
 const ALERT_TEXT = { expired: "Expired", blocked: "Blocked", near_expiry: "Near expiry", critical_stock: "Very low", low_stock: "Low stock" } as const;
-type Tab = "dispense" | "sale" | "bills";
+type Tab = "dispense" | "sale" | "bills" | "dues";
 
 // The pharmacy counter (W-14): the dispensing queue for pharmacists (C7: Rx items and
 // allergies only), the sale screen, and recent bills. Tabs follow the keys held (D-57).
@@ -26,7 +27,7 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
   const canSell = ctx.permissions.has("pharmacy_sell"), canDispense = ctx.permissions.has("dispense_prescription");
   const tabs: [Tab, string][] = [];
   if (canDispense) tabs.push(["dispense", "Dispense"]);
-  if (canSell) tabs.push(["sale", "Sale"], ["bills", "Bills"]);
+  if (canSell) tabs.push(["sale", "Sale"], ["bills", "Bills"], ["dues", "Dues"]);
   const tab: Tab = sp.rx && canSell ? "sale" : tabs.find(([t]) => t === sp.tab)?.[0] ?? tabs[0]?.[0] ?? "bills";
   const stores = await counterStores(ctx.tenantId, ctx.memberId);
   const store = stores.find((s) => s.id === sp.store) ?? stores[0];
@@ -51,6 +52,18 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
           </Panel>))}</div>;
   } else if (!store) {
     body = <p className="rounded-panel border border-line bg-surface p-5 text-ink-soft">You aren&apos;t assigned to a store that sells. Ask the admin to add you to the pharmacy store.</p>;
+  } else if (tab === "dues") {
+    const dues = await patientsWithDues(ctx.tenantId);
+    body = dues.length === 0 ? <p className="rounded-panel border border-line bg-surface p-5 text-ink-soft">Nobody owes anything.</p> : (
+      <Panel title="Patients who owe" aside={<span className="text-sm text-ink-faint">{npr(dues.reduce((s, d) => s + d.owed, 0))} in total</span>} flush>
+        <ul className="divide-y divide-line">{dues.map((d) => (
+          <li key={d.patient_id} className="grid gap-3 px-5 py-3 lg:grid-cols-[1fr_auto]">
+            <div><div className="font-medium">{d.name} <span className="text-sm text-ink-faint">{d.mrn}{d.phone ? `, ${d.phone}` : ""}</span></div>
+              <div className="text-sm text-ink-soft">Owes {npr(d.owed)} on {d.bills} bill{d.bills > 1 ? "s" : ""}, oldest {new Date(d.oldest).toLocaleDateString("en-GB", { timeZone: "Asia/Kathmandu", dateStyle: "medium" })}</div></div>
+            <CollectDues key={`${d.patient_id}:${d.owed}`} patientId={d.patient_id} owed={d.owed} />
+          </li>))}</ul>
+      </Panel>
+    );
   } else if (tab === "sale") {
     const db = serviceClient();
     const [items, services, set] = await Promise.all([

@@ -92,6 +92,8 @@ export type BillDetail = {
   profile: { name: string; pan: string | null; address: string | null; phone: string | null; footer: string | null };
   lines: { n: number; text: string; qty: number; unit: string; price: number; discount: number; tax: number; total: number; lots: string }[];
   external_rx: { prescriber_name: string; prescriber_reg_no: string | null; facility: string | null; rx_date: string } | null;
+  patient_id: string | null; outstanding: number; same_day: boolean; void_reason: string | null;
+  returns: { return_no: string; total: number; settlement: string; created_at: string; reason: string }[];
 };
 export async function getBill(tenantId: string, id: string): Promise<BillDetail | null> {
   const db = serviceClient();
@@ -128,7 +130,68 @@ export async function getBill(tenantId: string, id: string): Promise<BillDetail 
       lots: allocs.filter((a) => a.invoice_line_id === x.id).map((a) => { const b = bt.find((y) => y.id === a.batch_id); return b ? `${b.batch_no}${b.expiry_date ? ` exp ${b.expiry_date.slice(0, 7)}` : ""}` : ""; }).join(", "),
     })),
     external_rx: ex.data as BillDetail["external_rx"],
+    patient_id: h.patient_id, void_reason: h.void_reason,
+    outstanding: Number((await db.rpc("invoice_outstanding", { p_invoice: id })).data ?? 0),
+    same_day: await sameBusinessDay(tenantId, h.issued_at),
+    returns: rows<{ return_no: string; total: number; settlement: string; created_at: string; reason: string }>(
+      await db.from("sale_returns").select("return_no, total, settlement, created_at, reason").eq("tenant_id", tenantId).eq("invoice_id", id).order("created_at"), "returns")
+      .map((r) => ({ ...r, total: Number(r.total) })),
   };
+}
+
+async function sameBusinessDay(tenantId: string, at: string) {
+  const db = serviceClient();
+  const [a, b] = await Promise.all([db.rpc("business_day", { p_tenant: tenantId, p_at: at }), db.rpc("business_day", { p_tenant: tenantId, p_at: new Date().toISOString() })]);
+  return Boolean(a.data) && a.data === b.data;
+}
+
+export type ReturnableLot = {
+  allocation_id: string; item: string; batch_no: string; expiry_date: string | null; unit: string;
+  sold: number; returned: number; price: number; can_shelve: boolean; cold: boolean;
+};
+/** Every lot a bill sold from, with how much can still come back (in base units). */
+export async function returnableLots(tenantId: string, invoiceId: string): Promise<ReturnableLot[]> {
+  const db = serviceClient();
+  const lines = rows<{ id: string; description: string; item_id: string | null }>(
+    await db.from("invoice_lines").select("id, description, item_id").eq("tenant_id", tenantId).eq("invoice_id", invoiceId).eq("line_type", "item"), "lines");
+  if (!lines.length) return [];
+  const al = rows<{ id: string; invoice_line_id: string; item_id: string; batch_id: string; base_qty: number; unit_price_base: number }>(
+    await db.from("invoice_line_allocations").select("id, invoice_line_id, item_id, batch_id, base_qty, unit_price_base").eq("tenant_id", tenantId).in("invoice_line_id", lines.map((l) => l.id)), "allocations");
+  const [rl, bt, un, it, tz] = await Promise.all([
+    db.from("sale_return_lines").select("allocation_id, qty_base").eq("tenant_id", tenantId).in("allocation_id", al.map((a) => a.id)),
+    db.from("item_batches").select("id, batch_no, expiry_date, status").eq("tenant_id", tenantId).in("id", al.map((a) => a.batch_id)),
+    db.from("item_units").select("item_id, name").eq("tenant_id", tenantId).eq("is_base", true).in("item_id", al.map((a) => a.item_id)),
+    db.from("inventory_items").select("id, storage_condition").eq("tenant_id", tenantId).in("id", al.map((a) => a.item_id)),
+    db.rpc("stock_today", { p_tenant: tenantId }),
+  ]);
+  const today = String(tz.data ?? new Date().toISOString().slice(0, 10));
+  const ret = rows<{ allocation_id: string; qty_base: number }>(rl, "returned"), bats = rows<{ id: string; batch_no: string; expiry_date: string | null; status: string }>(bt, "batches");
+  const units = rows<{ item_id: string; name: string }>(un, "units"), items = rows<{ id: string; storage_condition: string }>(it, "items");
+  return al.map((a) => {
+    const b = bats.find((x) => x.id === a.batch_id);
+    const cold = ["cool_2_8", "frozen"].includes(items.find((x) => x.id === a.item_id)?.storage_condition ?? "");
+    return {
+      allocation_id: a.id, item: lines.find((l) => l.id === a.invoice_line_id)?.description ?? "", batch_no: b?.batch_no ?? "", expiry_date: b?.expiry_date ?? null,
+      unit: units.find((u) => u.item_id === a.item_id)?.name ?? "", sold: Number(a.base_qty),
+      returned: ret.filter((r) => r.allocation_id === a.id).reduce((s2, r) => s2 + Number(r.qty_base), 0), price: Number(a.unit_price_base),
+      can_shelve: b?.status === "active" && (!b.expiry_date || b.expiry_date > today) && !cold, cold,
+    };
+  });
+}
+
+export type DueRow = { patient_id: string; name: string; mrn: string; phone: string | null; bills: number; owed: number; oldest: string };
+/** Patients who owe, most owed first. */
+export async function patientsWithDues(tenantId: string): Promise<DueRow[]> {
+  const db = serviceClient();
+  const open = rows<{ patient_id: string; issued_at: string; outstanding: number }>(await db.rpc("patient_open_bills", { p_tenant: tenantId, p_patient: null }), "dues");
+  if (!open.length) return [];
+  const ids = [...new Set(open.map((o) => o.patient_id))];
+  const pts = rows<{ id: string; full_name: string; mrn: string; phone: string | null }>(await db.from("patients").select("id, full_name, mrn, phone").eq("tenant_id", tenantId).in("id", ids), "patients");
+  return ids.map((id) => {
+    const mine = open.filter((o) => o.patient_id === id), p = pts.find((x) => x.id === id);
+    return { patient_id: id, name: p?.full_name ?? "", mrn: p?.mrn ?? "", phone: p?.phone ?? null, bills: mine.length,
+      owed: Math.round(mine.reduce((s2, o) => s2 + Number(o.outstanding), 0) * 100) / 100, oldest: mine[0]?.issued_at ?? "" };
+  }).sort((a, b) => b.owed - a.owed);
 }
 
 export type QueueRx = {

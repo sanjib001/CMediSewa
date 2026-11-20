@@ -792,6 +792,29 @@ notes or diagnosis). Only verified pharmacists see it; every read is audited.
 
 ---
 
+## B7b Returns, void, dues (2026-11-21)
+
+**D-105 Customer returns as built:** only against the original bill, per lot it sold, never
+more than sold minus earlier returns. Value = qty × that lot's own sale price, less the
+line's discount share, plus its VAT. Each lot goes back on the shelf (only if active,
+unexpired and not cold-chain; P-22 default), to quarantine, or is destroyed (cost stays in
+COGS). Settled by cash/online refund (a negative receipt, no more than was paid) or by
+reducing the bill's due (no more than it owes). Needs `sale_returns` and a password
+confirmed in the last 5 minutes.
+
+**D-106 Void as built:** the whole bill, same business day (`day_closing_hour`), only while
+nothing was returned against it, `void_invoices` + password in the last 5 minutes. Stock
+goes back to the same lots and stores, the sale's journal is reversed, and each payment's
+share is refunded in the legs it came in (cash / the same online channel). A voided bill's
+prescription items return to the dispensing queue.
+
+**D-107 What a bill owes** is derived, never stored: total − returns − net payments
+(`invoice_outstanding`). Dues are collected oldest bill first within the oldest bill's
+billing profile (`collect_patient_dues`), never more than owed, at the counter (A1) by
+anyone with `manage_billing` or `pharmacy_sell`.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |

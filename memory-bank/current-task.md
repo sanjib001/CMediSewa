@@ -1,7 +1,15 @@
 # Current Task
 
-**Phase:** Phase 0 backend: B1–B6 done. **B7 Sales & billing in progress:** B7a pharmacy counter done. Next: **B7b** bill void (same day), sales returns, collecting dues.
+**Phase:** Phase 0 backend: B1–B6 done. **B7 Sales & billing done** (B7a counter + B7b returns, void, dues). Next: **B8** (expenses, finance and reports per the roadmap).
 **Last updated:** 2026-11-20
+
+## B7b Returns, void, dues: done (2026-11-21)
+| Item | Status |
+|---|---|
+| Migration 0045: sale_returns (+lines), invoice_outstanding, invoice_paid, business_day, patient_open_bills; post_sale_return, void_invoice, collect_patient_dues | done |
+| Bill page: returns shown, Collect due, Return items, Void (today only); Return items page (per batch: shelf / quarantine / destroyed; refund or reduce due); Pharmacy Dues tab | done |
+| Checks | DB 83/83 · fresh replay of all 45 migrations on an empty DB ✓ · **end-to-end purchasing + counter + returns 79/79**, incl. inventory = stock ledger, customers owe nothing, cash in the accounts = documents · all earlier journeys ✓ · typecheck/lint/build ✓ · posture ✓ |
+| Not yet | the counter's credit-limit check counts bills before returns (stricter than needed); voiding/returning front-desk visit bills has no screen yet; printed refund receipt |
 
 ## B7a Pharmacy counter: done (2026-11-21)
 | Item | Status |

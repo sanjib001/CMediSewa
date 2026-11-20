@@ -37,12 +37,27 @@ const ERRORS: [RegExp, string][] = [
   [/NO_LINES/, "Add at least one item."],
   [/NO_PERMISSION/, "You don't have permission for this."],
   [/customer_phone_check/, "Enter a valid phone number."],
+  [/REAUTH_REQUIRED/, "Confirm your password again to do this."],
+  [/NOT_SAME_DAY/, "Only today's bills can be voided. Use a return for older bills."],
+  [/HAS_RETURNS/, "Items from this bill were already returned, so it can't be voided. Return the rest instead."],
+  [/ALREADY_VOID|INVOICE_VOID/, "This bill is void."],
+  [/MORE_THAN_SOLD/, "That's more than this bill sold from that batch (minus earlier returns)."],
+  [/MORE_THAN_DUE/, "The return is more than the bill still owes. Refund it instead."],
+  [/MORE_THAN_PAID/, "The return is more than was paid on this bill. Reduce the due instead."],
+  [/CANT_RESTOCK_SELLABLE/, "That batch is expired or blocked, so it can't go back on the shelf. Send it to quarantine."],
+  [/COLD_CHAIN_QUARANTINE/, "Cold-chain medicines can't go back on the shelf once they leave. Send them to quarantine."],
+  [/NO_QUARANTINE_STORE/, "There's no quarantine store. Ask the admin to add one."],
+  [/NOT_ON_THIS_BILL/, "That batch isn't on this bill."],
+  [/NOTHING_TO_RETURN/, "Enter what is coming back."],
+  [/REASON_REQUIRED/, "Give a reason."],
+  [/NO_DUES/, "This patient owes nothing."],
+  [/BAD_AMOUNT/, "Enter an amount more than zero."],
 ];
 function friendly(e: { message?: string; code?: string } | null): string {
   const text = `${e?.code ?? ""} ${e?.message ?? ""}`;
   for (const [re, msg] of ERRORS) if (re.test(text)) return msg + (/line (\d+)/.exec(text) ? ` (line ${/line (\d+)/.exec(text)![1]})` : "");
   console.error("[pharmacy action]", e?.code, e?.message);
-  return "Something went wrong. Nothing was sold.";
+  return "Something went wrong. Nothing was changed.";
 }
 const counter = () => requireTenant({ operation: "pharmacy.counter", next: "/employee/pharmacy" });
 
@@ -90,4 +105,53 @@ export async function findPatient(q: string): Promise<PatientLite[]> {
   const { data, error } = await serviceClient().rpc("search_patients", { p_tenant: ctx.tenantId, p_q: String(q ?? "").slice(0, 60), p_limit: 8 });
   if (error) return [];
   return (data ?? []).map(toLite);
+}
+
+const after = (id: string) => { revalidatePath("/employee/pharmacy"); revalidatePath(`/employee/pharmacy/bills/${id}`); };
+
+/** Void a whole bill: today only, nothing returned yet, password confirmed in the last 5 minutes. */
+export async function voidBill(input: { id: string; reason: string }): Promise<{ ok: true } | Fail> {
+  const ctx = await requireTenant({ operation: "money.correct", permission: "void_invoices", next: `/employee/pharmacy/bills/${input.id}` });
+  if (!UUID.test(input.id ?? "")) return { ok: false, error: "That bill wasn't found." };
+  const { error } = await serviceClient().rpc("void_invoice", {
+    p_tenant: ctx.tenantId, p_idempotency_key: crypto.randomUUID(), p_invoice: input.id, p_reason: String(input.reason ?? "").slice(0, 300),
+    p_by: ctx.memberId, p_session_level: ctx.level, p_reauth_at: ctx.reauthAt?.toISOString() ?? null, p_device: ctx.deviceId,
+  });
+  if (error) return { ok: false, error: friendly(error) };
+  after(input.id);
+  return { ok: true };
+}
+
+export type ReturnInput = {
+  idempotencyKey: string; invoiceId: string; settlement: "refund_cash" | "refund_online" | "reduce_due"; channel?: string | null; reason: string;
+  lines: { allocation_id: string; qty_base: number; restock: "sellable" | "quarantine" | "none" }[];
+};
+export async function postReturn(input: ReturnInput): Promise<{ ok: true; no: string; total: number } | Fail> {
+  const ctx = await requireTenant({ operation: "money.correct", permission: "sale_returns", next: `/employee/pharmacy/bills/${input.invoiceId}/return` });
+  if (!UUID.test(input.idempotencyKey ?? "") || !UUID.test(input.invoiceId ?? "")) return { ok: false, error: "Reload the page and try again." };
+  const lines = (input.lines ?? []).filter((l) => Number(l.qty_base) > 0).slice(0, 100);
+  if (lines.some((l) => !UUID.test(l.allocation_id) || !["sellable", "quarantine", "none"].includes(l.restock))) return { ok: false, error: "Reload the page and try again." };
+  const { data, error } = await serviceClient().rpc("post_sale_return", {
+    p_tenant: ctx.tenantId, p_idempotency_key: input.idempotencyKey, p_invoice: input.invoiceId, p_settlement: input.settlement, p_channel: input.channel || null,
+    p_reason: String(input.reason ?? "").slice(0, 300), p_lines: lines.map((l) => ({ ...l, qty_base: Number(l.qty_base) })),
+    p_by: ctx.memberId, p_session_level: ctx.level, p_reauth_at: ctx.reauthAt?.toISOString() ?? null, p_device: ctx.deviceId,
+  });
+  if (error) return { ok: false, error: friendly(error) };
+  after(input.invoiceId);
+  const r = data as { return_no: string; total: number };
+  return { ok: true, no: r.return_no, total: Number(r.total) };
+}
+
+/** Collect a patient's dues: oldest bill first. */
+export async function collectDues(input: { idempotencyKey: string; patientId: string; cash: number; online: number; channel?: string | null }): Promise<{ ok: true; receipt: string; amount: number } | Fail> {
+  const ctx = await counter();
+  if (!UUID.test(input.idempotencyKey ?? "") || !UUID.test(input.patientId ?? "")) return { ok: false, error: "Reload the page and try again." };
+  const { data, error } = await serviceClient().rpc("collect_patient_dues", {
+    p_tenant: ctx.tenantId, p_idempotency_key: input.idempotencyKey, p_patient: input.patientId, p_cash: Number(input.cash) || 0, p_online: Number(input.online) || 0,
+    p_channel: input.channel || null, p_reference: null, p_by: ctx.memberId, p_session_level: ctx.level, p_device: ctx.deviceId,
+  });
+  if (error) return { ok: false, error: /OVERPAYMENT/.test(error.message ?? "") ? "That's more than the patient owes." : friendly(error) };
+  revalidatePath("/employee/pharmacy");
+  const r = data as { receipt_no: string; amount: number };
+  return { ok: true, receipt: r.receipt_no, amount: Number(r.amount) };
 }
