@@ -1,7 +1,18 @@
 # Current Task
 
-**Phase:** Phase 0 backend: **B4 is done** (B4a front desk, B4b doctor, B4c website booking requests). B1–B3 done. Next: **B5 Inventory**.
+**Phase:** Phase 0 backend: B1–B4 done. **B5a inventory core is done.** Next: **B5b** transfers, adjustments, counts, block/recall, quarantine, disposal; then **B5c** alerts, suggestions, reconciliation.
 **Last updated:** 2026-11-20
+
+## B5a Inventory core: done (2026-11-20)
+| Item | Status |
+|---|---|
+| Migrations 0033–0034: item_categories, manufacturers, generics, inventory_items (+ code counter), medicine_details, item_units (one base, factor frozen once stocked), item_barcodes, store_item_levels, item_batches (+ price history), stock_movements (append-only), stock_balances (trigger, never negative), stock_openings + lines; save_item, post_opening_stock (ledger_writer, exposed), allocate_stock (FEFO, internal), stock_by_batch, store_access | done |
+| Admin → Medicines: list with search, stock in packs ("2 box + 3 strip"), reorder/critical flags; add/edit item (medicine details, pack presets, units, barcodes, levels) | done |
+| Admin → Stock & stores: per store, lots by earliest expiry with expired/near-expiry flags and cost value; opening stock entry; who works in the store (view/operate/manage) | done |
+| Demo clinic: 6 medicines with opening stock (one expired, one near-expiry lot); pharmacy user manages Pharmacy | done |
+| Checks | DB 57/57 (item master, opening stock + journal, never negative, FEFO, isolation) · **B5a end-to-end 16/16** · B1, B3, B4a, B4b, B4c journeys pass · typecheck/lint/build ✓ · posture ✓ |
+| Bug found & fixed by the tests | ledger_writer couldn't read the opening header to answer a retry (0034) |
+| Not yet | B5b/B5c; purchases (B6); sales/dispensing using allocate_stock (B7); linking prescription lines to items |
 
 ## B4c Website booking requests: done (2026-11-20, D-82, D-83)
 | Item | Status |

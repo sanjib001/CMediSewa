@@ -653,6 +653,27 @@ with a reason. Prescription lines store the printed medicine text; the link to i
 
 ---
 
+## B5a Inventory core (2026-11-20)
+
+**D-87 B5 is delivered in three slices:** B5a item master, lots, ledger + balances, opening
+stock, FEFO allocation, store access; B5b transfers, adjustments, counts, block/recall,
+quarantine and disposal; B5c alerts, purchase suggestions and nightly reconciliation.
+
+**D-88 Item master is written only through `save_item()`** (item + medicine details + units +
+barcodes in one audited transaction). Generics, categories and manufacturers are per clinic,
+found-or-created by name with suggestions (P-24 default: no platform list yet). Unit sizes
+and the base unit are frozen once the item has any lot; new units can still be added.
+
+**D-89 Stock posting rules as built:** every quantity change is a `stock_movements` row written
+by a ledger_writer function; `stock_balances` is maintained only by trigger and can never go
+negative (CHECK). Posting stock needs A2, `manage_stock` and **Manage** access to the store
+(clinic admins and `all_stores` holders manage every store). Opening stock creates one lot per
+line, converts to base units, refuses a known batch number with a different expiry unless a
+reason is given, refuses a sale price above MRP (P-25 default), and posts Dr INVENTORY /
+Cr OPENING_EQUITY. FEFO (`allocate_stock`) skips expired, blocked/recalled and short-dated lots.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |
