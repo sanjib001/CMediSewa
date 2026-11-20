@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireSuperAdmin } from "@/lib/auth/guards";
 import { listTenants } from "@/lib/platform/admin-data";
-import { PageHeader, Panel } from "@/components/ui/primitives";
+import { ButtonLink, PageHeader, Panel } from "@/components/ui/primitives";
 import { cn } from "@/lib/cn";
 
 export const metadata = { title: "Clinics" };
@@ -16,9 +16,9 @@ export default async function Clinics() {
   const rows = await listTenants();
   return (
     <>
-      <PageHeader title="Clinics" subtitle="Every clinic on the platform, its status and how long it is paid for." />
+      <PageHeader title="Clinics" subtitle="Every clinic on the platform, its status and how long it is paid for." actions={<ButtonLink href="/superadmin/tenants/new">Add a clinic</ButtonLink>} />
       <Panel flush>
-        {rows.length === 0 ? <p className="px-5 py-6 text-ink-soft">No clinics yet. Approve an application to create one.</p> : (
+        {rows.length === 0 ? <p className="px-5 py-6 text-ink-soft">No clinics yet. Add one, or approve an application.</p> : (
           <div className="overflow-x-auto">
             <table className="w-full min-w-[40rem] text-left text-[0.95rem]">
               <thead className="border-b border-line text-sm text-ink-faint">

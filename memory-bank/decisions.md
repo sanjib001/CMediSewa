@@ -711,6 +711,43 @@ cost; B6 purchase orders start from it. Push/email notification of alerts comes 
 
 ---
 
+## B6a Purchasing (2026-11-20)
+
+**D-94 B6 is delivered in two slices:** B6a vendors, purchase bills into new lots, vendor
+payments and statements; B6b purchase orders (from Reorder), purchase returns with credit
+notes or refunds, and nightly payable reconciliation.
+
+**D-95 Purchase bills as built:** totals are computed in SQL from the lines (client totals
+ignored); each line creates a NEW lot whose cost = (line net − its share of the bill discount)
+÷ (paid + free base units); VAT is recoverable input tax (P-08 default) posted to
+TAX_RECEIVABLE, not into lot cost; the same vendor bill number can't be entered twice (unless
+the first was voided); medicines need an expiry after the bill date, and a shelf life below
+`min_receive_shelf_days` needs a reason. Journal: Dr INVENTORY + Dr TAX_RECEIVABLE / Cr CASH,
+BANK, AP_VENDORS. A posted bill is immutable; void (A2 + password within 5 minutes) only
+while none of its lots has moved and nothing was paid against it.
+
+**D-96 The payable is never stored.** It is the AP_VENDORS journal balance per vendor; a bill's
+outstanding = its credit part − payments allocated to it. A vendor's opening balance is an
+"opening" bill (Dr OPENING_EQUITY / Cr AP_VENDORS) so payments settle it like any bill.
+Payments settle the oldest bills first (or chosen bills); any remainder is a vendor advance.
+
+---
+
+## Direct clinic creation (user request, 2026-11-21)
+
+**D-97 The Super Admin can create a clinic directly** (Clinics → Add a clinic), modelled on
+HRestroSewa's "New restaurant" page. It is recorded as a `direct` application and provisioned
+by the same `provision_tenant()` in one transaction (`create_tenant_direct`), so a direct clinic
+is identical to an approved one. Unlike HRestroSewa (where the Super Admin sets staff PINs), no
+one but the clinic admin ever knows their password: the Super Admin gets a one-time setup link
+(7 days) and the clinic's sign-in address `/login/<clinic>`. The admin sets a password and 2FA,
+then adds staff from Staff & roles. An email already administering a live clinic is refused.
+
+**D-98 Staff of a clinic that isn't live yet** see a "not live yet" page; only the clinic admin
+enters the Admin area to finish setup. (Sending staff to /admin bounced them back in a loop.)
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |

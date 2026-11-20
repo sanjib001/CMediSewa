@@ -1,7 +1,25 @@
 # Current Task
 
-**Phase:** Phase 0 backend: B1–B4 done. **B5 inventory is done** (B5a core, B5b operations, B5c alerts and reconciliation). Next: **B6 Purchasing**.
+**Phase:** Phase 0 backend: B1–B5 done. **B6a purchasing is done.** Next: **B6b** purchase orders, purchase returns, payable reconciliation.
 **Last updated:** 2026-11-20
+
+## Super Admin: create a clinic directly: done (2026-11-21)
+| Item | Status |
+|---|---|
+| Migration 0042: tenant_applications.source (website / direct), create_tenant_direct (records a direct application, provisions in one step, refuses an email already administering a live clinic, bad PAN, non-platform-admin) | done |
+| Super Admin → Clinics → **Add a clinic**: clinic details, link (auto from name), admin name + email, plan, start, days, trial/paid/complimentary → one-time setup link + the clinic's sign-in address, copy buttons | done |
+| `/not-live` page for staff of a pending clinic (fixes a redirect loop) | done |
+| Checks | DB 72/72 · **end-to-end 22/22**: create → setup link → password + 2FA → sign in at /login/<clinic> → invite staff → staff waits until go-live → reaches the desk · all earlier journeys pass · typecheck/lint/build ✓ · posture ✓ |
+
+## B6a Purchasing: done (2026-11-20)
+| Item | Status |
+|---|---|
+| Migration 0041: vendors (+code counter), purchase_invoices (+lines; duplicate-bill unique index), vendor_payments (+allocations); FKs from lots and journal to vendors/purchase lines; save_vendor, vendor_balances, purchase_outstanding; post_vendor_opening, post_purchase_invoice, void_purchase_invoice, post_vendor_payment (ledger_writer, exposed) | done |
+| Admin → Vendors (list with what's owed, add), vendor page (bills with what's still owed, account statement from the journal, pay, opening balance, details) | done |
+| Admin → Purchases (list), Enter a bill (lines with free qty, discount, VAT, batch, expiry, MRP; bill discount; paid now / on credit), bill page (lines, lot cost, amounts, void) | done |
+| Checks | DB 71/71 · **B6a end-to-end 20/20** (payable from accounts = from bills; inventory in accounts = stock ledger value) · all earlier journeys pass · typecheck/lint/build ✓ · posture ✓ |
+| Also | CI fix: build without database access; CI bootstrap adds auth.users + pgcrypto (verified locally on PGlite: 40 migrations replay, posture, 65/66 DB tests) |
+| Not yet | B6b; vendor advance applied to a later bill (stays as an advance for now) |
 
 ## B5c Alerts, suggestions, reconciliation: done (2026-11-20)
 | Item | Status |

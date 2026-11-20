@@ -184,3 +184,34 @@ test("the app can read invite status but never the token hash", async () => {
     await expectError(c, `select token_hash from member_invites limit 1`, [], /permission denied/);
   });
 });
+
+test("Super Admin creates a clinic directly: same provisioning, admin + one-time setup link, no duplicates", async () => {
+  await withTx(async (c) => {
+    const pa = await platformAdmin(c);
+    const p = await plan(c);
+    const slug = `direct-${uuid().slice(0, 6)}`;
+    const email = `admin-${uuid().slice(0, 6)}@example.invalid`;
+    const create = (o = {}) => c.query(
+      `select * from create_tenant_direct($1, $2, 'Sita Sharma', $3, '9841000000', 'Lalitpur', 'Lalitpur Metro', $4, $5, current_date, 30, 'trial', $6, $7)`,
+      [o.name ?? "Sunrise Clinic", o.slug ?? slug, o.email ?? email, o.pan ?? "301234567", p, o.token ?? `tok-${uuid()}`, o.by ?? pa]);
+    await c.query(`set role service_role`);
+    const { rows: [r] } = await create({ token: "direct-token-1" });
+    await c.query(`reset role`);
+    const { rows: [t] } = await c.query(`select status, name, pan_number from tenants where id = $1`, [r.tenant_id]);
+    assert.deepEqual([t.status, t.name, t.pan_number], ["pending", "Sunrise Clinic", "301234567"], "pending until the clinic admin finishes setup and goes live");
+    const { rows: [m] } = await c.query(`select membership_role, email, auth_user_id from tenant_members where id = $1`, [r.member_id]);
+    assert.deepEqual([m.membership_role, m.email, m.auth_user_id], ["tenant_admin", email, null], "admin created, waiting for the setup link");
+    const { rows: [app] } = await c.query(`select source, status from tenant_applications where tenant_id = $1`, [r.tenant_id]);
+    assert.deepEqual([app.source, app.status], ["direct", "approved"], "recorded as a direct, approved application");
+    const counts = (await c.query(`select (select count(*) from tenant_roles where tenant_id = $1)::int roles, (select count(*) from stores where tenant_id = $1)::int stores,
+      (select count(*) from tenant_subscriptions where tenant_id = $1)::int subs, (select count(*) from ledger_accounts where tenant_id = $1)::int accounts`, [r.tenant_id])).rows[0];
+    assert.deepEqual(counts, { roles: 4, stores: 2, subs: 1, accounts: 30 }, "exactly what an approved application gets");
+    assert.equal((await c.query(`select count(*)::int n from invite_preview('direct-token-1')`)).rows[0].n, 1, "the setup link works");
+    await c.query(`set role service_role`);
+    await expectError(c, `select * from create_tenant_direct('Other', $1, 'X Y', 'x@example.invalid', '9841000000', null, null, null, $2, current_date, 30, 'trial', 't2', $3)`, [slug, p, pa], /SLUG_TAKEN/);
+    await expectError(c, `select * from create_tenant_direct('Other', $1, 'X Y', $2, '9841000000', null, null, null, $3, current_date, 30, 'trial', 't3', $4)`, [`${slug}-b`, email, p, pa], /ADMIN_EMAIL_IN_USE/);
+    await expectError(c, `select * from create_tenant_direct('Other', $1, 'X Y', 'y@example.invalid', '9841000000', null, null, '12', $2, current_date, 30, 'trial', 't4', $3)`, [`${slug}-c`, p, pa], /BAD_PAN/);
+    await expectError(c, `select * from create_tenant_direct('Other', $1, 'X Y', 'z@example.invalid', '9841000000', null, null, null, $2, current_date, 30, 'trial', 't5', $3)`, [`${slug}-d`, p, uuid()], /NOT_PLATFORM_ADMIN/);
+    await c.query(`reset role`);
+  });
+});

@@ -25,6 +25,8 @@ const ERRORS: Record<string, string> = {
   INVOICE_VOID: "That invoice is void.",
   MEMBER_NOT_INVITABLE: "This person has already accepted their invite.",
   CREDENTIAL_NOT_FOUND: "That registration was not found.",
+  ADMIN_EMAIL_IN_USE: "That email is already the admin of another clinic. Use a different email.",
+  BAD_PAN: "PAN is 9 digits.",
 };
 function friendly(e: { message?: string } | null): string {
   const code = Object.keys(ERRORS).find((k) => e?.message?.includes(k));
@@ -170,4 +172,41 @@ export async function verifyCredentialAsPlatform(fd: FormData): Promise<FormResu
   if (error) return { ok: false, error: friendly(error) };
   revalidatePath(`/superadmin/tenants/${s(fd, "tenant_id")}`);
   return { ok: true, message: "Verified." };
+}
+
+// ── direct clinic creation (Super Admin → Clinics → Add a clinic) ─────────────
+export type CreateClinicResult =
+  | { ok: true; tenantId: string; slug: string; setupLink: string; signInLink: string }
+  | { ok: false; error: string };
+
+/** Create a clinic at once (no website application). Same provisioning as an approval; the
+ *  clinic admin gets a one-time setup link (7 days) to set a password and 2FA, then signs in
+ *  at the clinic's own link and adds staff. The link is shown only in this response. */
+export async function createClinic(input: {
+  name: string; slug: string; ownerName: string; ownerEmail: string; phone: string; district?: string; municipality?: string; pan?: string;
+  planId: string; startsOn: string; periodDays: number; source: string;
+}): Promise<CreateClinicResult> {
+  const { admin } = await requireSuperAdmin();
+  const name = String(input.name ?? "").trim(), slug = String(input.slug ?? "").trim().toLowerCase();
+  const ownerName = String(input.ownerName ?? "").trim(), email = String(input.ownerEmail ?? "").trim().toLowerCase(), phone = String(input.phone ?? "").trim();
+  const days = Number(input.periodDays);
+  if (name.length < 2) return { ok: false, error: "Enter the clinic's name." };
+  if (!/^[a-z0-9](?:[a-z0-9-]{0,48}[a-z0-9])?$/.test(slug)) return { ok: false, error: "Clinic link: lowercase letters, numbers and hyphens (2–50)." };
+  if (ownerName.length < 2) return { ok: false, error: "Enter the clinic admin's name." };
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { ok: false, error: "Enter the clinic admin's email. They sign in with it." };
+  if (!/^[0-9+ -]{7,20}$/.test(phone)) return { ok: false, error: "Enter a phone number." };
+  if (!Number.isInteger(days) || days < 1 || days > 1100) return { ok: false, error: "Period must be 1–1100 days." };
+  if (!["trial", "paid", "complimentary"].includes(input.source)) return { ok: false, error: "Choose trial, paid or complimentary." };
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(input.startsOn)) return { ok: false, error: "Choose the start date." };
+  const token = newToken();
+  const { data, error } = await serviceClient().rpc("create_tenant_direct", {
+    p_business_name: name, p_slug: slug, p_owner_name: ownerName, p_owner_email: email, p_phone: phone, p_district: input.district ?? "",
+    p_municipality: input.municipality ?? "", p_pan: input.pan ?? "", p_plan: input.planId, p_starts_on: input.startsOn, p_period_days: days,
+    p_source: input.source, p_invite_token_hash: hmac("invite", token), p_by: admin.id,
+  }).single<{ tenant_id: string; member_id: string }>();
+  if (error || !data) return { ok: false, error: friendly(error) };
+  revalidatePath("/superadmin");
+  revalidatePath("/superadmin/tenants");
+  const setupLink = await inviteLink(token);
+  return { ok: true, tenantId: data.tenant_id, slug, setupLink, signInLink: setupLink.replace(/\/invite\/.*$/, `/login/${slug}`) };
 }

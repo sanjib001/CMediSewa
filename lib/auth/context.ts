@@ -116,7 +116,9 @@ export async function requireTenant(opts: {
     redirect(identity ? "/login?no_access=1" : await staffLoginPath());
   }
   if (ctx.tenantStatus === "suspended" && opts.operation !== "admin.area") redirect("/login?suspended=1");
-  if (ctx.tenantStatus === "pending" && !opts.allowPendingTenant) redirect("/admin");
+  // A clinic that isn't live yet: its admin finishes setup in the Admin area; other staff
+  // wait on a page that says so (sending them to /admin bounced them back here in a loop).
+  if (ctx.tenantStatus === "pending" && !opts.allowPendingTenant) redirect(ctx.membershipRole === "tenant_admin" ? "/admin" : "/not-live");
 
   const need = OPERATION_ASSURANCE[opts.operation];
   // A password session of someone who must use 2FA is finished at the MFA step first.
