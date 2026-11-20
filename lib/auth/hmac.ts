@@ -8,7 +8,7 @@ function key(): string {
 }
 
 /** HMAC with a purpose prefix, so the same secret never produces interchangeable hashes. */
-export function hmac(purpose: "device" | "login" | "invite", value: string): string {
+export function hmac(purpose: "device" | "login" | "invite" | "booking", value: string): string {
   return createHmac("sha256", key()).update(`${purpose}:${value}`).digest("base64url");
 }
 

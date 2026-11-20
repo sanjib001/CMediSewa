@@ -2,6 +2,7 @@ import { cache } from "react";
 import { notFound } from "next/navigation";
 import { serviceClient } from "@/lib/supabase/service";
 import { Icon } from "@/components/ui/icon";
+import { BookingForm } from "@/components/public/booking-form";
 
 // The clinic's public website (U7, D-34). Everything shown comes from public_clinic_profile():
 // an allow-list of fields, only for an ACTIVE clinic with a PUBLISHED site, and only doctors
@@ -59,6 +60,8 @@ export default async function ClinicSite({ params }: { params: Promise<{ slug: s
   const tel = (n: string) => `tel:${n.replace(/[^\d+]/g, "")}`;
   const consultations = p.services.filter((s) => s.kind === "consultation");
   const others = p.services.filter((s) => s.kind !== "consultation");
+  const canBook = p.booking_enabled && p.doctors.length > 0;
+  const today = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kathmandu" }).format(new Date());
 
   return (
     <div className="bg-surface">
@@ -74,7 +77,11 @@ export default async function ClinicSite({ params }: { params: Promise<{ slug: s
             <span className="grid size-11 place-items-center rounded-panel text-lg font-bold" style={{ background: accent, color: onColor(accent) }} aria-hidden>{p.name.charAt(0)}</span>
             <p className="text-lg font-semibold leading-tight">{p.name}</p>
           </div>
-          {p.phone ? <a href={tel(p.phone)} className="rounded-control px-4 py-2 font-medium" style={{ background: accent, color: onColor(accent) }}>Call {p.phone}</a> : null}
+          <div className="flex flex-wrap gap-2">
+            {canBook ? <a href="#book" className="rounded-control px-4 py-2 font-medium" style={{ background: accent, color: onColor(accent) }}>Book appointment</a> : null}
+            {p.phone ? <a href={tel(p.phone)} className={canBook ? "rounded-control border border-line-strong px-4 py-2 font-medium" : "rounded-control px-4 py-2 font-medium"}
+              style={canBook ? undefined : { background: accent, color: onColor(accent) }}>Call {p.phone}</a> : null}
+          </div>
         </div>
       </header>
 
@@ -144,9 +151,15 @@ export default async function ClinicSite({ params }: { params: Promise<{ slug: s
       <section id="book" className="border-t border-line">
         <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
           <h2 className="text-[1.5rem] font-semibold">Book an appointment</h2>
-          <p className="mt-2 text-ink-soft">
-            {p.phone ? <>Call <a className="font-medium underline" href={tel(p.phone)}>{p.phone}</a> to book. </> : null}Online booking is coming soon.
-          </p>
+          {canBook ? (
+            <>
+              <p className="mb-6 mt-2 max-w-2xl text-ink-soft">Choose a doctor and a time and send a request. The clinic will call or email you to confirm{p.phone ? <>, or call <a className="font-medium underline" href={tel(p.phone)}>{p.phone}</a></> : null}.</p>
+              <BookingForm slug={p.slug} today={today} accent={accent} onAccent={onColor(accent)}
+                doctors={p.doctors.map((d) => ({ id: d.id, name: d.name, specialty: d.specialty, fee: d.fee }))} />
+            </>
+          ) : (
+            <p className="mt-2 text-ink-soft">{p.phone ? <>Call <a className="font-medium underline" href={tel(p.phone)}>{p.phone}</a> to book.</> : "Please contact the clinic to book."}</p>
+          )}
         </div>
       </section>
 

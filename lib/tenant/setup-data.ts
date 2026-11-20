@@ -149,12 +149,12 @@ export async function upcomingSlots(tenantId: string, memberId: string, days = 7
 export type SiteSettings = {
   published: boolean; theme_color: string; hero_title: string | null; hero_subtitle: string | null; about_md: string | null;
   contact_phone: string | null; contact_email: string | null; whatsapp: string | null; map_url: string | null; hours_text: string | null;
-  seo_title: string | null; seo_description: string | null; show_prices: boolean; show_registration_numbers: boolean;
+  seo_title: string | null; seo_description: string | null; show_prices: boolean; show_registration_numbers: boolean; booking_enabled: boolean;
 };
 export async function getWebsite(tenantId: string) {
   const db = serviceClient();
   const [s, a, f] = await Promise.all([
-    db.from("site_settings").select("published, theme_color, hero_title, hero_subtitle, about_md, contact_phone, contact_email, whatsapp, map_url, hours_text, seo_title, seo_description, show_prices, show_registration_numbers").eq("tenant_id", tenantId).maybeSingle(),
+    db.from("site_settings").select("published, theme_color, hero_title, hero_subtitle, about_md, contact_phone, contact_email, whatsapp, map_url, hours_text, seo_title, seo_description, show_prices, show_registration_numbers, booking_enabled").eq("tenant_id", tenantId).maybeSingle(),
     db.from("site_announcements").select("id, title, body_md, starts_at, ends_at, is_pinned").eq("tenant_id", tenantId).order("starts_at", { ascending: false }),
     db.from("site_faqs").select("id, question, answer_md, sort_order").eq("tenant_id", tenantId).order("sort_order"),
   ]);

@@ -400,7 +400,7 @@ export async function saveWebsite(fd: FormData): Promise<FormResult> {
     tenant_id: ctx.tenantId, published: publish, theme_color: color, hero_title: opt(fd, "hero_title"), hero_subtitle: opt(fd, "hero_subtitle"),
     about_md: opt(fd, "about_md"), contact_phone: opt(fd, "contact_phone"), contact_email: opt(fd, "contact_email"), whatsapp: opt(fd, "whatsapp"),
     map_url: mapUrl, hours_text: opt(fd, "hours_text"), seo_title: opt(fd, "seo_title"), seo_description: opt(fd, "seo_description"),
-    show_prices: on(fd, "show_prices"), show_registration_numbers: on(fd, "show_registration_numbers"),
+    show_prices: on(fd, "show_prices"), show_registration_numbers: on(fd, "show_registration_numbers"), booking_enabled: on(fd, "booking_enabled"),
     published_at: publish && !before?.published ? new Date().toISOString() : undefined, updated_by: ctx.memberId,
   }, { onConflict: "tenant_id" });
   if (error) return { ok: false, error: friendly(error) };

@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { DEMO_CLINIC, DEMO_DOCTORS, DEMO_QUEUE, DEMO_STOCK_ALERTS, DEMO_TODAY, npr } from "@/lib/demo";
+import { DEMO_STOCK_ALERTS, DEMO_TODAY, npr } from "@/lib/demo";
+import { getDeskSetup, getToday, todayIn } from "@/lib/desk/data";
 import { DemoNotice, PageHeader, Panel, ButtonLink } from "@/components/ui/primitives";
 import { Icon } from "@/components/ui/icon";
 import { cn } from "@/lib/cn";
@@ -23,11 +24,22 @@ export default async function AdminDashboard() {
   const { items: SETUP, blockers } = await getSetupStatus(ctx.tenantId);
   const setupDone = SETUP.filter((s) => s.done).length;
   const pending = ctx.tenantStatus === "pending";
+  const today = todayIn();
+  const [{ doctors }, board] = await Promise.all([getDeskSetup(ctx.tenantId), getToday(ctx.tenantId, today)]);
+  const live = board.visits.filter((v) => v.status !== "cancelled");
+  const flow = {
+    booked: board.appointments.filter((a) => !["cancelled"].includes(a.status)).length,
+    arrived: live.length,
+    waiting: live.filter((v) => v.status === "waiting").length,
+    done: live.filter((v) => ["closed", "awaiting_billing"].includes(v.status)).length,
+    opd: board.visits.reduce((sum, v) => sum + (v.paid ?? 0), 0),
+  };
+  const dateLine = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kathmandu", weekday: "long", day: "numeric", month: "long", year: "numeric" }).format(new Date());
   return (
     <>
       <PageHeader
         title="Today at the clinic"
-        subtitle={`${DEMO_CLINIC.todayBs} · ${DEMO_CLINIC.todayAd}`}
+        subtitle={dateLine}
         actions={<ButtonLink href="/employee/registrar" tone="secondary">Open registrar desk</ButtonLink>}
       />
       {pending ? (
@@ -49,29 +61,28 @@ export default async function AdminDashboard() {
           {ctx.membershipRole === "tenant_admin" ? <div className="mt-4"><GoLiveButton ready={blockers.length === 0} /></div> : null}
         </section>
       ) : null}
-      <DemoNotice />
-
       {/* Patients flow, written as one sentence-like line rather than four look-alike tiles. */}
       <section aria-label="Patients today" className="mb-6 flex flex-wrap items-baseline gap-x-8 gap-y-2 border-y border-line py-4">
-        <Figure value={t.booked} label="booked" />
-        <Figure value={t.arrived} label="registered" />
-        <Figure value={t.waiting} label="waiting now" emphasis />
-        <Figure value={t.done} label="seen" />
+        <Figure value={flow.booked} label="booked" />
+        <Figure value={flow.arrived} label="registered" />
+        <Figure value={flow.waiting} label="waiting now" emphasis />
+        <Figure value={flow.done} label="seen" />
       </section>
 
       <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
         <div className="space-y-6">
           <Panel title="OPD queues" aside={<Link className="text-sm font-medium text-pine hover:underline" href="/employee/registrar">Registrar view</Link>} flush>
             <ul className="divide-y divide-line">
-              {DEMO_DOCTORS.map((d) => {
-                const q = DEMO_QUEUE.filter((v) => v.doctorId === d.id);
+              {doctors.length === 0 ? <li className="px-5 py-4 text-ink-soft">No doctors set up yet.</li> : null}
+              {doctors.map((d) => {
+                const q = live.filter((v) => v.doctorId === d.id);
                 const now = q.find((v) => v.status === "with_doctor");
                 const waiting = q.filter((v) => v.status === "waiting").length;
                 return (
                   <li key={d.id} className="flex flex-wrap items-center gap-x-6 gap-y-1 px-5 py-3.5">
                     <div className="min-w-0 flex-1">
                       <div className="font-medium">{d.name}</div>
-                      <div className="text-sm text-ink-faint">{d.specialty} · {d.room}</div>
+                      <div className="text-sm text-ink-faint">{[d.specialty, d.room].filter(Boolean).join(", ")}</div>
                     </div>
                     <div className="text-sm text-ink-soft">
                       {now ? <>Seeing token <span className="rounded bg-marigold-tint px-1.5 font-semibold text-marigold-ink">{now.token}</span></> : "Not started"}
@@ -83,6 +94,7 @@ export default async function AdminDashboard() {
             </ul>
           </Panel>
 
+          <DemoNotice>Stock and pharmacy figures below are demo data until inventory (B5) and pharmacy sales (B7) are built.</DemoNotice>
           <Panel title="Stock that needs attention" aside={<Link className="text-sm font-medium text-pine hover:underline" href="/admin/stock">Stock & stores</Link>} flush>
             <ul className="divide-y divide-line">
               {DEMO_STOCK_ALERTS.map((a) => (
@@ -101,7 +113,7 @@ export default async function AdminDashboard() {
         <div className="space-y-6">
           <Panel title="Money today">
             <dl className="grid grid-cols-[1fr_auto] gap-y-2.5 text-[0.95rem]">
-              <dt className="text-ink-soft">OPD and services</dt><dd className="text-right">{npr(t.opdRevenue)}</dd>
+              <dt className="text-ink-soft">OPD fees received (real)</dt><dd className="text-right">{npr(flow.opd)}</dd>
               <dt className="text-ink-soft">Pharmacy</dt><dd className="text-right">{npr(t.pharmacyRevenue)}</dd>
               <dt className="border-t border-line pt-2.5 font-semibold">Sales</dt>
               <dd className="border-t border-line pt-2.5 text-right font-semibold">{npr(t.opdRevenue + t.pharmacyRevenue)}</dd>

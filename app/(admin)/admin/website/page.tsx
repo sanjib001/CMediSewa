@@ -38,6 +38,7 @@ export default async function Website() {
               <label className="block"><span className={label}>Accent colour</span><input name="theme_color" type="color" defaultValue={site?.theme_color ?? "#0f5c4d"} className="h-10 w-20 rounded-control border border-line-strong" /></label>
               <div className="flex flex-col justify-end gap-1">
                 <label className="flex items-center gap-2"><input type="checkbox" name="show_prices" defaultChecked={site?.show_prices ?? true} />Show fees and prices</label>
+                <label className="flex items-center gap-2"><input type="checkbox" name="booking_enabled" defaultChecked={site?.booking_enabled ?? true} />Take booking requests on the website</label>
                 <label className="flex items-center gap-2"><input type="checkbox" name="show_registration_numbers" defaultChecked={site?.show_registration_numbers ?? true} />Show doctors&apos; NMC numbers</label>
               </div>
               <label className="block"><span className={label}>Search title</span><input name="seo_title" maxLength={70} defaultValue={site?.seo_title ?? ""} className={field} /></label>
