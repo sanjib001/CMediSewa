@@ -21,7 +21,10 @@ const NEPAL = [
 ];
 
 // Public plans are read live from the platform's plans (Super Admin → Plans & billing).
+// The page is pre-rendered at build time; a build without database access (CI) renders it
+// without plans instead of failing, and the 5-minute revalidation fills them in when served.
 async function publicPlans() {
+  if (!process.env.NEXT_PUBLIC_SUPABASE_URL || !process.env.SUPABASE_SECRET_KEY) return [];
   const { data } = await serviceClient().from("plans")
     .select("id, name, description, price_npr, billing_cycle_days, features")
     .eq("is_public", true).eq("is_active", true).order("sort_order").order("price_npr");
