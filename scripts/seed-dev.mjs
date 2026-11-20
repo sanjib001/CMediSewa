@@ -22,6 +22,7 @@ import crypto from "node:crypto";
 import { createClient } from "@supabase/supabase-js";
 import { ROOT, loadTarget, client } from "./lib/db.mjs";
 import { pinProblem } from "../lib/permissions.ts";
+import { ensureDemoSetup } from "./lib/demo-setup.mjs";
 
 const SLUG = "arogya-demo";
 const OUT = path.join(ROOT, "scripts", "dev-users.local.json");
@@ -138,6 +139,8 @@ try {
       ...(p.admin || p.credential?.profession === "doctor" ? { note: "2FA: an authenticator app is required at first sign-in" } : {}),
     };
   }
+  const setup = await ensureDemoSetup(c, tenantId);
+  if (setup.length) console.log(`demo setup added: ${setup.join(", ")}`);
   await c.query(
     `insert into audit_log (tenant_id, actor_kind, action, target_type, target_id, outcome, detail)
      values ($1, 'system', 'dev.seed', 'tenant', $2, 'success', $3)`, [tenantId, String(tenantId), { via: "scripts/seed-dev.mjs", reset }]);
