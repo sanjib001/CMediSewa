@@ -2,6 +2,8 @@ import Link from "next/link";
 import { requireTenant, can } from "@/lib/auth/context";
 import { getSuggestions, lastReconciliation } from "@/lib/inventory/data";
 import { runReconciliation } from "@/app/actions/inventory";
+import { listVendors } from "@/lib/purchasing/data";
+import { OrderSuggestions } from "@/components/purchasing/orders";
 import { ActionForm } from "@/components/platform/action-form";
 import { PageHeader, Panel } from "@/components/ui/primitives";
 
@@ -14,7 +16,7 @@ const npr = (n: number) => `Rs. ${n.toLocaleString("en-IN", { maximumFractionDig
 // ledger check. Purchase orders arrive in B6 and will start from this list.
 export default async function Reorder() {
   const ctx = await requireTenant({ operation: "admin.area", permission: "view_stock", allowPendingTenant: true, next: "/admin/stock/reorder" });
-  const [sug, rec] = await Promise.all([getSuggestions(ctx.tenantId), lastReconciliation(ctx.tenantId)]);
+  const [sug, rec, vendors] = await Promise.all([getSuggestions(ctx.tenantId), lastReconciliation(ctx.tenantId), listVendors(ctx.tenantId)]);
   const total = sug.reduce((s, x) => s + x.est_cost, 0);
   return (
     <>
@@ -40,6 +42,13 @@ export default async function Reorder() {
             </div>
           )}
         </Panel>
+
+        {sug.length && can(ctx, "manage_purchases") ? (
+          <Panel title="Order from a vendor" aside={<span className="text-sm text-ink-faint">Creates a purchase order you then receive against</span>}>
+            <OrderSuggestions vendors={vendors.filter((v) => v.is_active).map((v) => ({ id: v.id, name: v.name }))}
+              suggestions={sug.map((s) => ({ key: `${s.store_id}:${s.item_id}`, store_id: s.store_id, store: s.store, item_id: s.item_id, item: s.item, units: s.units, unit: s.unit, purchase_unit_id: s.purchase_unit_id, unit_cost: s.unit_cost }))} />
+          </Panel>
+        ) : null}
 
         <Panel title="Stock ledger check" aside={<span className="text-sm text-ink-faint">Runs every night; balances are rebuilt from the ledger if they ever differ</span>}>
           <p className="mb-3 text-ink-soft">

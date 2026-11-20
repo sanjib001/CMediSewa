@@ -11,7 +11,8 @@ import { cn } from "@/lib/cn";
 const f = "w-full rounded-control border border-line-strong bg-surface px-2 py-1.5 text-sm text-ink placeholder:text-ink-faint";
 const lbl = "mb-1 block text-sm font-medium";
 const npr = (n: number) => `Rs. ${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-type Row = { item: ItemRow; unit_id: string; qty: string; free_qty: string; unit_cost: string; discount_pct: string; tax_rate: number; batch_no: string; expiry_date: string; mrp: string; short_expiry_reason: string };
+export type PoPrefill = { poId: string; poNo: string; vendorId: string; storeId: string; lines: { po_line_id: string; item: ItemRow; unit_id: string; qty: number; unit_cost: number | null }[] };
+type Row = { po_line_id?: string; item: ItemRow; unit_id: string; qty: string; free_qty: string; unit_cost: string; discount_pct: string; tax_rate: number; batch_no: string; expiry_date: string; mrp: string; short_expiry_reason: string };
 
 function Picker({ onPick }: { onPick: (i: ItemRow) => void }) {
   const [q, setQ] = useState("");
@@ -37,13 +38,16 @@ function Picker({ onPick }: { onPick: (i: ItemRow) => void }) {
 
 /** Enter a vendor bill (W-41). Totals shown here are an estimate; the database computes the
  *  real ones from the lines. Each line becomes a new lot in the receiving store. */
-export function PurchaseForm({ vendors, stores, defaultVendor, today }: { vendors: { id: string; name: string }[]; stores: { id: string; name: string }[]; defaultVendor?: string; today: string }) {
+export function PurchaseForm({ vendors, stores, defaultVendor, today, po }: { vendors: { id: string; name: string }[]; stores: { id: string; name: string }[]; defaultVendor?: string; today: string; po?: PoPrefill | null }) {
   const router = useRouter();
-  const [vendorId, setVendorId] = useState(defaultVendor ?? vendors[0]?.id ?? "");
-  const [storeId, setStoreId] = useState(stores[0]?.id ?? "");
+  const [vendorId, setVendorId] = useState(po?.vendorId ?? defaultVendor ?? vendors[0]?.id ?? "");
+  const [storeId, setStoreId] = useState(po?.storeId ?? stores[0]?.id ?? "");
   const [billNo, setBillNo] = useState("");
   const [billDate, setBillDate] = useState(today);
-  const [rows, setRows] = useState<Row[]>([]);
+  const [rows, setRows] = useState<Row[]>(po ? po.lines.map((l) => ({
+    po_line_id: l.po_line_id, item: l.item, unit_id: l.unit_id, qty: String(l.qty), free_qty: "", unit_cost: l.unit_cost === null ? "" : String(l.unit_cost), discount_pct: "", tax_rate: 0,
+    batch_no: "", expiry_date: "", mrp: "", short_expiry_reason: "",
+  })) : []);
   const [billDiscount, setBillDiscount] = useState("");
   const [cash, setCash] = useState("");
   const [online, setOnline] = useState("");
@@ -67,9 +71,10 @@ export function PurchaseForm({ vendors, stores, defaultVendor, today }: { vendor
 
   return (
     <div className="space-y-6">
+      {po ? <p className="rounded-control bg-pine-tint px-3 py-2 text-sm text-pine-deep">Receiving order {po.poNo}: the lines below are what&apos;s still to come. Change quantities to what actually arrived and remove anything that didn&apos;t.</p> : null}
       <section className="grid gap-3 rounded-panel border border-line bg-surface p-5 sm:grid-cols-4">
         <label className="block sm:col-span-2"><span className={lbl}>Vendor</span>
-          <select value={vendorId} onChange={(e) => setVendorId(e.target.value)} className={cn(f, "py-2")}>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label>
+          <select value={vendorId} disabled={Boolean(po)} onChange={(e) => setVendorId(e.target.value)} className={cn(f, "py-2")}>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select></label>
         <label className="block"><span className={lbl}>Vendor&apos;s bill no.</span><input value={billNo} onChange={(e) => setBillNo(e.target.value)} required className={cn(f, "py-2")} /></label>
         <label className="block"><span className={lbl}>Bill date</span><input type="date" max={today} value={billDate} onChange={(e) => setBillDate(e.target.value)} className={cn(f, "py-2")} /></label>
         <label className="block sm:col-span-2"><span className={lbl}>Receive into</span>
@@ -132,7 +137,7 @@ export function PurchaseForm({ vendors, stores, defaultVendor, today }: { vendor
           setError(null); setBadLine(null);
           const r = await postPurchase({
             idempotencyKey: key.current, vendorId, billNo, billDate, storeId, billDiscount: bd, cash: Number(cash) || 0, online: Number(online) || 0, channel,
-            lines: rows.map((x) => ({ item_id: x.item.id, unit_id: x.unit_id, qty: x.qty, free_qty: x.free_qty || 0, unit_cost: x.unit_cost || 0, discount_pct: x.discount_pct || 0,
+            lines: rows.map((x) => ({ po_line_id: x.po_line_id ?? null, item_id: x.item.id, unit_id: x.unit_id, qty: x.qty, free_qty: x.free_qty || 0, unit_cost: x.unit_cost || 0, discount_pct: x.discount_pct || 0,
               tax_rate: x.tax_rate, batch_no: x.batch_no, expiry_date: x.expiry_date, mrp: x.mrp, short_expiry_reason: x.short_expiry_reason })),
           });
           if (r.ok) { router.push(`/admin/purchases/${r.id}`); router.refresh(); }

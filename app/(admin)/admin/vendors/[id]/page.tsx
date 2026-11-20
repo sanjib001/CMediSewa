@@ -26,7 +26,10 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
   return (
     <>
       <PageHeader title={v.name} subtitle={<><Link href="/admin/vendors" className="text-pine hover:underline">Vendors</Link> / {v.vendor_code}. You owe <strong>{npr(v.payable)}</strong>{v.advance ? `, and have ${npr(v.advance)} paid in advance` : ""}.</>}
-        actions={can(ctx, "manage_purchases") ? <ButtonLink href={`/admin/purchases/new?vendor=${v.id}`}>Enter a bill</ButtonLink> : null} />
+        actions={<>
+          {can(ctx, "return_to_vendor") ? <ButtonLink tone="secondary" href={`/admin/purchases/returns/new?vendor=${v.id}`}>Return stock</ButtonLink> : null}
+          {can(ctx, "manage_purchases") ? <ButtonLink href={`/admin/purchases/new?vendor=${v.id}`}>Enter a bill</ButtonLink> : null}
+        </>} />
       <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
         <div className="space-y-6">
           <Panel title="Bills" aside={<span className="text-sm text-ink-faint">{open.length} unpaid</span>} flush>

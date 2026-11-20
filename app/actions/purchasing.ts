@@ -38,6 +38,7 @@ const ERRORS: [RegExp, string][] = [
   [/BAD_AMOUNT/, "Enter an amount more than zero."],
   [/BAD_QTY/, "Quantities must be more than zero."],
   [/NO_LINES/, "Add at least one line."],
+  [/PO_LINE_NOT_FOUND/, "That order line isn't open for this vendor any more."],
   [/batch_no_check/, "Batch numbers use letters, numbers, / . _ - only."],
   [/pan_vat_no_check/, "PAN/VAT is 9 digits."],
   [/phone_check/, "Enter a valid phone number."],
@@ -81,7 +82,7 @@ export async function postVendorOpening(fd: FormData): Promise<{ ok: true; messa
 
 export type PurchaseLine = {
   item_id: string; unit_id: string; qty: string | number; free_qty?: string | number; unit_cost: string | number; discount_pct?: string | number; tax_rate?: number;
-  batch_no?: string; mfg_date?: string; expiry_date?: string; mrp?: string | number; sale_price?: string | number; short_expiry_reason?: string;
+  batch_no?: string; mfg_date?: string; expiry_date?: string; mrp?: string | number; sale_price?: string | number; short_expiry_reason?: string; po_line_id?: string | null;
 };
 export async function postPurchase(input: {
   idempotencyKey: string; vendorId: string; billNo: string; billDate: string; storeId: string; lines: PurchaseLine[];
@@ -124,4 +125,67 @@ export async function payVendor(fd: FormData): Promise<{ ok: true; message: stri
   if (error) return { ok: false, error: friendly(error) };
   refresh(vendorId);
   return { ok: true, message: `Payment of Rs. ${(cash + online).toLocaleString("en-IN")} recorded, applied to the oldest bills first.` };
+}
+
+// ── B6b: purchase orders, returns, payable check ──────────────────────────────
+const MORE: [RegExp, string][] = [
+  [/PO_HAS_RECEIPTS/, "Goods were already received on this order. Close it instead of cancelling."],
+  [/PO_NOT_OPEN/, "This order is already finished."],
+  [/LOT_FROM_ANOTHER_VENDOR/, "That batch was bought from a different vendor."],
+  [/LOT_NOT_ON_THIS_BILL/, "That batch isn't on this bill."],
+  [/MORE_THAN_RECEIVED/, "That's more than this bill brought in (minus earlier returns)."],
+  [/INSUFFICIENT_STOCK/, "Not enough of that batch in this store."],
+  [/HAS_RETURNS/, "Items from this bill were returned, so it can't be voided."],
+  [/REASON_REQUIRED/, "Choose a reason for each line."],
+];
+const friendlier = (e: { message?: string; code?: string } | null) => {
+  const text = `${e?.code ?? ""} ${e?.message ?? ""}`;
+  for (const [re, msg] of MORE) if (re.test(text)) return msg;
+  return friendly(e);
+};
+
+export async function createPurchaseOrder(input: { vendorId: string; storeId: string; expected?: string; note?: string; lines: { item_id: string; unit_id: string; qty: number | string; expected_unit_cost?: number | string | null }[] }):
+  Promise<{ ok: true; id: string } | Fail> {
+  const ctx = await requireTenant({ operation: "stock.operate", permission: "manage_purchases", allowPendingTenant: true, next: "/admin/purchases/orders" });
+  const { data, error } = await serviceClient().rpc("create_purchase_order", {
+    p_tenant: ctx.tenantId, p_by: ctx.memberId, p_vendor: input.vendorId, p_store: input.storeId, p_expected: input.expected || null,
+    p_note: String(input.note ?? "").slice(0, 300), p_lines: (input.lines ?? []).slice(0, 200),
+  });
+  if (error) return { ok: false, error: friendlier(error) };
+  revalidatePath("/admin/purchases/orders");
+  return { ok: true, id: data as string };
+}
+
+export async function endPurchaseOrder(input: { id: string; action: "cancel" | "close"; reason?: string }): Promise<{ ok: true } | Fail> {
+  const ctx = await requireTenant({ operation: "stock.operate", permission: "manage_purchases", allowPendingTenant: true, next: "/admin/purchases/orders" });
+  const { error } = await serviceClient().rpc("end_purchase_order", { p_tenant: ctx.tenantId, p_by: ctx.memberId, p_po: input.id, p_action: input.action, p_reason: input.reason ?? null });
+  if (error) return { ok: false, error: friendlier(error) };
+  revalidatePath("/admin/purchases/orders");
+  revalidatePath(`/admin/purchases/orders/${input.id}`);
+  return { ok: true };
+}
+
+export async function postPurchaseReturn(input: {
+  idempotencyKey: string; vendorId: string; storeId: string; invoiceId?: string | null; settlement: "credit_note" | "cash_refund" | "online_refund";
+  channel?: string | null; note?: string; lines: { batch_id: string; qty_base: number; reason: string }[];
+}): Promise<{ ok: true; id: string } | Fail> {
+  const ctx = await requireTenant({ operation: "stock.post", permission: "return_to_vendor", allowPendingTenant: true, next: "/admin/purchases/returns/new" });
+  const { data, error } = await serviceClient().rpc("post_purchase_return", {
+    p_tenant: ctx.tenantId, p_idempotency_key: input.idempotencyKey, p_vendor: input.vendorId, p_store: input.storeId, p_invoice: input.invoiceId || null,
+    p_settlement: input.settlement, p_channel: input.settlement === "online_refund" ? input.channel ?? null : null, p_note: String(input.note ?? "").slice(0, 300),
+    p_lines: (input.lines ?? []).slice(0, 200), p_by: ctx.memberId, p_session_level: ctx.level, p_device: ctx.deviceId,
+  });
+  if (error) return { ok: false, error: friendlier(error) };
+  refresh(input.vendorId);
+  revalidatePath("/admin/purchases/returns");
+  return { ok: true, id: data as string };
+}
+
+export async function runPayableCheck(): Promise<{ ok: true; message: string } | Fail> {
+  const ctx = await requireTenant({ operation: "admin.area", permission: "pay_vendors", allowPendingTenant: true, next: "/admin/vendors" });
+  const { data, error } = await serviceClient().rpc("reconcile_vendor_payables", { p_tenant: ctx.tenantId });
+  if (error) return { ok: false, error: friendly(error) };
+  const r = data as { vendors: number; mismatches: number };
+  revalidatePath("/admin/vendors");
+  return { ok: true, message: r.mismatches ? `${r.mismatches} vendor(s) don't match their documents. Logged for review.` : `All ${r.vendors} vendors match their bills, payments and returns.` };
 }

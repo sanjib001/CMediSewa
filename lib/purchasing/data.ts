@@ -92,3 +92,71 @@ export async function listVendorPayments(tenantId: string, vendorId: string): Pr
     .eq("tenant_id", tenantId).eq("vendor_id", vendorId).order("paid_at", { ascending: false }).limit(100);
   return ((data ?? []) as PaymentRow[]).map((p) => ({ ...p, amount: Number(p.amount), cash_amount: Number(p.cash_amount), online_amount: Number(p.online_amount) }));
 }
+
+// ── B6b: orders, returns, payable check ──────────────────────────────────────
+export type OrderRow = { id: string; po_no: string; vendor_id: string; deliver_to_store_id: string; status: string; expected_date: string | null; created_at: string; note: string | null };
+export async function listOrders(tenantId: string): Promise<OrderRow[]> {
+  return rows<OrderRow>(await serviceClient().from("purchase_orders").select("id, po_no, vendor_id, deliver_to_store_id, status, expected_date, created_at, note")
+    .eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(100), "orders");
+}
+export async function getOrder(tenantId: string, id: string) {
+  const db = serviceClient();
+  const { data: po } = await db.from("purchase_orders").select("*").eq("tenant_id", tenantId).eq("id", id).maybeSingle();
+  if (!po) return null;
+  const head = po as OrderRow & { closed_reason: string | null };
+  const lines = rows<{ id: string; line_no: number; item_id: string; unit_id: string; qty: number; factor_snapshot: number; base_qty: number; expected_unit_cost: number | null }>(
+    await db.from("purchase_order_lines").select("id, line_no, item_id, unit_id, qty, factor_snapshot, base_qty, expected_unit_cost").eq("po_id", id).order("line_no"), "order lines");
+  const ids = [...new Set(lines.map((l) => l.item_id))];
+  const [it, un, ...rec] = await Promise.all([
+    ids.length ? db.from("inventory_items").select("id, name").in("id", ids) : Promise.resolve({ data: [] }),
+    ids.length ? db.from("item_units").select("id, name").in("item_id", ids) : Promise.resolve({ data: [] }),
+    ...lines.map((l) => db.rpc("po_line_received", { p_line: l.id })),
+  ]);
+  return {
+    head,
+    lines: lines.map((l, i) => {
+      const received = Number((rec[i] as { data: unknown }).data ?? 0);
+      return { ...l, qty: Number(l.qty), base_qty: Number(l.base_qty), factor: Number(l.factor_snapshot), received_base: received,
+        remaining_units: Math.max(0, Math.round(((Number(l.base_qty) - received) / Number(l.factor_snapshot)) * 1000) / 1000),
+        item: ((it.data ?? []) as { id: string; name: string }[]).find((x) => x.id === l.item_id)?.name ?? "",
+        unit: ((un.data ?? []) as { id: string; name: string }[]).find((x) => x.id === l.unit_id)?.name ?? "" };
+    }),
+  };
+}
+
+export type ReturnRow = { id: string; return_no: string; vendor_id: string; settlement: string; total: number; posted_at: string; purchase_invoice_id: string | null };
+export async function listReturns(tenantId: string): Promise<ReturnRow[]> {
+  return rows<ReturnRow>(await serviceClient().from("purchase_returns").select("id, return_no, vendor_id, settlement, total, posted_at, purchase_invoice_id")
+    .eq("tenant_id", tenantId).order("posted_at", { ascending: false }).limit(100), "returns").map((r) => ({ ...r, total: Number(r.total) }));
+}
+
+export type ReturnableLot = { batch_id: string; item: string; batch_no: string; expiry_date: string | null; status: string; qty: number; unit: string; cost: number; on_bill: string | null };
+/** Lots in a store bought from this vendor (optionally only those on one bill), with stock on hand. */
+export async function returnableLots(tenantId: string, vendorId: string, storeId: string, invoiceId?: string | null): Promise<ReturnableLot[]> {
+  const db = serviceClient();
+  const lq = db.from("item_batches").select("id, item_id, batch_no, expiry_date, status, unit_cost_base, purchase_invoice_line_id").eq("tenant_id", tenantId).eq("vendor_id", vendorId);
+  const lots = rows<{ id: string; item_id: string; batch_no: string; expiry_date: string | null; status: string; unit_cost_base: number; purchase_invoice_line_id: string | null }>(await lq, "lots");
+  if (!lots.length) return [];
+  let keep = lots;
+  if (invoiceId) {
+    const { data: pl } = await db.from("purchase_invoice_lines").select("id").eq("purchase_id", invoiceId);
+    const set = new Set(((pl ?? []) as { id: string }[]).map((x) => x.id));
+    keep = lots.filter((l) => l.purchase_invoice_line_id && set.has(l.purchase_invoice_line_id));
+  }
+  const [bal, it, un] = await Promise.all([
+    db.from("stock_balances").select("batch_id, qty_on_hand").eq("tenant_id", tenantId).eq("store_id", storeId).in("batch_id", keep.map((l) => l.id)),
+    db.from("inventory_items").select("id, name").in("id", [...new Set(keep.map((l) => l.item_id))]),
+    db.from("item_units").select("item_id, name").eq("is_base", true).in("item_id", [...new Set(keep.map((l) => l.item_id))]),
+  ]);
+  const q = (id: string) => Number(((bal.data ?? []) as { batch_id: string; qty_on_hand: number }[]).find((b) => b.batch_id === id)?.qty_on_hand ?? 0);
+  return keep.filter((l) => q(l.id) > 0).map((l) => ({
+    batch_id: l.id, item: ((it.data ?? []) as { id: string; name: string }[]).find((x) => x.id === l.item_id)?.name ?? "", batch_no: l.batch_no, expiry_date: l.expiry_date,
+    status: l.status, qty: q(l.id), unit: ((un.data ?? []) as { item_id: string; name: string }[]).find((x) => x.item_id === l.item_id)?.name ?? "", cost: Number(l.unit_cost_base),
+    on_bill: l.purchase_invoice_line_id,
+  })).sort((a, b) => a.item.localeCompare(b.item) || (a.expiry_date ?? "9").localeCompare(b.expiry_date ?? "9"));
+}
+
+export async function lastPayableCheck(tenantId: string) {
+  const { data } = await serviceClient().from("payable_reconciliations").select("ran_at, vendors, mismatches").eq("tenant_id", tenantId).order("ran_at", { ascending: false }).limit(1).maybeSingle();
+  return data as { ran_at: string; vendors: number; mismatches: number } | null;
+}

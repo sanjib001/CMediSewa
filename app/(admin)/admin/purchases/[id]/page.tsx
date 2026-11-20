@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { requireTenant, can } from "@/lib/auth/context";
 import { getPurchase } from "@/lib/purchasing/data";
 import { VoidPurchase } from "@/components/purchasing/void-purchase";
-import { PageHeader, Panel } from "@/components/ui/primitives";
+import { ButtonLink, PageHeader, Panel } from "@/components/ui/primitives";
 
 export const metadata = { title: "Purchase" };
 export const dynamic = "force-dynamic";
@@ -21,7 +21,8 @@ export default async function Purchase({ params }: { params: Promise<{ id: strin
   return (
     <>
       <PageHeader title={`${h.purchase_no}${isVoid ? " (void)" : ""}`}
-        subtitle={<><Link href="/admin/purchases" className="text-pine hover:underline">Purchases</Link> / {p.vendor?.name} bill #{h.vendor_invoice_no} of {h.vendor_invoice_date}{p.store ? `, received into ${p.store}` : ""}.</>} />
+        subtitle={<><Link href="/admin/purchases" className="text-pine hover:underline">Purchases</Link> / {p.vendor?.name} bill #{h.vendor_invoice_no} of {h.vendor_invoice_date}{p.store ? `, received into ${p.store}` : ""}.</>}
+        actions={!isVoid && h.kind === "purchase" && can(ctx, "return_to_vendor") ? <ButtonLink tone="secondary" href={`/admin/purchases/returns/new?invoice=${id}`}>Return items from this bill</ButtonLink> : null} />
       {isVoid ? <p className="mb-6 rounded-panel bg-alert-tint p-4 text-alert">Voided: {h.void_reason}</p> : null}
       <div className="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
         <Panel title="Lines" flush>

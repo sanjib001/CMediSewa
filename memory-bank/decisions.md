@@ -748,6 +748,27 @@ enters the Admin area to finish setup. (Sending staff to /admin bounced them bac
 
 ---
 
+## B6b Orders, returns, payable check (2026-11-21)
+
+**D-99 Purchase orders hold no received quantity.** What was received on an order line is
+derived from the non-void bills whose lines reference it (`po_line_received`); the order's
+status (open → part received → received) is recomputed when a bill is posted or voided.
+An order is cancelled only before anything arrives, otherwise closed with a reason. Orders
+can be started from Reorder suggestions (one order per store).
+
+**D-100 Purchase returns as built:** only lots bought from that vendor; when a bill is named,
+only its lots and no more than it brought in minus earlier returns; expired, blocked and
+recalled lots can go back. Value = lot cost plus the VAT paid on it (reversed from
+TAX_RECEIVABLE). Credit note: settles open bills (the named bill first, then oldest), any rest
+is a vendor advance; refund: cash or bank in. A bill with returns can't be voided.
+
+**D-101 Payable check:** per vendor, journal AP_VENDORS = Σ bills' outstanding and journal
+VENDOR_ADVANCES = unapplied payments + unapplied credit notes. A difference is never
+"repaired" (the journal is the record); it is logged (audit outcome = error) and shown on
+Vendors. It runs nightly with the stock check (`/api/cron/stock`) and on demand.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |

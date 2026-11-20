@@ -15,7 +15,7 @@ export default async function Purchases() {
   const vname = (id: string) => vendors.find((v) => v.id === id)?.name ?? "";
   return (
     <>
-      <PageHeader title="Purchases" subtitle="Vendor bills received into stock."
+      <PageHeader title="Purchases" subtitle={<>Vendor bills received into stock. Also: <Link href="/admin/purchases/orders" className="text-pine underline">Purchase orders</Link>, <Link href="/admin/purchases/returns" className="text-pine underline">Returns</Link>.</>}
         actions={can(ctx, "manage_purchases") ? <ButtonLink href="/admin/purchases/new">Enter a bill</ButtonLink> : null} />
       {bills.length === 0 ? <p className="rounded-panel border border-line bg-surface p-5 text-ink-soft">No bills yet.</p> : (
         <div className="overflow-x-auto rounded-panel border border-line bg-surface">

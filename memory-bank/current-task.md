@@ -1,7 +1,17 @@
 # Current Task
 
-**Phase:** Phase 0 backend: B1–B5 done. **B6a purchasing is done.** Next: **B6b** purchase orders, purchase returns, payable reconciliation.
+**Phase:** Phase 0 backend: B1–B5 done. **B6 purchasing is done** (B6a + B6b). Next: **B7 Sales & billing** (pharmacy counter, dispensing, returns, dues).
 **Last updated:** 2026-11-20
+
+## B6b Purchase orders, returns, payable check: done (2026-11-21)
+| Item | Status |
+|---|---|
+| Migration 0043: purchase_orders (+lines), bill lines/headers linked to orders, purchase_returns (+lines, +allocations), payable_reconciliations; po_line_received, po_refresh_status, create/end_purchase_order, post_purchase_return, reconcile_vendor_payables; post_purchase_invoice and void_purchase_invoice updated for orders; nightly job also checks payables | done |
+| Purchase orders list/new/order page (ordered, received, still to come; receive a bill for it; cancel/close); order from Reorder suggestions | done |
+| Returns list; Return to vendor (from a bill, a vendor or the menu): batches in a store bought from that vendor, quantity and reason per batch, credit note / cash / online refund | done |
+| Vendors page: payables check (last result + Check now) | done |
+| Checks | DB 76/76 · **purchasing end-to-end (B6a+B6b) 44/44** incl. accounts inventory = stock ledger and payables = documents · all earlier journeys pass · typecheck/lint/build ✓ · posture ✓ |
+| Not yet | applying a vendor advance to a later bill; emailing a PO to the vendor (needs mail) |
 
 ## Super Admin: create a clinic directly: done (2026-11-21)
 | Item | Status |
