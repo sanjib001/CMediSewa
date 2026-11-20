@@ -8,6 +8,7 @@ export const EXPOSED_POSTING_FUNCTIONS = new Set([
   "request_transfer", "decide_transfer", "dispatch_transfer", "receive_transfer", "post_stock_adjustment",
   "start_stock_count", "record_count", "post_stock_count", "cancel_stock_count", "set_batch_status", "post_disposal",
   "reconcile_stock_balances", "reconcile_all_tenants",
+  "post_vendor_opening", "post_purchase_invoice", "void_purchase_invoice", "post_vendor_payment",
 ]);
 
 const LEDGER_TABLES = ["postings", "ledger_entries", "document_sequences", "ledger_accounts"];
