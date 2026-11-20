@@ -133,7 +133,7 @@ Performance is bounded by round-trips, not query cost: remove round trips, batch
 ### A. Reusable patterns (adapt the idea, re-implement for CMediSewa)
 | Pattern | HRestroSewa source | CMediSewa adaptation |
 |---|---|---|
-| Shared-schema multi-tenancy | `restaurant_id` everywhere | `clinic_id` everywhere, **plus composite FKs `(clinic_id, id)`** so the DB itself rejects cross-tenant references |
+| Shared-schema multi-tenancy | `restaurant_id` everywhere | `tenant_id` everywhere, **plus composite FKs `(tenant_id, id)`** so the DB itself rejects cross-tenant references |
 | Server-only data access + RLS deny-all backstop | service_role, revoked anon grants | Same, **plus** clinical access through RPCs that check care relationship and write the audit row in one transaction |
 | Middleware = redirect only; guards = authority | `proxy.ts`, `guards.ts` | Same split |
 | Live staff-row check per request | `getStaffRow` | Same, plus a check that the clinic is active and its subscription valid |
@@ -151,7 +151,7 @@ Performance is bounded by round-trips, not query cost: remove round trips, batch
 | Ordered SQL + guarded runner | `scripts/migrate.mjs` | Same tool shape, with CMediSewa hostnames |
 
 ### B. Reusable components (copy then adapt; no shared package)
-Recommendation: **copy at Phase 0, then own the copy.** A shared npm package or monorepo
+Recommendation: **copy at B0 (Foundation), then own the copy.** A shared npm package or monorepo
 would tie CMediSewa's release cadence to a production POS for a handful of small files.
 Revisit if more than about 3 products share them (D-02).
 
@@ -185,8 +185,61 @@ self-service links.
 ### Explicitly NOT carried over
 Tables, sessions, orders, OT tickets, workstations, menu, stock/recipes, rooms/stays, walk-ins,
 mock bills, rota payroll, QR ordering modes, the 4-digit-PIN-as-primary-credential model
-(too weak for medical records, see D-05), and the admin-bypasses-everything rule for clinical
+(replaced by a device-bound PIN layer over email/password, D-27), and the admin-bypasses-everything rule for clinical
 content (see D-06).
+
+## 2a. Tenant link + PIN flow (analysed 2026-11-20 for Revision 2; `app/actions/auth.ts`, `proxy.ts`)
+1. A manager shares `/login?mode=staff&slug=<slug>`. `proxy.ts` sets the httpOnly
+   `rs_last_slug` cookie (400 days) when the link is **opened**, before any login, so an
+   installed PWA starts on that restaurant. Staff can also find a slug with
+   `searchRestaurants` (name ILIKE, at least 2 chars, at most 8 results, active only).
+2. `getRestaurantStaff(slug)` returns **every active staff member's id, name, title and role**,
+   unauthenticated.
+3. `loginWithPin(restaurant_user_id, pin)`: a 4-digit check → `pin_lockout_status` (refuses
+   even a correct PIN while locked) → `signInWithPassword(emp-<id>@restrosewa.internal,
+   "rspin-"+pin)`, with a legacy raw-PIN fallback that upgrades the account →
+   `record_pin_attempt` → 5 failures lock for 30 minutes → route by role (admins also use
+   PIN).
+4. Logout is local scope and returns the device to its restaurant's picker.
+**Kept for CMediSewa:** the tenant link, the remembered-tenant cookie, the PWA start-URL
+behaviour, the picker + PIN pad, DB-clock lockout, local-scope logout.
+**Changed:** the PIN is a separate hash rather than the Auth password, the picker only shows
+on trusted devices, the PIN is 6 digits, there is a per-device throttle, PIN sessions are
+capped at A1, and admins need A2 for the Admin area (D-27).
+
+## 2b. Stock, purchasing, sales & finance (analysed 2026-11-20 for Revision 3)
+Verified in `supabase/migrations/20260711200000_stock.sql`, `…200001_stock_report.sql`,
+`…300000_purchases.sql`, `…300001_purchase_functions.sql`,
+`20260825100000_extra_income.sql` (`finance_transactions`), `lib/payment-split.ts`.
+- **products**: `product_code` (`PRD-` + per-tenant seq), **one free-text `unit`** (the
+  comment reads "buy in the unit you sell in", so there is no conversion), `opening_stock`
+  (set once), `low_stock_threshold`, `last_unit_cost`, `is_active`. No batches, expiry or
+  locations.
+- **stock_adjustments**: `kind adjustment|wastage`, signed `qty ≠ 0`, notes. Stock
+  on hand is derived (`stock_report`): opening + purchases − POS usage (order lines × recipe
+  links, with dated cancellation releases) ± adjustments.
+- **purchases / purchase_items**: `PUR-` code from `seq_no` via
+  `pg_advisory_xact_lock(hashtext('purchase_seq:'||restaurant))` + `max()+1`;
+  `cash + online + credit = total` CHECK; `line_total` generated. **`record_purchase`**
+  validates every product's tenant, **computes the total itself**, locks the vendor `FOR
+  UPDATE`, derives the cash/online split from the method, writes lines, sets
+  `last_unit_cost`, and adds the credit part to the stored `vendors.credit_balance`.
+- **Vendor payments** move `credit_balance` down. `edit_purchase` corrects in place behind
+  the Security PIN, with an audit trail.
+- **Payments**: cash/online/card legs, "mixed" kept in lockstep by `resolveSplit()` (the DB
+  CHECK has the final say; online is the anchor and cash absorbs rounding). Card counts as
+  bank money.
+- **Finance**: `finance_transactions` is a derived ledger, a union of payments, credits,
+  purchases, vendor payments, expenses, income and advances, each row carrying
+  cash/online/credit-to-us/credit-by-us deltas and running balances. `finance_report` gives
+  opening and closing. Profit is explicitly **estimated**, because cost comes from
+  `last_unit_cost` × recipe links.
+**Carried into CMediSewa:** server-computed totals, row locks, CHECK-balanced splits,
+same-sign legs, purchase as the single source of stock-in and payable, FIFO settlement,
+no-back-dating expenses, the four money balances, report layout.
+**Redesigned:** units with conversion, lots per receipt with expiry, stores, a movement
+ledger + non-negative balance cache, per-lot sale allocations, an idempotent posting
+pipeline, a journal with exact COGS, immutable posted documents (D-38 to D-48).
 
 ## 3. Observed HRestroSewa risks that CMediSewa should not inherit
 These are observations, not changes requested to HRestroSewa.
@@ -196,3 +249,6 @@ These are observations, not changes requested to HRestroSewa.
 3. Off-site backups aren't documented.
 4. Schema drift happened between the live DB and the migrations. CMediSewa should verify
    parity in CI against a fresh DB replay.
+5. The staff list is public by slug, and a 4-digit PIN with a per-person lockout of 5/30 min
+   still allows slow online guessing across many staff. That is acceptable for a POS floor
+   but not for medical records (§2a).

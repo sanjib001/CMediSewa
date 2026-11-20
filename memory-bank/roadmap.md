@@ -1,86 +1,101 @@
 # Roadmap
 
-Status: **Recommendation.** No dates are committed. Phases are gated by exit criteria, not
-by a calendar. Module IDs are listed in `features.md`.
+Status: **Owner-directed phase structure** (Revision 5, 2026-11-20). Dates are not
+committed. Each milestone has exit criteria, and nothing starts before its foundations are
+green.
 
-## Dependency graph (MVP)
+| Phase | Scope | Owner direction |
+|---|---|---|
+| **Phase 0** | **Database + backend first**: schema, migrations, RPCs, Server Actions, auth backend, permissions engine, posting core, background jobs, automated tests. No product UI | "in phase 0 let's set the database and backend first" |
+| **Phase 1** | **Initial outline (UI) + MVP**: the five areas and four staff dashboards (Admin, Registrar, Doctor OPD, Pharmacy) built on the Phase 0 backend; pilot go-live | "in phase 1 the initial outline and MVP of the system" |
+| **Phase 2** | Next features after the pilot (SMS, online documents, online payments, controlled-drug register…) | "then we will move on" |
+| **Phase 3** | **Laboratory** + Lab dashboard (+ clinical files) | "we will work on lab in phase 3" |
+| Future | insurance, multi-branch, telemedicine… | — |
+Older labels: "R1/R2", "MS0–MS13" and "Gate A/B" from Revision 4 are **retired**. Every
+clinic has its own pharmacy, so there is one pilot gate at the end of Phase 1 (P-17
+resolved). The posting core is still built first (D-53).
+
+## Dependency graph
 ```
-Phase 0 foundation
-   └─► M-03 Auth ─► M-01 Clinics (Super Admin) ─► M-02 Subscriptions-lite
-                         └─► M-05 Settings ─► M-04 Staff & permissions
-                                               └─► M-06 Depts & services ─► M-07 Doctors ─► M-08 Schedules
-   M-19 Audit (built alongside M-03; every later module writes to it)
-   M-09 Patients ─────────────────────────────────────────────┐
-   M-08 + M-09 ─► M-10 Appointments ─► M-11 Public site & booking
-                        └─► M-12 Check-in & queue ─► M-13 Consultation (+M-15) ─► M-14 Prescriptions
-                                     └─────────────────────────► M-16 Billing
-   M-10/M-12 ─► M-17 Notifications (in-app, push, email)
-   M-10/M-16 ─► M-18 Reports
+PHASE 0 (backend)
+ B0 Foundation ─► B1 Identity & access ─► B2 Platform ─► B3 Tenant setup ─┬─► B4 Clinical operations ─┐
+                                                                         └─► B5 Inventory ─► B6 Purchasing ┤
+                                                                                                           ▼
+                                                                         B7 Sales & billing ─► B8 Finance & reports
+ B9 Realtime, notifications & jobs (after B4; done before Phase 1 ends)
+PHASE 1 (UI + MVP)
+ U1 Design system & shells ─► U2 Marketing + Super Admin ─► U3 Admin dashboard ─┬─► U4 Registrar dashboard ─┐
+                                                                               ├─► U5 Doctor OPD dashboard ─┤─► U8 PWA & polish ─► PILOT
+                                                                               ├─► U6 Pharmacy dashboard ───┤
+                                                                               └─► U7 Public clinic website ┘
+PHASE 2 ─► PHASE 3 (Lab) ─► Future
 ```
 
-## Phase 0: Foundation (no clinic features)
-1. Resolve the **blocking** pending decisions: P-01 (domain), P-02 (hosting), P-03
-   (scheduling mode), P-07 (admin clinical access), P-11 (MFA scope). Others can wait
-   (`decisions.md`).
-2. Scaffold the Next.js app (pinned versions, TS strict, ESLint, Tailwind v4) and copy the
-   HRestroSewa components listed in `../docs/hrestrosewa-reference.md` §2B, adapted.
-3. Supabase local dev + **migration 0001: access posture** (RLS defaults, revoke
-   anon/authenticated, explicit service_role grants, default privileges for both grantors).
-   Migration runner with dev/staging/prod interlocks.
-4. CI: typecheck, lint, unit tests, migration replay on an empty DB, RLS/grant posture check,
-   and a service-key-in-bundle scan.
-5. Design tokens and the base layout shells for each route group (`ui-ux.md`).
-6. Staging environment on Coolify with synthetic data.
-**Exit:** an empty app deploys to staging through CI. The posture check passes on a fresh DB.
+## Phase 0: database & backend
+Every milestone is delivered as migrations + RPCs + Server Actions + **automated tests that
+drive the real workflows without UI**. `workflows.md` W-31 becomes an executable end-to-end
+test script. This is how Phase 0 avoids building a backend the UI later can't use (D-55).
 
-## Phase 1: MVP (the build order follows dependencies)
-| Step | Modules | Technical milestone | Testing milestone |
+| # | Milestone | Contents | Exit criteria |
 |---|---|---|---|
-| 1 | M-03, M-19 | Auth (invite, password, MFA, lockout), guards, live membership check, `audit_log` + append-only trigger | auth E2E; lockout; deactivated user loses access on the next request |
-| 2 | M-01, M-02 | Super Admin: clinics CRUD, admin invite, plans, subscription periods, expiry cron | Super Admin can't reach any clinic route or patient table (negative tests) |
-| 3 | M-05, M-04 | Clinic settings, staff invite, permission sections + presets, staff-type gating, derived nav | permission matrix tests (each preset × each route/action) |
-| 4 | M-06, M-07, M-08 | Departments, services, doctors (NMC no.), schedule templates, exceptions, `available_slots()` | slot derivation unit tests (exceptions, leave, effective dating, timezone/BS edges) |
-| 5 | M-09 | Patients, MRN trigger, search, duplicate detection | **two-clinic isolation test suite** established here and extended every later step |
-| 6 | M-10 | Appointment RPCs (book, confirm, cancel, reschedule, no-show), GiST exclusion, status-machine trigger | **concurrency test:** N parallel bookings for one slot gives exactly 1 success |
-| 7 | M-11 | Public site, booking flow, manage link, CAPTCHA, rate limits | public-contract test (no MRN or clinical fields); abuse-limit tests |
-| 8 | M-12 | Check-in RPC, tokens, queue board (SSE realtime bus) | token uniqueness under concurrency; SSE fallback poll |
-| 9 | M-13, M-15 | Encounter RPCs, care predicate in SQL, chart read audit, finalize immutability, addenda | **care-relationship matrix tests** (C1–C6), denied reads audited |
-| 10 | M-14 | Rx issue, allergy check, PDF/print | Rx immutability; print audit; PDF snapshot test |
-| 11 | M-16 | Invoices, fiscal-year numbering, payments, void, refund, receipts | numbering never reused or skipped; balance derivation; fiscal-year rollover |
-| 12 | M-17 | Notification outbox, email (Resend), push (VAPID), dispatch cron | exactly-once; PHI-free payload assertions |
-| 13 | M-18 | Basic reports | derived totals equal the source rows |
-**Deployment milestones:**
-- **D1** (after step 3): staging is live with auth, clinics and staff for internal review.
-- **D2** (after step 7): staging demo of public booking for a pilot clinic.
-- **D3** (after step 13): production stack provisioned (P-02), backups + PITR + off-site
-  verified, **restore drill passed**, monitoring on, and security review done (§Exit).
-- **D4:** pilot clinic go-live (one clinic, real data), with a 2–4 week stabilisation period.
+| **B0** | Foundation | Next.js skeleton (pinned) with the five empty route groups on one host; Supabase local; **migration 0001 access posture**; migration runner (dev/staging/prod interlocks); `tenants`, `tenant_settings`, `billing_profiles`, `tenant_modules`, `audit_log`; composite-FK lint; `lib/modules.ts`; `lib/clinic-time.ts` (Asia/Kathmandu, BS, fiscal year); **posting core** (`postings`, `document_sequences`, `ledger_accounts`, `ledger_entries`, balance trigger, `ledger_writer` role); CI (replay, posture, ledger guard, bundle scan); staging | fresh DB replays; posture + ledger-guard tests green; deploys to staging |
+| **B1** | Identity & access | email/password + invites + recovery; Super Admin TOTP; MFA; lockout; `session_assurance`; `resolve_request_context`; guards + step-up; permissions engine (keys, role templates, custom roles, overrides, credentials with independent verification, business type/module filters, **store scope**); TS/SQL parity; **P-23 spike** → trusted devices, PIN verify/lockout, idle lock, switch user (server side) | auth integration tests; operation × assurance matrix; PIN never reaches A2 operations |
+| **B2** | Platform | applications → verification → approve → `provision_tenant` (settings, one billing profile, role templates, **Pharmacy + quarantine stores**, modules on, subscription, admin invite); plans, subscriptions, platform invoices/payments, expiry cron | application → tenant test; Super Admin negative suite |
+| **B3** | Tenant setup | settings actions; staff, roles, credentials, store assignment, devices; departments, services (OPD fee services), doctors, schedules, `available_slots()`; website content model + publish; stores | **two-tenant isolation suite** established and run on every later milestone |
+| **B4** | Clinical operations | patients (MRN, duplicates); appointments (GiST exclusion, status machine); public booking RPC + manage token + OTP patient accounts; **registration/check-in with the OPD fee invoice + payment** (`consultation_billing_point = check_in`); tokens/queue; encounters with the care predicate + audited reads; prescriptions | booking concurrency; public contract; care-matrix tests |
+| **B5** | Inventory | item master, units, barcodes, lots, movements → balances (CHECK ≥ 0), `allocate()` FEFO, opening stock, transfers, adjustments, counts, quarantine, disposal, block, alerts, suggestions, reconciliation | stock concurrency; expired never allocated; reconciliation catches tampering |
+| **B6** | Purchasing | vendors, PO, purchase invoices (lots), returns, vendor payments + allocations, vendor ledger | payable = documents = journal; duplicate bill refused |
+| **B7** | Sales & billing | invoices (services + items), allocations, payments (cash/online/mixed), dues, returns, void, dispensing (Rx link, partial, substitution), external Rx, controlled items blocked | Σ allocations = qty; COGS = Σ lot cost; **W-31 end-to-end script passes** |
+| **B8** | Finance & reports | expenses, other income, openings, `finance_report`, P&L, daily summary, stock/expiry/purchase/vendor/sales reports | opening(T) = closing(T−1); finance integrity green |
+| **B9** | Realtime, notifications & jobs | SSE bus; outbox + dispatch cron (email); web-push backend; expiry/low-stock/no-show/subscription jobs | exactly-once delivery; PHI-free payloads |
+**Phase 0 exit:** every MVP workflow runs end to end through actions/RPCs in automated tests
+on staging.
 
-**MVP exit criteria:** the `project.md` MVP definition passes on staging end to end; the
-isolation, care-access, concurrency and PHI-leak test suites are green; the pre-launch
-legal items in `security.md` §10 have at least a counsel opinion on consent text, retention
-and invoicing; and a restore drill is documented.
+## Phase 1: initial outline (UI) & MVP
+| # | Milestone | Contents | Exit criteria |
+|---|---|---|---|
+| **U1** | Design system & shells | tokens, components (`ui-ux.md` §10), five area layouts, sign-in screens (L1–L9), lock screen, step-up dialog, store switcher | clickable outline of every area |
+| **U2** | Marketing + Super Admin | landing, pricing, registration, contact; Super Admin applications, tenants, plans, billing, monitoring | onboarding E2E in the browser |
+| **U3** | **Admin dashboard** | setup checklist + go-live; profile/branding/settings; staff, roles, devices; departments, services, doctors, schedules; website manager; patients; appointments overview; inventory (items, stores, stock, transfers, counts); vendors and purchases; billing; expenses; finance; reports; audit | admin can configure a pilot clinic completely |
+| **U4** | **Registrar dashboard** | today's appointments, register/search patient, book/reschedule/cancel, **check-in with OPD fee bill + receipt + token**, queue board, collections/dues, print Rx, all other entries as permitted | front-desk day E2E |
+| **U5** | **Doctor OPD dashboard** | my queue, call next, patient summary + allergy banner, consultation, e-prescription (catalogue items) → pharmacy queue, follow-up, my schedule/leave | consultation → Rx E2E |
+| **U6** | **Pharmacy dashboard** | dispensing queue, OTC sale (scan/search, units, FEFO lots), pharmacy billing + payments + returns, stock (receive, transfers, counts, adjustments, expiry/quarantine), purchases and vendors (as permitted), low-stock/near-expiry alerts | dispense → bill → stock deducted E2E |
+| **U7** | Public clinic website | tenant-themed site, doctors, services, slots, booking, status, manage link, optional patient account | booking from phone E2E |
+| **U8** | PWA & polish | install, push opt-in, offline gate, iOS standalone sign-in, print layouts (OPD bill, pharmacy bill, Rx, token, GRN) | pilot readiness checklist |
+**Pilot gate (end of Phase 1):** W-31 passes in the browser; prod stack ready (P-02, P-09);
+backups + PITR + off-site; restore drill; monitoring; security review; counsel opinion on
+`security.md` §10–§11. Then go-live and 2–4 weeks of stabilisation.
 
-## Phase 2: Useful additions (order is a suggestion, driven by pilot feedback)
-1. M-22 SMS reminders (after P-05) and M-26 follow-ups & referrals.
-2. M-20 Laboratory (catalogue, orders, results, report PDF) and M-21 clinical files
-   (private bucket, signed URLs).
-3. M-27 Daily summary email (HRestroSewa reporting service shape).
-4. M-24 Online payments (eSewa/Khalti/Fonepay, after a gateway decision).
-5. M-23 Patient portal (phone OTP) and M-28 patient merge.
-6. M-25 Self-service clinic signup and trial. Subdomain public sites. Nepali UI.
-7. Queue TV display, shared-device quick switch (P-06), credit/due billing.
+## Phase 2: next features (order follows pilot feedback)
+M-48 controlled-drug register (first if the pilot stocks controlled items) · M-32 SMS + SMS
+OTP · M-33 patient documents online · M-34 online payments · M-47 cashier shifts · M-46
+purchase suggestions & supplier performance · M-45 reservations · M-52 patient advances ·
+M-35 follow-ups/referrals · M-36 daily summary email · M-37 patient merge · M-49 advanced
+barcode · M-51 bulk recall · M-06 support desk · M-38 instant self-serve · M-39 subdomain
+sites · Nepali UI.
 
-## Future expansion
-M-29 Pharmacy & inventory (reuse HRestroSewa's *derived stock* pattern, with batches and
-expiry) · M-30 Insurance (HIB/SSF) claims · M-31 Multi-branch · M-32 Telemedicine ·
-M-33 FHIR / LIS integration · M-34 Custom domains · analytics and benchmarking across
-clinics (aggregate, anonymised, opt-in).
+## Phase 3: laboratory
+M-30 lab (test catalogue, orders from OPD, samples, results, report PDF, lab billing through
+the same invoice pipeline) · **Lab dashboard** (worklist, sample status, result entry,
+verification) · M-31 clinical files (private storage, signed URLs). Needs B4 (encounters),
+B7 (billing) and the Phase 1 dashboards.
 
-## Risks to schedule
-- Legal answers (P-08, P-09, P-10) may change invoice format or hosting late. Keep tax fields
-  and the hosting choice flexible until the answers arrive.
-- Care-access rules are the most likely to be renegotiated with real doctors. They live in
-  one predicate (TS + SQL) so a change is one place.
-- SMS cost and delivery in Nepal are unknown (P-05). Email-only reminders may underperform
-  with patients who don't use email.
+## Future
+M-40 insurance (HIB/SSF) · M-41 multi-branch · M-42 telemedicine · M-43 interoperability ·
+M-44 payroll & attendance · M-50 accounting export / e-billing · custom domains.
+
+## Testing approach (cumulative; each suite runs on every later milestone)
+Posture + ledger guard (B0) · auth + assurance (B1) · Super Admin negative (B2) · two-tenant
+isolation (B3+) · booking concurrency + public contract + care matrix (B4) · stock
+concurrency + reconciliation (B5) · payable integrity (B6) · allocation/COGS + **W-31
+script** (B7) · finance integrity (B8) · PHI-free notifications (B9) · browser E2E per
+dashboard (U2–U7).
+
+## Risks
+- **Backend before UI (D-55):** endpoints may not fit the screens. Mitigation: workflows
+  drive the API, executable workflow tests, and the U1 clickable outline early in Phase 1,
+  with B-milestone fixes allowed.
+- P-23 (PIN sessions) is the riskiest unknown, with the fallback of PIN-as-unlock only.
+- Legal answers (P-08, P-09, P-10, P-22, P-27) can change invoicing, dispensing and hosting.
+- Doctors' acceptance of the care-access and assurance rules, to be tested in U5 with the
+  pilot doctor.

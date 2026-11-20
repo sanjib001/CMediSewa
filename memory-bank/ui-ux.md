@@ -1,122 +1,191 @@
 # UI / UX
 
-Status: **Recommendation.** Visual design is not final. A dedicated design pass (tokens,
-type, components) happens in Phase 0 and is reviewed by the owner before screens are built.
+Status: **Recommendation** (Revision 2: five areas, separate Admin and Employee shells, PIN
+and lock screens, website manager, pharmacy and inventory screens). Visual design is not
+final. A design pass (tokens, type, components) happens in U1 (Phase 1) and is reviewed by the
+owner.
 
 ## 1. Design direction
-- **Calm, clinical, trustworthy.** A light neutral canvas, one confident primary colour
-  (a medical teal or blue; **[OPEN]**, decided with the brand), and semantic colours used only
-  for meaning: red = allergy/critical, amber = waiting/late, green = done/paid.
-- **Speed at the desk over decoration.** Reception works with a queue in front of it.
-  Every frequent action is one tap from the dashboard, search is always reachable
-  (`/` shortcut on desktop) and the keyboard works on the PC.
-- **Readable for everyone:** 16px base, large touch targets (≥44px), high contrast
-  (WCAG AA), tabular numerals for money, times and tokens.
-- **Dark mode** for staff (night OPD), driven by tokens, reusing HRestroSewa's theme toggle
-  and theme-sync approach. Its CSS traps (`@theme inline`, animation `fill-mode: both`) are
-  also carried over so they aren't reintroduced.
-- **Bilingual-ready:** layouts must tolerate Devanagari strings that run about 30% longer.
-  Nepali glyphs need a fallback font (Noto Sans Devanagari, for example).
-- **Dates:** show AD with BS alongside wherever patients or printed documents see a date
-  (e.g. "2026-11-20 · २०८३ मंसिर ४"). Format is a clinic setting.
+- **Calm, clinical, trustworthy.** A light neutral canvas, one primary colour (medical teal
+  or blue, **[OPEN]**), and semantic colours used only for meaning: red = allergy, critical
+  or expired; amber = waiting, late or near expiry; green = done or paid.
+- **Speed at the desk and counter:** frequent actions are one tap away, search is always
+  reachable (`/` on desktop), barcode-scanner input works in item search, and the keyboard
+  works on PCs.
+- 16px base, touch targets of 44px or more, WCAG AA contrast, tabular numerals for money,
+  quantities, tokens and times.
+- Dark mode for internal areas (token-driven, using HRestroSewa's theme toggle/sync). The
+  HRestroSewa CSS traps (`@theme inline`, `fill-mode: both`) are not reintroduced.
+- Bilingual-ready: layouts tolerate Devanagari strings, with a Noto Sans Devanagari
+  fallback. AD + BS dates wherever patients or printouts see a date.
+- **Every area is visually distinct**, so users always know where they are: marketing
+  (brand-led), Super Admin (dense, neutral, no tenant branding), Admin (tenant logo,
+  management chrome), Employee (task-focused, larger controls), Patient site (the tenant's
+  own theme).
 
-## 2. Dashboard structure (clinic)
+## 2. Marketing website
+A hero (value + "Register your clinic/pharmacy" + "See pricing"), features by business type,
+screenshots, a **pricing** table from public plans (monthly/yearly toggle if cycles allow),
+testimonials (later), FAQ, contact (phone, email, hours, form), and legal pages. The
+**registration** form is single-page with clear sections and inline validation, and ends on
+a "Check your email" screen. Mobile-first, fast and SEO-friendly. HRestroSewa's landing is
+the structural reference.
+
+## 3. Super Admin
+Sidebar: Dashboard · Applications · Tenants · Plans · Billing · Monitoring · Settings ·
+Audit. Applications use a review layout (details | checks | approve/reject). Tenant detail
+has tabs (Profile, Subscription, Invoices, Access, Activity). Destructive actions (suspend,
+close) open a red confirm dialog with a reason field. It never shows patient data.
+
+## 4. Admin (per tenant)
 ```
-┌────────────┬───────────────────────────────────────────────────────────┐
-│  Logo       │  Top bar: clinic name · global patient search · bell ·   │
-│             │           user menu (profile, theme, logout)             │
-│  Today      ├───────────────────────────────────────────────────────────┤
-│  Queue      │  Page content                                              │
-│  Appts      │   e.g. Today: KPI tiles (booked / checked-in / waiting /   │
-│  Patients   │   completed / no-show / revenue) + per-doctor queue cards  │
-│  Consult*   │                                                            │
-│  Billing    │                                                            │
-│  Reports    │                                                            │
-│  ───────    │                                                            │
-│  Setup ▸    │  (Doctors, Departments, Services, Schedules, Staff,        │
-│  Audit      │   Settings: admin-only)                                    │
-└────────────┴───────────────────────────────────────────────────────────┘
- * "My queue / Consultations" appears for doctors.
+┌─────────────┬────────────────────────────────────────────────────────────┐
+│ Tenant logo │ Top bar: tenant name · global search · bell · area switch  │
+│             │          (Admin ⇄ Employee) · user menu                    │
+│ Dashboard   ├────────────────────────────────────────────────────────────┤
+│ Patients    │                                                            │
+│ Appointments│  Content                                                   │
+│ Doctors     │   Dashboard: KPI tiles (today's appointments, checked in,  │
+│ Inventory ▸ │   revenue, dues, payables, low stock, near expiry) +      │
+│  Items      │   alerts list + quick links                                │
+│  Stores     │                                                            │
+│  Transfers  │                                                            │
+│  Counts     │                                                            │
+│ Purchases   │                                                            │
+│ Vendors     │                                                            │
+│ Billing     │                                                            │
+│ Expenses    │                                                            │
+│ Finance     │                                                            │
+│ Reports     │                                                            │
+│ Website     │                                                            │
+│ Staff & roles│                                                           │
+│ Settings    │  (Profile & branding, Departments & services, Booking,     │
+│ Audit       │   Invoicing, Devices & PIN, Notifications)                 │
+└─────────────┴────────────────────────────────────────────────────────────┘
 ```
-- **The sidebar is derived from permissions** (`getClinicNav(ctx)`), so a receptionist sees
-  Today, Queue, Appointments, Patients and Billing, and a doctor sees Today, My Queue,
-  My Appointments and Patients (care-scoped).
-- **Landing page per staff type:** doctor → My Queue, receptionist → Today,
-  accountant → Billing, admin → Today.
+- Items are hidden when the business type doesn't have the module (no Inventory for a clinic
+  without stores, no Appointments for pharmacy-only) or when the member lacks the
+  permission.
+- **Setup checklist** on first run: Profile → Departments/Services → Doctors → Roles &
+  staff → Stores & opening stock (pharmacy) → Booking rules → Website → Devices.
+- **Website manager:** a split view with a section editor on the left (hero, about,
+  announcements, gallery, FAQs, visibility toggles for doctors and services, SEO) and a
+  **live preview** on the right (phone/desktop toggle). The top shows Draft/Published state
+  with "Preview link" and "Publish" buttons. Publishing asks for re-auth.
+- **Staff & roles:** the members list (roles, credential status, PIN on/off, last active), a
+  role editor with one control per section (None / View / Full + extras, HRestroSewa-style)
+  where credential-gated keys show "needs credential", and Devices (enrolled devices, last
+  used, revoke).
+- **Inventory:** the items list with on-hand by store, low and near-expiry chips, and an
+  item detail with batches (expiry, MRP, on hand per store) and a movement history (like
+  HRestroSewa's `product_history`).
 
-## 3. Responsive strategy
-- **Reception PC (≥1280px):** sidebar plus a two-pane layout (queue list | detail).
-- **Tablet (768–1279px):** collapsible sidebar. The consultation screen uses tabs
-  (Summary / Notes / Rx).
-- **Phone (<768px):** a bottom tab bar (four items plus "More") replaces the sidebar, forms
-  are single-column, and tables become cards. Doctors on phones mainly need My Queue,
-  the patient summary and a quick Rx.
-- No horizontal scrolling on any page. Data tables collapse to cards on small screens.
+## 5. Employee workspaces: Registrar, Doctor OPD, Pharmacy (+ Lab in Phase 3) (D-56)
+- **Shell:** a large-control layout. A bottom tab bar on phones and a left rail on
+  tablets/PCs. A member lands on their role's dashboard. A member with several roles gets a
+  workspace switcher (e.g. Registrar ⇄ Pharmacy). Always available: notifications, my
+  schedule, profile (password, MFA, PIN), lock, switch user.
+- **Registrar dashboard** (`/employee/registrar`):
+  ```
+  ┌ Today ───────────────┬ Queue (per doctor) ─────────┬ Quick actions ──────────┐
+  │ booked 32 · arrived  │ Dr. Sharma  #14 in room      │ [Register / Check-in]   │
+  │ 20 · waiting 6       │   #15 waiting 12m            │ [New appointment]       │
+  │ appointments list    │ Dr. Karki   #08 in room      │ [Collect due] [Reprint] │
+  │ (status chips)       │                              │ search patient (/)      │
+  └──────────────────────┴──────────────────────────────┴─────────────────────────┘
+  ```
+  **Register / Check-in** is one flow: find or create the patient → choose doctor/service →
+  **OPD fee bill** (price from the service, discount within limit) → payment
+  (cash/online/mixed) → **print receipt + token**. The patient joins the doctor's queue.
+  Other entries the admin permits (vitals for a nurse role, expenses, etc.) appear as extra
+  panels.
+- **Doctor OPD dashboard** (`/employee/opd`): my queue (token, name, wait) → "Call next" →
+  **Consultation screen**: a patient header (name, age/sex, MRN, red **allergy banner**), a
+  vitals strip, sections (complaint, history, exam, diagnosis, plan, follow-up) and an
+  **e-prescription builder** (catalogue search by brand/generic, dose/frequency/duration,
+  quick repeat) → "Finalize and send to pharmacy" (+ print). Opening it from an A1 session
+  shows the step-up dialog first. Also: today's list, my schedule and leave.
+- **Pharmacy dashboard** (`/employee/pharmacy`): tabs
+  - **Dispense:** Rx queue → item rows with suggested FEFO batch, expiry and qty,
+    substitution and partial options → bill;
+  - **Sale:** scan/search → cart (units, batch preview) → payment → print;
+  - **Bills:** today's invoices, returns, dues collection;
+  - **Stock:** on-hand by store, low and near-expiry lists, receive, transfer, count,
+    adjust, quarantine;
+  - **Purchases:** purchase invoices, POs, vendors, vendor payments.
+  Tabs appear only if the member has the keys. Expiry is colour-coded. Prescription-only
+  items show a badge. Actions needing a password show a lock icon.
+- **Lab dashboard** (`/employee/lab`, Phase 3): a worklist, sample status, result entry
+  and verification.
+- **Lock screen:** tenant logo, the member's name and avatar, a PIN pad, "Use password",
+  "Switch user". The screen behind is blurred and no patient data is visible.
 
-## 4. Super Admin interface
-A plain, dense admin UI with no clinic branding: a Clinics table (status, plan, expiry,
-counts), a clinic detail page (profile, subscription history, admin invite, suspend), a Plans
-page, platform Metrics and Settings. The visual language stays deliberately separate from the
-clinic UI so a platform admin always knows which context they are in. A red banner appears
-on any destructive action.
-
-## 5. Clinic Admin interface
-The clinic dashboard plus **Setup** (guided at first run, see the onboarding checklist in
-W-02): Clinic profile → Departments → Services and fees → Doctors → Schedules → Staff →
-Booking rules → Publish website. Each step shows a completion state. The **Audit** page has
-filters by patient, staff member, action and date, plus a "break-glass to review" list.
-
-## 6. Staff dashboards
-- **Reception, Today:** the queue board per doctor (token, patient, status chip, wait time),
-  a "Check in" button on each upcoming appointment, a "New walk-in" action, and a quick
-  register form.
-- **Queue board display** (optional TV/monitor view, P2): token numbers and doctor room
-  only, **no patient names**, read-only, live over SSE.
-- **Doctor, My Queue:** ordered list, then "Start consultation".
-- **Consultation screen:** a patient header (name, age/sex, MRN, **allergy banner in red**),
-  a vitals strip, and sections for Complaint, History, Exam, Diagnosis, Plan and Follow-up,
-  plus an Rx builder (medicine, dose, frequency, duration, with quick-repeat from last Rx)
-  and a "Finalize and print" button. Autosave runs on drafts. A finalized record is
-  read-only and has "Add addendum".
-- **Billing:** visit → services pre-filled from the appointment → discount (if permitted)
-  → payment method(s) → "Issue and print". Thermal 80mm and A4/A5 receipt layouts, reusing
-  HRestroSewa's print-width setting idea.
-
-## 7. Patient-facing website
-- A mobile-first, light, fast page (most traffic is phones on mobile data). No client-heavy
-  bundles: Server Components, minimal JS and optimised images.
-- Clinic branding: logo, primary colour from the clinic, name and address.
-- Sections: hero (name, hours, call button, "Book appointment"), departments, doctors
-  (cards with photo, specialty and OPD days), services and fees (optional), location
-  (map link), contact.
-- SEO: per-clinic metadata, `MedicalClinic` / `Physician` schema.org JSON-LD and a sitemap
-  entry for each published clinic. HRestroSewa's SEO landing work is a reference for this.
-
-## 8. Appointment booking experience
+## 6. Sign-in screens
 ```
-1 Choose  ──►  2 Pick time  ──►  3 Your details  ──►  4 Confirm  ──►  ✓ Booked
- department     date strip         name, phone,         summary +        ref no. +
- or doctor      + slot chips       age/DOB, sex,        consent tick     manage link
-                (or "token for     email (opt),         + CAPTCHA        (+ SMS/email
-                 this OPD")        reason (opt)                          when enabled)
+ <domain>/login/<slug>       (trusted device)          (untrusted device)
+ ┌──────────────────────────────┐                     ┌──────────────────────────────┐
+ │  [Tenant logo]  Tenant name   │                     │  [Tenant logo]  Tenant name   │
+ │  Who's signing in?            │                     │  Email or username            │
+ │  ( Anita R. ) ( Dr. Sharma )  │                     │  Password                     │
+ │  ( Bikash K. ) ( Sita M. )    │                     │  [Sign in]  Forgot password?  │
+ │  ── then 6-digit PIN pad ──   │                     │  (no staff list is shown)     │
+ │  Use email & password instead │                     └──────────────────────────────┘
+ └──────────────────────────────┘
 ```
-- At most 4 steps. A step indicator is shown and the back button never loses entered data.
-- Slots show only real availability (derived server-side). Taken slots disappear rather
-  than erroring later. If a race does happen, the screen says "That time was just taken,
-  here are the nearest open times" and keeps the form.
-- Phone is the required contact (+977 format with validation). Email is optional.
-- The confirmation screen is printable and screenshot-friendly: clinic, doctor,
-  date/time (AD + BS), token if any, reference number, arrival instructions and the
-  manage link.
-- Cancel and reschedule from the manage link, with the clinic's cut-off rule shown upfront.
-- Accessibility: labels on every field, an error summary, and nothing conveyed by colour
-  alone.
+Generic `/login` = the email/password form plus "Find your clinic" (a narrow name search, as
+in HRestroSewa's `searchRestaurants`, which leads to the untrusted view). A **step-up
+dialog** is a modal asking for the password (and TOTP) with a one-line reason ("Opening a
+medical record needs your password").
 
-## 9. Reusable design components
-Copied from HRestroSewa `components/ui` and restyled: Button, Input, Skeleton, SearchSelect,
-PeriodFilter, CountPill, ThemeToggle/ThemeSync, PaymentMethodPicker, plus the PWA set
-(InstallPrompt, OfflineGate, PushPrompt, RegisterSW, PullToRefresh).
-**New for CMediSewa:** PatientHeader (with AllergyBanner), StatusChip (appointment state
-machine colours), SlotPicker, DateStrip (AD + BS), TokenBadge, VitalsStrip, RxItemRow,
-KPI Tile, DataTable→Cards responsive wrapper, AuditTrail list, ConfirmDialog (with reason
-input for voids, cancellations and break-glass), PrintLayout (Rx, receipt).
+## 7. Responsive strategy
+Reception and pharmacy PCs (≥1280px) get two-pane layouts. Tablets (768–1279px) get a
+collapsible rail and tabbed consultation. Phones (<768px) get bottom tabs, single-column
+forms and tables turned into cards. Nothing scrolls horizontally.
+
+## 8. Client / Patient website
+Mobile-first and light, mostly Server Components with minimal JS, themed by the tenant's
+`theme_color` and logo.
+Sections are toggled by the admin: hero (name, hours, call, Book), announcements, about,
+departments, services and fees, doctors (cards → profile page), gallery, FAQs, location,
+contact. The header has "Book appointment" and "Sign in" (optional account).
+SEO: per-tenant metadata, `MedicalClinic` / `Pharmacy` / `Physician` JSON-LD, sitemap.
+
+## 9. Appointment booking experience
+```
+1 Choose ──► 2 Pick time ──► 3 Your details ──► 4 Confirm ──► ✓ Booked
+ dept or      date strip       prefilled if       summary,       ref no., status badge,
+ doctor       + slot chips     signed in; else    consent,       manage link, "Create an
+              (or token)       name, phone, age,  CAPTCHA        account to track your
+                               sex, email (opt)                  bookings" (optional)
+```
+At most four steps, and the back button keeps entered data. Only real availability is
+shown. If a race happens: "That time was just taken, here are the nearest open times." The
+confirmation is printable. The **status page** (manage link or My appointments) shows a
+status timeline with cancel/reschedule buttons that respect the cut-off. Account sign-in
+uses a two-screen OTP (destination → code) with resend throttling shown.
+
+## 10. Reusable components
+From HRestroSewa (restyled): Button, Input, Skeleton, SearchSelect, PeriodFilter, CountPill,
+ThemeToggle/Sync, PaymentMethodPicker, StationChips-style filter chips (for stores), and the
+PWA set (InstallPrompt, OfflineGate, PushPrompt, RegisterSW, PullToRefresh).
+New: PatientHeader + AllergyBanner, StatusChip, SlotPicker, DateStrip (AD + BS), TokenBadge,
+VitalsStrip, RxItemRow, BatchPicker (FEFO, expiry colour), StockBadge (low/near-expiry),
+Cart/InvoiceEditor, KPI Tile, DataTable→Cards wrapper, AuditTrail, ConfirmDialog with
+reason, **StepUpDialog**, **PinPad**, **StaffPicker**, **LockScreen**, SiteSectionEditor,
+SitePreviewFrame, PrintLayout (Rx, receipt, token slip, purchase GRN).
+
+## 11. Integration additions (Revisions 3–4)
+- **Store switcher** in the Employee and Admin top bars for members assigned to more than one
+  store. The current store scopes stock screens, the counter and receiving. Its name is always
+  visible on sales and receiving screens, so stock never leaves the wrong store by accident.
+- **Transfers inbox** per store: requests to approve, dispatches to receive, discrepancies.
+- **Billing profile** shown on every invoice and receipt header (legal name, PAN). In a visit
+  view, the patient sees one statement listing the services invoice and the pharmacy invoice.
+- **Admin → Modules:** toggles with dependency hints ("Pharmacy counter needs Inventory").
+  Turning a module off asks for confirmation and states that data is kept.
+- **Setup checklist** items appear only for enabled modules. "Go live" shows what's left.
+- **Visit timeline** (front desk and admin): booking → check-in → vitals → consultation →
+  prescription → dispensing → invoices → payments, each step linked to its record (with the
+  clinical steps hidden from non-clinical roles).
+- **Suspended tenant banner** (W-33): read-only mode with an export button. The public site
+  shows a contact page.

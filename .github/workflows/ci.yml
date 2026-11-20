@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  static:
+    name: lint · typecheck · unit tests · build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm test
+      - name: build
+        run: npm run build
+        env:
+          NEXT_PUBLIC_SUPABASE_URL: https://example.invalid
+          NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY: ci-placeholder
+      - name: secret key must not appear in client bundles
+        run: |
+          if grep -rq "SUPABASE_SECRET_KEY\|sb_secret_" .next/static 2>/dev/null; then
+            echo "server secret referenced in client bundle"; exit 1
+          fi
+
+  database:
+    name: migrations replay on an empty database · posture · DB tests
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: ci
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres" --health-interval 5s --health-timeout 5s --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - name: Supabase-like roles
+        run: PGPASSWORD=ci psql -h localhost -U postgres -v ON_ERROR_STOP=1 -f tests/ci/bootstrap-supabase-roles.sql
+      - name: env file for the empty database
+        run: |
+          printf '%s\n' 'APP_ENV="development"' 'DB_SSL="false"' \
+            'SUPABASE_DB_URL="postgresql://postgres:ci@localhost:5432/postgres"' > .env.ci
+      - run: node scripts/migrate.mjs up --env .env.ci
+      - run: node scripts/check-posture.mjs --env .env.ci
+      - run: npm run test:db
+        env:
+          CMEDISEWA_TEST_ENV: .env.ci

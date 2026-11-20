@@ -1,35 +1,57 @@
 # CMediSewa
 
-**CMediSewa** is a planned multi-tenant SaaS platform for **small medical clinics and
-healthcare centres in Nepal**. One deployment serves many clinics. Each clinic gets:
+**CMediSewa** is a planned multi-tenant SaaS platform for **medical clinics, healthcare
+centres and pharmacy/medical operations in Nepal**. It follows HRestroSewa's multi-tenant
+structure, with five application areas:
 
-- an internal **management dashboard** for its admin, doctors, nurses, receptionists and
-  other staff, and
-- a separate public **clinic website** where patients can see the clinic's services and
-  doctors, check open appointment slots and book online.
+1. **Marketing website**: product, pricing, registration of new businesses, contact.
+2. **Super Admin**: tenants, applications, plans and platform billing, monitoring, settings.
+3. **Admin** (per tenant): profile and branding, the tenant's public website, employees and
+   roles, doctors, departments, patients, appointments, medicines and inventory, stores,
+   vendors and purchases, sales and billing, expenses and finance, reports, settings.
+4. **Employee**: a role-based workspace (front desk, doctor, nurse, pharmacy counter,
+   cashier, stock tasks…), with configurable roles.
+5. **Client / Patient website** (per tenant): branding, information, doctors, services,
+   available slots, booking, booking status, optional patient account. It is managed from
+   that tenant's Admin, the same way a HRestroSewa restaurant manages its QR menu site.
 
-A **Super Admin** layer runs the platform itself: onboarding clinics, plans and
-subscriptions, platform settings and usage monitoring.
+Internal users sign in with **email + password** (MFA for sensitive roles). Employees can
+also use HRestroSewa-style **tenant link + PIN quick access on trusted devices**. A PIN never
+opens medical records on its own (see `memory-bank/permissions.md` §2–3).
 
-> **Status: architecture & planning. No application code yet.**
-> The documentation in `memory-bank/` has to be reviewed and the pending decisions in
-> `memory-bank/decisions.md` resolved before Phase 0 (scaffold) starts. See
+> **Status: Phase 0 (database & backend) in progress. B0 Foundation is done locally; next
+> is B1 Identity & access.** Phase 1 builds the UI outline and MVP; lab is Phase 3. See
 > `memory-bank/current-task.md`.
+
+## Getting started (development)
+
+```bash
+npm install                    # exact pinned versions
+cp .env.example .env.local     # fill in the dev Supabase values (never commit .env.local)
+npm run migrate                # status against the dev database
+npm run migrate:up             # apply pending migrations
+npm run db:posture             # verify the access posture (RLS, grants, ledger guard)
+npm test                       # unit tests (lib/)
+npm run test:db                # DB behaviour tests (transactions are rolled back)
+npm run lint && npm run typecheck && npm run build
+npm run dev                    # http://localhost:3000
+```
 
 ## Who it is for
 
 | User | What they do |
 |---|---|
 | Platform operator (Super Admin) | Registers clinics, manages plans/subscriptions, monitors the platform. **Never sees patient data.** |
-| Clinic Admin (owner / manager) | Runs one clinic: staff, doctors, departments, services, schedules, settings, billing, reports. |
-| Clinic staff | Receptionist, doctor, nurse, lab technician, pharmacist, accountant. Each sees only the modules **and the patient records** their role and care relationship allow. |
-| Patients | Book, reschedule and cancel appointments on the clinic's public site. No account in the MVP. |
+| Prospective business | Registers on the marketing site and is approved by the Super Admin. |
+| Tenant Admin (owner / manager) | Runs one tenant end to end, including its website, inventory and finance. No implicit access to medical records. |
+| Employees | Configurable roles (doctor, receptionist, nurse, pharmacist, inventory manager, cashier, lab technician, custom). Each sees only the modules **and the patient records** their roles, credentials, session level and care relationship allow. |
+| Patients | Book as a guest or with an optional OTP account on the tenant's website; manage and track bookings. |
 
 ## Architecture at a glance
 
 ```
                  ┌──────────────────────── one Next.js app ───────────────────────┐
- Browser  ──►    │ (marketing)  (public)/c/[slug]  (auth)  (clinic)  (superadmin)  │
+ Browser  ──►    │ (marketing) (public)/c/[slug] (auth) (admin) (employee) (superadmin)│
                  │      │             │               │         │          │       │
                  │      └──── Server Components + Server Actions (the only API) ─┘ │
                  │                    │ service_role, server-only                  │
@@ -75,13 +97,19 @@ CMediSewa/
 │   ├── roadmap.md            phases, implementation order, milestones
 │   ├── decisions.md          decision log (D-xx accepted/proposed, P-xx pending)
 │   └── current-task.md       where the project is right now
-└── docs/
-    └── hrestrosewa-reference.md   what was analysed in HRestroSewa and what is reused
+├── docs/
+│   └── hrestrosewa-reference.md   what was analysed in HRestroSewa and what is reused
+├── app/                      five route groups: (marketing) (public)/c/[slug] (auth)
+│                             (admin) (employee) (superadmin), placeholders until Phase 1
+├── lib/                      clinic-time.ts (Kathmandu time, BS, fiscal year), modules.ts (+ tests)
+├── supabase/migrations/      ordered SQL migrations (YYYYMMDDHHMMSS_name.sql)
+├── scripts/                  migrate.mjs, check-posture.mjs, gen-fiscal-calendar.mjs, lib/
+├── tests/db/                 DB behaviour tests (access posture, posting core)
+├── tests/ci/                 CI bootstrap for an empty Postgres
+└── .github/workflows/ci.yml  lint · typecheck · unit · build · empty-DB replay · posture · DB tests
 ```
 
-**Application source code** will live at the repository root in the standard Next.js layout
-(`app/`, `lib/`, `components/`, `supabase/migrations/`, `scripts/`), the same layout HRestroSewa
-uses. Phase 0 creates it. Folders are added when a module needs them, not ahead of time.
+Folders are added when a module needs them, not ahead of time. The layout follows HRestroSewa's.
 
 ## How the memory bank is organised
 

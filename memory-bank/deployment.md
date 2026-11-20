@@ -46,9 +46,11 @@ uses synthetic fixtures (`scripts/seed-demo.mjs`).
 ## 5. Environment variables (names only; values in Coolify secrets and never committed)
 | Var | Scope | Notes |
 |---|---|---|
-| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` | public | anon key holds **no table grants** (D-18) |
-| `SUPABASE_SERVICE_ROLE_KEY` | server | server-only module, never imported by client code |
-| `SUPABASE_DB_URL` / `REALTIME_DB_URL` | server | **session** connection for LISTEN, quoted in `.env` (HRestroSewa `#`-truncation lesson) |
+| `APP_ENV` | tooling | `development` / `staging` / `production`. The migration runner and DB tests classify a target by this, never by hostname (D-61) |
+| `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` | public | Supabase's new-format publishable key (replaces the legacy anon key). It holds **no table grants** (D-18) |
+| `SUPABASE_SECRET_KEY` | server | new-format secret key (acts as `service_role`; replaces the legacy service-role key). Server-only; CI greps the client bundle for it |
+| `SUPABASE_DB_URL` (+ `REALTIME_DB_URL` from B9) | server | Postgres connection for migrations, DB tests and the LISTEN bus. **Quoted**, with the password URL-encoded (`@` → `%40`) |
+| `DB_SSL` | tooling | `"false"` only for a plain local/CI Postgres; omitted elsewhere |
 | `NEXT_PUBLIC_APP_URL` | public | canonical URL for links in messages |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | mixed | web-push |
 | `RESEND_API_KEY`, `MAIL_FROM` | server | email over HTTPS |
@@ -56,6 +58,7 @@ uses synthetic fixtures (`scripts/seed-demo.mjs`).
 | `CRON_SECRET` | server | constant-time compared on `/api/cron/*` |
 | `TURNSTILE_SITE_KEY`, `TURNSTILE_SECRET_KEY` | mixed | booking CAPTCHA (**[OPEN]** provider) |
 | `MANAGE_TOKEN_PEPPER` | server | HMAC pepper for hashing booking manage-tokens |
+| `DEVICE_TOKEN_PEPPER`, `PATIENT_SESSION_PEPPER` | server | HMAC peppers for trusted-device tokens and patient session/OTP hashes |
 | `SENTRY_DSN` (or equivalent) | server | error tracking with **PHI scrubbing** |
 Keep a committed `.env.example` with names and comments only. Env files are named by target
 (`.env.local`, `.env.staging`, `.env.prod`). HRestroSewa learned that ambiguous names get
@@ -82,14 +85,14 @@ mistaken for prod, so file names here are unambiguous.
 ## 7. Domain & subdomain strategy (P-01)
 - Platform domain **[OPEN]** (e.g. `cmedisewa.com` or `.com.np`; `.np` registration has its
   own process to verify).
-- `app.<domain>`: clinic dashboard and Super Admin (one origin, with the cookie scoped to it).
-- `<domain>/c/<slug>`: public clinic sites in the MVP. Option for `<slug>.<domain>` in P2 via
-  wildcard DNS and wildcard TLS (DNS-01 challenge), rewritten in `proxy.ts`. Custom clinic
-  domains come later.
+- **One host for everything** (D-59, same as HRestroSewa): `<domain>/` marketing,
+  `<domain>/login` and `/login/<slug>` sign-in, `/admin/*`, `/employee/*`, `/superadmin/*`.
+- `<domain>/c/<slug>`: the **tenant public websites** in the MVP, with patient sessions
+  path-scoped (`cm_patient`). Option for `<slug>.<domain>` in P2 via wildcard DNS and
+  wildcard TLS (DNS-01 challenge), rewritten in `proxy.ts`. Custom tenant domains come
+  later.
 - `api` isn't needed, since Server Actions share the app origin. `db.<domain>` / the Supabase
   URL is a separate hostname used server-side and by Auth.
-- Splitting the public site's origin from the dashboard's means a cookie on the dashboard is
-  never sent to a page that renders clinic-controlled content (**Recommendation**).
 
 ## 8. Build & deployment workflow
 1. Develop on a branch. CI runs typecheck, lint, unit tests, **migration replay on an empty

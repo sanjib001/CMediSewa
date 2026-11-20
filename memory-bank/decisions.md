@@ -43,7 +43,8 @@ rejected for the MVP (`security.md` §6 has the full reasoning) and kept as an o
 future direct-client features.
 
 **D-05 Staff authentication: email/username + strong password + MFA, no PIN as primary.
-Proposed.**
+Superseded by D-27 (2026-11-20, Revision 2). Email/password stays primary, and PIN quick
+access is added back as a device-bound layer.**
 *Reason:* HRestroSewa's 4-digit PIN fits a POS floor but is too weak for medical records.
 MFA scope is P-11. A quick-unlock PIN for shared devices *on top of* a real session is P-06.
 
@@ -52,7 +53,9 @@ MFA scope is P-11. A quick-unlock PIN for shared devices *on top of* a real sess
 manager reading diagnoses is the main insider risk. Admin-doctors get access as doctors.
 Others use audited break-glass. The owner-doctor alternative is P-07.
 
-**D-07 One clinic dashboard (`(clinic)`) for admin and staff, gated by permission. Proposed.**
+**D-07 One clinic dashboard (`(clinic)`) for admin and staff, gated by permission.
+Superseded by D-28 (2026-11-20). The owner requires HRestroSewa's separate Admin and
+Employee areas.**
 *Reason:* HRestroSewa's split `(admin)`/`(employee)` trees led to thin pages that reuse
 admin clients anyway. A single tree with derived navigation is simpler.
 
@@ -109,7 +112,9 @@ reproducible, reviewable upgrades.
 opposite directions. Making the posture explicit in migrations is the only reproducible
 setup.
 
-**D-19 MVP onboarding is Super-Admin-provisioned (invite-only); self-signup in P2. Proposed.**
+**D-19 MVP onboarding is Super-Admin-provisioned (invite-only); self-signup in P2.
+Superseded by D-29 (2026-11-20). Marketing-site registration is in the MVP, with
+Super Admin approval.**
 *Reason:* the first clinics need hand-holding and verification. Self-signup brings fraud
 and abuse surface.
 
@@ -123,7 +128,7 @@ can link the same phone across clinics later, with consent.
 worker posture already fits.
 
 **D-22 Invoice numbers sequential per clinic per Nepali fiscal year, stamped on issue, never
-reused. Proposed.**
+reused. Proposed. Refined by D-49: the series is per billing profile.**
 *Reason:* HRestroSewa's trigger-stamped numbering is proven. Fiscal-year scoping is the
 expected Nepali practice (**Assumption**, verify under P-08).
 
@@ -131,7 +136,8 @@ expected Nepali practice (**Assumption**, verify under P-08).
 *Reason:* "who looked at this patient" must be answerable. A trigger forbids update/delete
 for every role.
 
-**D-24 `clinic_members` decouples Auth users from clinics (many-to-many-ready). Proposed.**
+**D-24 `clinic_members` decouples Auth users from clinics (many-to-many-ready). Proposed.
+Refined by D-26: the table is renamed `tenant_members`.**
 *Reason:* visiting doctors commonly serve several clinics (**Assumption**). Building the
 table now costs nothing, whereas retrofitting it later touches auth everywhere. Whether
 the MVP UI exposes it is P-16.
@@ -143,23 +149,360 @@ clinical documents.
 
 ---
 
+## Revision 2 (2026-11-20): owner requirements applied
+The owner asked for: five application areas mirroring HRestroSewa, email/password for every
+internal account **plus** HRestroSewa's tenant link + PIN access, configurable roles,
+pharmacy/inventory/stores/vendors/purchases/sales/expenses/finance in the Admin, a
+tenant-managed public website, and patient registration on that website. The decisions
+below implement those requirements and are **Accepted in principle** (owner-directed). The
+details inside each are **Proposed**.
+
+**D-26 Tenant naming and business types. Proposed.**
+The tenant table is `tenants` with `tenant_id` everywhere (formerly `clinics`/`clinic_id`),
+because tenants now include clinics with pharmacies and (later) pharmacy-only businesses.
+`tenants.business_type` gates modules, as HRestroSewa's `restaurants.type` does with
+`hasRooms`. Composite FKs from D-03 are unchanged.
+
+**D-27 Dual authentication: email/password identity + device-bound tenant link/PIN quick
+access, with session assurance levels. Accepted in principle (owner requirement); mechanism
+Proposed.**
+*What HRestroSewa does (verified in `app/actions/auth.ts`):* `/login?mode=staff&slug=` shows
+the active staff list of the restaurant to **anyone** who has the slug (and `searchRestaurants`
+finds slugs). The 4-digit PIN **is** the Supabase password of a synthetic account
+`emp-<id>@restrosewa.internal`, so the person has no other credential. There is a DB-clock
+lockout of 5 failures → 30 min per person, and admins sign in by PIN as well.
+*What CMediSewa does:* every internal user has one Supabase identity with email (or
+username, P-18) + password. The PIN is a separate hashed secret (`member_pins`) that works
+only on admin-enrolled **trusted devices**. After `verify_pin` succeeds, the server mints a
+normal session for that same identity (P-23) and records **A1** in `session_assurance`.
+Password sign-in gives **A2**, and MFA gives **A3**. Operations declare a minimum level
+(`permissions.md` §3). **PIN alone never opens clinical records, the Admin area, money
+corrections or permission changes.** One session per device (switching user signs out
+locally first), so sessions never conflict.
+*Why:* it keeps HRestroSewa's proven speed on shared front-desk and counter devices while
+closing its three weaknesses for medical data: public staff enumeration, a short PIN as the
+only credential, and no separation between quick access and full authentication.
+*Alternatives rejected:* PIN as the Auth password (HRestroSewa model), because it means two
+credentials per person or a weak single credential; PIN on any device, because it brings
+back enumeration and remote brute force; no PIN at all, because it was rejected by the owner
+and is slow at shared counters.
+
+**D-28 Five areas with separate Admin and Employee route groups (HRestroSewa structure).
+Accepted in principle.**
+`(marketing)`, `(superadmin)`, `(admin)`, `(employee)`, `(public)/c/[slug]`. The admin layout
+admits any active member at A2+ and each page guards its own permission (HRestroSewa rule).
+The employee area is a role-based workspace at A1+. Both share the same client components
+and actions, so there are no duplicate screens.
+
+**D-29 Marketing-site registration → email verification → Super Admin approval →
+provisioning, in the MVP. Accepted in principle.**
+Instant self-serve activation stays P2 (M-38), because manual approval limits fraud while
+the first tenants onboard.
+
+**D-30 Configurable tenant roles; professional credentials gate clinical keys. Proposed.**
+`tenant_roles` (seeded from templates, editable, custom roles allowed) + multi-role
+assignment + per-member overrides. Clinical and dispensing keys are effective only with a
+matching verified credential. *Why:* the owner asked not to hardcode roles, and a
+credential gate keeps a mis-configured custom role from handing out clinical access.
+*Rejected:* a fixed `staff_type` enum (the Revision 1 plan), because it is too rigid for
+mixed roles like "receptionist + cashier".
+
+**D-31 Patient accounts are optional, per tenant, OTP-based, with app-managed sessions;
+clinical documents require a reception-verified link. Proposed.**
+Guests can book with no account (manage link). An account adds history, family members and
+saved details. Accounts live in `patient_accounts` per tenant (consistent with D-20), not in
+`auth.users`. The session is a hashed `patient_sessions` cookie scoped to `/c/[slug]`, so it
+can't collide with staff Supabase sessions. *Rejected:* required patient accounts, which add
+friction for first-time bookers who are often on phones; Supabase Auth for patients, which
+mixes patients into the staff identity store and gives them one global identity across
+tenants.
+
+**D-32 Inventory is an append-only movement ledger per store × batch; stock is derived.
+Proposed. Refined by D-38 (2026-11-20, Revision 3): the ledger stays the source of truth,
+plus a trigger-maintained balance cache with a DB `CHECK ≥ 0`.**
+It adapts HRestroSewa's derived-stock decision ("never store `current_stock`") to batches,
+expiry and multiple stores. Negative stock is prevented by advisory-locked RPCs, and expired
+batches are refused. A verified cache table is allowed later only if measured slowness
+requires it.
+
+**D-33 Finance is HRestroSewa's derived model: four balances (cash, bank/online, receivable,
+payable) from source rows + one opening seed. Proposed. Refined by D-43 (Revision 3): the
+same four balances become accounts of a double-entry journal written by the posting
+transaction, and the HRestroSewa-style derivation is kept as the nightly reconciliation
+(P-26).**
+Vendor payables are **derived** (HRestroSewa stores `vendors.credit_balance` and moves it
+only through RPCs; CMediSewa applies the "never store derived" rule strictly). Expenses use
+HRestroSewa's `extra_expenses` shape.
+
+**D-34 The public website is tenant-managed content, published from the Admin. Proposed.**
+It is the analogue of HRestroSewa's admin-managed menu feeding `/c/[slug]`. Typed
+`site_settings` + announcements/media/FAQs, sanitised Markdown with no raw HTML, a draft
+preview and a re-auth-gated publish, and cache revalidation by tenant tag.
+
+**D-35 One invoice pipeline for services and items; issuing writes stock-out in the same
+transaction. Proposed.**
+It avoids separate clinic and pharmacy billing that would split finance, numbering and
+patient dues.
+
+**D-36 Platform billing: platform invoices + manual payment recording in the MVP. Proposed.**
+It generalises HRestroSewa's `install_date`/extra-days subscription into explicit
+subscription periods and invoices. A gateway comes later (P-12).
+
+**D-37 Separate hosts: `<domain>` (marketing + tenant sites) and `app.<domain>` (Admin,
+Superseded by D-59 (2026-11-20, owner): one host, as in HRestroSewa.**
+**Original text:**
+Employee, Super Admin). Proposed.**
+Staff session cookies are host-only on `app.`, so they are never sent to pages that render
+tenant-authored public content. This refines D-13 (the path `/c/[slug]` remains).
+
+---
+
+## Revision 3 (2026-11-20): inventory, pharmacy, purchasing, sales & finance
+Based on HRestroSewa's actual implementation (verified in `supabase/migrations/
+20260711200000_stock.sql`, `…300000_purchases.sql`, `…300001_purchase_functions.sql`,
+`20260825100000_extra_income.sql` `finance_transactions`, `lib/payment-split.ts`):
+- products have one free-text unit with no conversion, `last_unit_cost`, `opening_stock`
+  and `low_stock_threshold`; there are no batches, expiry or stores;
+- stock is derived from opening + purchases − recipe usage ± signed adjustments;
+- `record_purchase` computes totals on the server, locks the vendor row, numbers with an
+  advisory lock + `max()+1`, enforces CHECK cash + online + credit = total, and moves a
+  stored `credit_balance`;
+- finance is a union of source tables into four balance deltas (card = bank), and profit is
+  "estimated" because cost is approximate.
+All entries below are **Proposed**.
+
+**D-38 Stock = append-only movement ledger (source of truth) + a trigger-maintained
+`stock_balances` cache with `CHECK (qty_on_hand >= 0)`.**
+*Why:* with lots × stores × concurrent counters, the database needs a row to lock and a
+constraint that makes negative stock impossible, not just an application check. Advisory
+locks plus a re-sum (the Revision 2 plan) work but leave the invariant to code.
+*Kept from HRestroSewa:* the ledger, not the cache, is authoritative. Nightly reconciliation
+can rebuild the cache at any time.
+*Alternatives:* pure derivation (Revision 2: correct but no DB-level non-negative guarantee,
+and slower aggregation); a stored mutable `current_stock` per item (rejected: it loses batch
+and store identity and invites manual edits).
+
+**D-39 Ledger tables are writable only by posting functions.** `stock_movements` and
+`ledger_entries` accept inserts only from `SECURITY DEFINER` functions owned by a non-login
+`ledger_writer` role. Every other role, including `service_role`, has no INSERT, UPDATE or
+DELETE on them. *Why:* this enforces the requirement that stock can't change without a proper
+movement record in the database itself, not just by convention.
+
+**D-40 FEFO is the default allocation (FIFO as the tie-break); manual override needs
+`override_batch`; expired and blocked lots can never be allocated.**
+*Why:* medicine value is lost at expiry, not by arrival order. A later delivery can expire
+sooner, so FIFO would knowingly sell long-dated stock while short-dated stock expires. FIFO
+stays available as a setting for non-medicine stores.
+
+**D-41 Lot per receipt; all stock in base units with per-unit conversion factors.**
+One `item_batches` row per purchase line (or opening/found entry), carrying batch no., mfg,
+expiry, exact cost, MRP and sale price. A new purchase never overwrites an existing lot. A
+"batch" in reports groups lots by `(item, batch_no)`. A batch-no/expiry mismatch is flagged.
+Units: the base unit is the smallest unit sold, factors are locked once used, and lines
+snapshot the factor. *Why:* exact COGS, no expiry overwrite, loose-tablet sales.
+*Alternative rejected:* one row per batch number with weighted-average cost, which blurs cost
+and needs updates on every receipt.
+
+**D-42 A sales line spans lots through `invoice_line_allocations` (one allocation = one lot =
+one `sale` movement), each with its own price and cost.**
+*Why:* the user asked how a multi-medicine, multi-batch sale is recorded. Per-lot allocations
+preserve batch-wise sales and returns history, exact COGS, and recall traceability to the
+patient. *Alternative rejected:* forcing one lot or one price per line.
+
+**D-43 Finance is a double-entry journal (`ledger_entries`) written in the same transaction
+as each posting, with a fixed system chart of accounts and store, party and channel
+dimensions.**
+*Why:* more document types (purchases with returns and allocations, multi-lot sales, returns,
+transfers in transit, losses) would make HRestroSewa's single union query grow special
+cases (its `advance_amount` lockstep is an example). A journal makes every posting's
+financial effect explicit, gives exact P&L and store-wise reports by summing accounts, and
+keeps carry-forward drift impossible. The HRestroSewa-style document derivation remains as
+`verify_finance_integrity`. *Alternative:* pure derivation as in HRestroSewa, kept open as
+**P-26**.
+
+**D-44 Every stock or money change is an idempotent posting with gapless numbering.**
+`postings(idempotency_key)` is unique per tenant. A retry returns the original result.
+`document_sequences` row-locked per (tenant, doc type, fiscal year). *Why:* double taps,
+flaky Nepali mobile networks and PWA resubmits are routine. HRestroSewa's advisory lock +
+`max()+1` is safe but not gapless under deletes and gives no retry protection.
+
+**D-45 Posted documents are immutable; corrections are reversals or returns.**
+This departs from HRestroSewa's Security-PIN in-place edits (`edit_purchase`,
+`edit_payment_tender`). *Why:* medicine stock has batch traceability and regulatory
+exposure, and in-place edits rewrite history that sales may already depend on. A sales void
+is allowed only on the same business day. A purchase void only while its lots are untouched.
+Everything else goes through returns or reversal postings with re-auth and audit.
+
+**D-46 Inventory permissions are store-scoped through `store_members` (view/operate/manage);
+`all_stores` and `tenant_admin` see every store.** It is HRestroSewa's strict assignment
+rule applied to stores. Item master, prices, vendors and finance stay tenant-wide.
+
+**D-47 Controlled and narcotic medicines are blocked from sale until the controlled-drug
+register (M-48) exists and P-22 is answered.** *Why:* selling them without the record-keeping
+the law may require is a risk the platform shouldn't create by default.
+
+**D-48 Vendor payables and patient dues are not stored balances.** They are journal account
+balances by party, cross-checked against the documents. Payments carry explicit
+**allocations** to invoices (FIFO by default, HRestroSewa's settlement rule), so the
+outstanding amount per invoice is exact and ageing reports are possible.
+
+---
+
+## Revision 4 (2026-11-20): integration audit
+All entries below are **Proposed**.
+
+**D-49 Billing profiles: one invoice = one billing profile (+ at most one store); numbering
+per profile.** A clinic and its in-house pharmacy often hold separate registrations and PAN
+in Nepal (**Assumption**, P-29). Profiles hold legal name, PAN, registration no., address and
+invoice series. A visit can therefore have a services invoice and a pharmacy invoice that
+both reference the same visit and patient, and the patient balance sums across them.
+Purchases also carry the buying profile. *Refines D-22* (numbering is per profile per fiscal
+year, not per tenant). *Alternative rejected:* one invoice per visit mixing both entities,
+which would be invalid if they are separate taxpayers.
+
+**D-50 Module registry + tenant toggles.** `lib/modules.ts` is the single source.
+Effective module = business type ∧ plan ∧ tenant toggle ∧ dependencies. A disabled module is
+not navigable, grantable or postable (`MODULE_DISABLED`). Toggling never deletes data. *Why:*
+"don't force every clinic to use every module". It generalises HRestroSewa's `hasRooms`.
+
+**D-51 Consultation-fee billing point is a tenant setting (`check_in` | `checkout` | `none`),
+and services invoices are created by the check-in/checkout RPCs, never re-keyed.** *Why:*
+Nepali OPDs often sell a prepaid ticket at registration (**Assumption**), while others bill
+at checkout. P-31 sets the default.
+
+**D-52 A professional credential must be verified by someone other than its holder.** Another
+tenant admin verifies, or the Super Admin for single-admin tenants (they see name, profession
+and registration no. only). Every change notifies all admins. *Why:* the audit found that an
+admin could self-grant a doctor credential and get round D-06.
+
+**D-53 The posting core is part of MS0 Foundation.** *Why:* the audit found that R1 issued
+service invoices before the journal existed (R2 step 14), which would have created
+un-journaled money. No document that moves money or stock may exist before the posting core.
+
+**D-54 Roadmap = dependency-ordered milestones MS0–MS13 with two pilot gates. Superseded by D-55.** Gate A (after
+MS6) = clinic without pharmacy. Gate B (after MS11) = clinic + pharmacy. R1 = MS0–MS6 and
+R2 = MS7–MS11, so older references stay valid.
+
+---
+
+## Revision 5 (2026-11-20): owner answers on structure and phases
+Owner statements: every clinic has its **own pharmacy**, run by a person who handles stock,
+billing and the counter. Clinics have a **registrar**, **OPD doctors**, a **lab** and other
+staff. Dashboards are needed for **Admin, Pharmacy, Registrar, Lab (Phase 3)**, plus a
+**Doctor OPD dashboard** (chosen). The pharmacy bills under the **same PAN/registration**,
+and billing is done by staff with permission. The **OPD fee is collected at registration**.
+Phase 0 = database + backend. Phase 1 = UI outline + MVP. Lab in Phase 3.
+These are **Accepted (owner)**.
+
+**D-55 Phases: Phase 0 backend, Phase 1 UI + MVP, Phase 2 next features, Phase 3 lab.
+Supersedes D-54.** Backend milestones B0–B9, UI milestones U1–U8, one pilot gate at the end
+of Phase 1. *Trade-off accepted:* building the backend before the UI risks API/screen
+mismatch, mitigated by workflow-driven, executable tests (W-31 as a script) and an early
+clickable outline (U1). D-53 (posting core first) is kept as B0.
+
+**D-56 Four staff dashboards: Admin, Registrar, Doctor OPD, Pharmacy (Lab in Phase 3).**
+The Admin dashboard is the `(admin)` area. Registrar, OPD, Pharmacy and Lab are role
+workspaces in the `(employee)` area (`/employee/registrar`, `/employee/opd`,
+`/employee/pharmacy`, `/employee/lab`), each a role template's home. Other staff get
+custom roles that reuse these workspaces with fewer permissions. Roles stay configurable
+(D-30). *Refines D-28.*
+
+**D-57 The Pharmacy role combines pharmacist, cashier and inventory manager.** One template
+covers dispensing, OTC sales, pharmacy billing and payments, stock (receive, transfer,
+count, adjust, quarantine), purchases and vendors. Money-moving and stock-correcting
+operations still need A2 (password), and some need re-auth (`permissions.md` §3), so PIN
+quick access covers only counter work. The admin can remove keys (e.g. vendor payments) per
+clinic.
+
+**D-58 Launch configuration: business type `clinic_pharmacy`, one billing profile (same PAN),
+OPD fee at registration.** It resolves **P-21** (launch with clinic + pharmacy; clinic-only
+and pharmacy-only later), **P-29** (one profile; the second-profile capability stays in the
+schema), **P-31** (`consultation_billing_point = check_in`, by the registrar) and **P-17**
+(one pilot gate, clinic + pharmacy). With one profile, the OPD bill and the pharmacy bill
+are separate invoices in the same series (one invoice = one store rule, D-49).
+Provisioning creates a **Pharmacy** store (sellable, receiving, dispensing) and a quarantine
+store. A main or department store is optional.
+
+---
+
+**D-59 One host for all five areas, as in HRestroSewa. Accepted (owner), supersedes D-37.**
+`<domain>/` marketing · `/c/<slug>` tenant sites · `/login`, `/login/<slug>` sign-in ·
+`/admin/*` · `/employee/*` · `/superadmin/*`, in one Next.js app on one origin.
+*Trade-off accepted:* the staff session cookie is also valid on public pages, so a script
+bug on a public page could act as a signed-in staff member in that browser.
+*Safeguards:* sanitised Markdown with no raw HTML in tenant content; a strict CSP with nonces
+on **every** page; Next's Server Action origin check; HttpOnly, SameSite=Lax cookies; patient
+sessions in a separately named cookie (`cm_patient`) scoped to `/c/<slug>`; staff book from
+the Registrar dashboard rather than the public site. Subdomain tenant sites (P2) or a split
+host can be revisited later without data changes.
+
+---
+
+## Phase 0 / B0 implementation decisions (2026-11-20)
+**D-60 Bikram Sambat data: `nepali-date-converter` 3.4.2 at runtime, cross-checked against
+`bikram-sambat` 1.8.1.** Both agree on every day from 2013 to 2033 (unit test) and on every
+fiscal-year start (the generator refuses to write if they disagree). The DB holds fiscal
+years as a generated reference table (`fiscal_years`, FY 2070/71–2089/90) used by
+`fiscal_year_of()`. *Limit:* both libraries end at 2090 BS (≈ AD 2033), so a new migration
+must extend the table before 2032. *Resolves the [OPEN] in D-14.*
+
+**D-61 Tooling targets declare themselves (`APP_ENV`); Supabase new-format keys.** The
+migration runner and DB tests refuse any env file without `APP_ENV`. Production writes need
+`--prod --yes` **and** `APP_ENV=production`. There is no hostname or project-ref guess
+(HRestroSewa's `PROD_REF` went stale). Env names follow Supabase's new keys:
+`NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY` and `SUPABASE_SECRET_KEY` (deployment.md §5). No
+Kong-HTTP mode: production is reached over an SSH tunnel (D-15).
+
+**D-62 Pinned toolchain (D-16 applied).** Next 16.4.5, React 19.3.1, TypeScript **6.0.3** (not
+7.x: Next 16 + TS 7 is unproven, and HRestroSewa runs 6.0.3), ESLint **9.39.5** (the plugins in
+`eslint-config-next` 16.4.5 do not support ESLint 10), supabase-js 2.119.0, @supabase/ssr
+0.12.7, pg 8.23.1, Tailwind 4.3.4. Each is the newest stable release at least 14 days old
+on 2026-11-20.
+
+**D-63 Access posture findings from the dev project, enforced by migrations 0001 + 0006 and
+`scripts/lib/posture.mjs`.** By default, objects created by `postgres` grant
+`anon`/`authenticated` TRUNCATE, TRIGGER, REFERENCES and MAINTAIN (TRUNCATE bypasses RLS),
+give `service_role` no DML, and give functions EXECUTE. After 0001/0006: anon and
+authenticated hold nothing, service_role holds plain DML only, no function is executable
+unless granted explicitly, and `ledger_writer` owns the posting primitives (it held CREATE
+only for the moment of the ownership transfer). The posture check runs in CI and in the
+DB test suite.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |
 |---|---|---|---|---|
-| **P-01** | Platform domain & URL scheme | `.com` / `.com.np`; path vs subdomain for clinics | buy the domain now; path `/c/[slug]` in MVP (D-13) | Phase 0 |
-| **P-02** | Hosting location | dedicated VPS / same VPS as HRestroSewa / Nepal DC / hosted cloud | dedicated VPS (`deployment.md` §3, option A) unless P-09 requires Nepal | Phase 1 step 13 (prod) |
-| **P-03** | Scheduling mode | time slots / daily tokens / both per doctor | **both**, configurable per doctor schedule | Phase 1 step 4 |
-| **P-04** | Online booking verification | none / SMS OTP / manual confirmation | CAPTCHA + rate limits + optional manual confirmation in MVP; OTP once P-05 done | no |
+| **P-01** | Platform domain & URL scheme | `.com` / `.com.np`; path vs subdomain for clinics | buy the domain now; path `/c/[slug]` in MVP (D-13) | Phase 0 start |
+| **P-02** | Hosting location | dedicated VPS / same VPS as HRestroSewa / Nepal DC / hosted cloud | dedicated VPS (`deployment.md` §3, option A) unless P-09 requires Nepal | pilot gate (prod readiness) |
+| **P-03** | Scheduling mode | time slots / daily tokens / both per doctor | **both**, configurable per doctor schedule | B3 |
+| **P-04** | Guest booking verification | none / SMS OTP / manual confirmation | CAPTCHA + rate limits + per-phone caps + optional manual confirmation in MVP; OTP once P-05 done | no |
 | **P-05** | SMS / messaging provider | Nepali SMS aggregators (e.g. Sparrow SMS, Aakash SMS: verify availability/pricing), Viber/WhatsApp business | evaluate cost, DLR reliability, sender-ID rules; decide before P2 | P2 |
-| **P-06** | Shared reception device sign-in | individual login each time / quick-switch PIN over a device session / idle lock | idle lock + re-auth in MVP; quick-switch in P2 | no |
-| **P-07** | Admin clinical access & doctor history window | strict (D-06) / clinic setting "admin clinical read (audited)" / limit C2 to N months | strict + C2 unlimited (audited) | Phase 1 step 9 |
+| ~~P-06~~ | Shared reception device sign-in | **Resolved by D-27** (2026-11-20): trusted devices + PIN quick access + switch user + idle lock, in the MVP | — | — |
+| **P-07** | Admin clinical access & doctor history window | strict (D-06) / clinic setting "admin clinical read (audited)" / limit C2 to N months | strict + C2 unlimited (audited) | B4 |
 | **P-08** | Tax & IRD billing compliance; Rx format rules | see `security.md` §10 | keep `tax_category`, `fiscal_year` fields; get counsel opinion | before go-live |
 | **P-09** | Data residency | foreign VPS / Nepal hosting | depends on counsel reading of privacy & cyber policy | before go-live |
 | **P-10** | Retention & deletion periods; consent text | — | soft delete only; placeholder 10 years; counsel to set | before go-live |
-| **P-11** | MFA scope | Super Admin only / + Clinic Admin / + doctors / everyone | mandatory: Super Admin + Clinic Admin + doctors; optional others | Phase 1 step 1 |
+| **P-11** | MFA scope | Super Admin only / + Clinic Admin / + doctors / everyone | mandatory: Super Admin + Clinic Admin + doctors; optional others | B1 |
 | **P-12** | Online payments (subscriptions & patients) | manual recording / eSewa / Khalti / Fonepay | manual in MVP; gateway in P2 | P2 |
 | **P-13** | Language | English only / bilingual from MVP | i18n-ready MVP, English UI; Nepali public site P2 | no |
 | **P-14** | Plans & pricing | per clinic / per doctor / tiered features | per-clinic tiers with doctor caps (schema supports either) | before go-live |
 | **P-15** | Diagnosis coding | free text / ICD-10 / ICD-11 | free text + optional ICD-10 field | no |
-| **P-16** | Multi-clinic membership in MVP UI | hidden / clinic switcher | hidden in MVP (model supports it, D-24) | no |
+| **P-16** | Multi-tenant membership in MVP UI | hidden / tenant switcher | hidden in MVP (model supports it, D-24) | no |
+| ~~P-17~~ | Pilot go-live point | **Resolved by D-58**: one pilot gate at the end of Phase 1 (clinic + pharmacy) | — | — |
+| **P-18** | Employees without personal email | require email / allow tenant-scoped usernames (admin-managed recovery) | allow usernames for `tenant_member`; require email for `tenant_admin` | B1 |
+| **P-19** | PIN length | 4 digits (HRestroSewa) / 6 digits | **6 digits**, plus device-bound use and lockout | B1 |
+| **P-20** | Patient account sign-in method | email OTP / SMS OTP / password | email OTP in MVP; SMS OTP with P-05; no patient passwords | B4 |
+| ~~P-21~~ | Business types at launch | **Resolved by D-58**: `clinic_pharmacy` at launch; clinic-only and pharmacy-only later | — | — |
+| **P-22** | Drug classes & dispensing rules | — | model `schedule_class`; enforce Rx-required for prescription-only and controlled items; counsel/DDA to confirm categories, narcotics register and pharmacist requirements | B7 |
+| **P-24** | Platform drug master | none (each tenant types its own) / platform-seeded generics, dosage forms, strength units / full product master | seed generics + dosage forms + units at platform level; items stay tenant-owned | B5 |
+| **P-25** | Sale price above MRP | allow / refuse / allow with reason | refuse (`PRICE_ABOVE_MRP`); verify the legal MRP rule | B7 |
+| **P-26** | Finance engine | double-entry journal + reconciliation (D-43) / pure derivation from documents (HRestroSewa) | journal | **B0** (posting core in foundation) |
+| **P-27** | Tax on medicines and services | all exempt / VAT on some items / per-item tax category | per-item and per-service `tax_category`; counsel to confirm (with P-08) | before go-live |
+| **P-28** | Restocking customer returns | allow sealed packs / quarantine only / never | sealed, unexpired, non-cold-chain → sellable; else quarantine (pharmacist confirms) | B7 |
+| **P-23** | Session minting after PIN | `auth.admin.generateLink` + `verifyOtp` server-side / custom JWT / PIN-as-unlock only | spike the first in Phase 0; fall back to PIN-as-unlock only | B1 |
+| ~~P-29~~ | Billing entities | **Resolved by D-58**: same PAN, one billing profile (multi-profile capability kept) | — | — |
+| **P-30** | Credential verifier in single-admin tenants | Super Admin verifies / allow self-verification with notification / external council lookup | Super Admin verifies (no PHI involved) | B1 |
+| ~~P-31~~ | Consultation-fee billing point | **Resolved by D-58**: at registration (check-in), by the registrar | — | — |
+| **P-32** | Super Admin IP allow-list | none / allow-list / VPN only | allow-list once ops IPs are stable; TOTP mandatory regardless | B2 |
