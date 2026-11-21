@@ -105,6 +105,7 @@ export async function saveBillingProfile(fd: FormData): Promise<FormResult> {
 const SETTING_RULES: Record<string, [number, number]> = {
   booking_window_days: [1, 365], min_notice_minutes: [0, 10080], cancellation_cutoff_hours: [0, 168],
   idle_lock_minutes: [1, 240], shift_window_hours: [1, 24], near_expiry_days: [1, 730], critical_expiry_days: [0, 365],
+  reminder_hours_before: [0, 72],
 };
 export async function saveOperatingSettings(fd: FormData): Promise<FormResult> {
   const ctx = await guard("settings.change", "manage_settings", "/admin/settings");
@@ -122,6 +123,14 @@ export async function saveOperatingSettings(fd: FormData): Promise<FormResult> {
   row.print_paper_width = pick("print_paper_width", ["58mm", "80mm", "a5", "a4"]);
   if (Object.values(row).includes(null)) return { ok: false, error: "Choose a value for every option." };
   row.auto_confirm_online = on(fd, "auto_confirm_online");
+  // Billing rules: dues need allow_credit (and the allow_credit key) within the per-patient limit;
+  // a discount above the limit needs someone with apply_discounts (D-102).
+  const limit = num(fd, "credit_limit_per_patient"), pct = num(fd, "max_discount_pct_without_reauth");
+  if (limit === null || limit < 0 || limit > 10_000_000) return { ok: false, error: "The credit limit must be between 0 and 1,00,00,000." };
+  if (pct === null || pct < 0 || pct > 100) return { ok: false, error: "The discount limit is a percentage from 0 to 100." };
+  row.allow_credit = on(fd, "allow_credit");
+  row.credit_limit_per_patient = Math.round(limit * 100) / 100;
+  row.max_discount_pct_without_reauth = Math.round(pct * 100) / 100;
   const { error } = await serviceClient().from("tenant_settings").update(row).eq("tenant_id", ctx.tenantId);
   if (error) return { ok: false, error: friendly(error) };
   await audit({ tenantId: ctx.tenantId, actorKind: "member", actorId: ctx.memberId, sessionLevel: ctx.level, action: "settings.update", targetType: "tenant_settings", targetId: ctx.tenantId, detail: row });

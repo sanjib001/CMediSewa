@@ -45,7 +45,7 @@ export default async function PlatformOverview() {
         <Figure value={o.byStatus.suspended} label="suspended" tone={o.byStatus.suspended ? "text-alert" : undefined} />
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.5fr_1fr]">
         <Panel title="Clinics" flush>
           {total === 0 ? (
             <div className="px-5 py-8">

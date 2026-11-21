@@ -51,7 +51,7 @@ export default async function Billing({ searchParams }: { searchParams: Promise<
           <button className="rounded-control border border-line-strong px-3 py-1.5">Show</button>
         </form>
       </div>
-      <div className="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr_1fr]">
         <Panel title="Bills" flush><ReportTable cols={COLS} rows={rows} /></Panel>
         <Panel title="Patients who owe" aside={dues.length ? <span className="text-sm text-ink-faint">{npr(dues.reduce((s, d) => s + d.owed, 0))}</span> : null} flush>
           {dues.length === 0 ? <p className="px-5 py-4 text-ink-soft">Nobody owes anything.</p> : (

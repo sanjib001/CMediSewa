@@ -1008,6 +1008,80 @@ updates are unaffected: they never wait for a cron.
 
 ---
 
+## U8a Install, offline, idle lock (2026-11-21)
+
+**D-129 Installable, never cached:** a web app manifest (standalone, opens /employee, icons
+192/512/maskable drawn in code at /pwa-icon/*, pre-rendered at build) and iPhone home-screen
+metadata (apple-touch-icon 180). The service worker (registered for everyone) caches exactly
+one page, /offline, and serves it only when a page load fails; no patient, bill or stock page
+is ever stored on a device. A banner shows while the device is offline.
+
+**D-130 Idle lock as built:** after the clinic's `idle_lock_minutes` with no activity in any
+tab (default 10; at least 15 on a device that isn't trusted), the screen blurs with a
+60-second "Still there?" countdown; any touch or key continues, otherwise the session signs
+out on that device (local scope) and the next person signs in (PIN on a trusted device). A
+blur alone would only hide; signing out is the lock. The purchase bill prints as a goods
+received note.
+
+---
+
+## U2 Platform settings, contact, audit, health (2026-11-21)
+
+**D-131 Platform settings and Contact:** one `platform_settings` row (support phone, WhatsApp,
+email, hours, office address; registrations open/closed), changed only by a platform admin
+through `set_platform_settings`, audited with before and after. The public /contact page shows
+those details (no message form: no spam inbox). While registrations are closed the form is
+hidden and `submitRegistration` refuses (a marketing switch, enforced in the app; the
+database keeps its own limits). Pricing on the landing page was already live from public
+plans.
+
+**D-132 Super Admin oversight:** Platform audit (platform admins' actions and the platform
+jobs; per clinic, everything) never identifies patients ("a patient record"). The overview's
+Health panel (`platform_health()`): last nightly check, clinics whose books or vendor
+payables differ, stock balances repaired, messages waiting/failed/dry-run, errors and refusals
+in 24 h, subscriptions ending within 14 days; the environment label comes from APP_ENV. Plans
+& billing lists every invoice to clinics with what is outstanding.
+
+**Lesson (U2):** Supabase's API refuses an UPDATE without a WHERE clause (safeupdate), which
+direct-connection DB tests don't see. Single-row updates name their row (`where id`), and every
+new write path is exercised end to end through the app, not only in DB tests.
+
+---
+
+## U7 Manage link in patient emails (2026-11-21)
+
+**D-133 Every confirmation, reminder and "moved" email carries a private "see or cancel" link.**
+Tokens are only ever stored as an HMAC keyed by the app, so the database cannot rebuild a link:
+the dispatcher mints a fresh 32-byte token per email at send time, records its hash
+(`add_manage_link` → `appointment_links`) and puts the URL (NEXT_PUBLIC_APP_URL) in the text
+and as a button. The website's original link keeps working; status and cancel accept either
+(`appointment_by_token`, scoped to the clinic's address). No link is minted in dry-run mode
+(nothing is sent). Declined/cancelled emails carry no link. `RESEND_API_BASE` (normally
+unset) lets a relay or a local test stub stand in for Resend.
+
+**D-134 The optional patient account is deferred to after the pilot.** The emailed link gives
+every patient (website or desk booking) a way to see and cancel without an account.
+
+---
+
+## Browser UI pass (2026-11-21)
+
+**D-135 Fixes from driving the app in a real browser (headless Chrome via playwright-core,
+outside the repo):** (1) the idle lock was rendered inside the top bar, whose backdrop blur made
+"fixed inset-0" cover only the bar, leaving patient screens readable; it now renders on
+<body> (portal) and is checked to cover and blur the whole window. (2) On phones, Admin →
+Billing scrolled sideways by 511 px and the registrar queue by 5 px: grid columns without an
+explicit size grew to their widest content; all 21 page grids now use `grid-cols-1` below
+their breakpoint, and the queue's status links wrap. (3) "Dr. Dr. Name" when the display name
+already starts with "Dr.": `dr_name()` in SQL (notification triggers) and `drName()` in the app
+add the title only when missing.
+
+**Testing note:** the long-running `next dev` server goes stale after many edits (actions
+fail, pages reload in loops). Final checks run against a fresh production build
+(`next build` + `next start -p 3100`); restart `next dev` before manual testing.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |

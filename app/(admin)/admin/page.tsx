@@ -77,7 +77,7 @@ export default async function AdminDashboard() {
         <Figure value={flow.done} label="seen" />
       </section>
 
-      <div className="grid gap-6 xl:grid-cols-[1.4fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_1fr]">
         <div className="space-y-6">
           <Panel title="OPD queues" aside={<Link className="text-sm font-medium text-pine hover:underline" href="/employee/registrar">Registrar view</Link>} flush>
             <ul className="divide-y divide-line">

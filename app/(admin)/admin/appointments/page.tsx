@@ -34,7 +34,7 @@ export default async function Appointments() {
       <PageHeader title="Appointments" subtitle="Website booking requests and upcoming appointments." />
       {requests.length === 0 ? <p className="mb-6 rounded-panel border border-line bg-surface px-5 py-4 text-ink-soft">No website requests waiting.</p> : null}
       <BookingRequests requests={requests} canAct={can(ctx, "manage_appointments") && can(ctx, "manage_patients")} />
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Panel title="Today" flush>
           {board.appointments.length === 0 ? <p className="px-5 py-4 text-ink-soft">No appointments today.</p> : (
             <ul className="divide-y divide-line">{board.appointments.map((a) => (

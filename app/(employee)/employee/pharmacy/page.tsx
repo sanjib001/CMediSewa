@@ -13,6 +13,7 @@ import { CounterSale, type RxPrefill } from "@/components/pharmacy/counter";
 import { AllergyBanner, PageHeader, Panel } from "@/components/ui/primitives";
 import { cn } from "@/lib/cn";
 import { LiveRefresh } from "@/components/notify/live-refresh";
+import { drName } from "@/lib/doctor-name";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pharmacy" };
@@ -44,7 +45,7 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
     body = !queue ? <p className="text-ink-soft">Only a verified pharmacist sees the dispensing queue.</p> : queue.length === 0
       ? <p className="rounded-panel border border-line bg-surface p-5 text-ink-soft">No prescriptions waiting. Issued prescriptions from the last 14 days appear here until everything on them is dispensed.</p>
       : <div className="space-y-5">{queue.map((rx) => (
-          <Panel key={rx.prescription_id} title={`${rx.patient.full_name} (${rx.patient.mrn})`} aside={<span className="text-sm text-ink-faint">{rx.rx_number}, Dr. {rx.doctor ?? ""}, {new Date(rx.issued_at).toLocaleString("en-GB", { timeZone: "Asia/Kathmandu", dateStyle: "medium", timeStyle: "short" })}</span>} flush>
+          <Panel key={rx.prescription_id} title={`${rx.patient.full_name} (${rx.patient.mrn})`} aside={<span className="text-sm text-ink-faint">{rx.rx_number}, {drName(rx.doctor)}, {new Date(rx.issued_at).toLocaleString("en-GB", { timeZone: "Asia/Kathmandu", dateStyle: "medium", timeStyle: "short" })}</span>} flush>
             <div className="px-5 pt-4"><AllergyBanner allergy={rx.allergies.length ? rx.allergies.join(", ") : null} /></div>
             <ul className="divide-y divide-line">{rx.items.map((i) => (
               <li key={i.id} className={cn("grid gap-x-6 px-5 py-3 sm:grid-cols-[1.6fr_1fr_auto]", i.dispensed && "text-ink-faint")}>
@@ -143,7 +144,7 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
     const [bills, alerts] = await Promise.all([todaysBills(ctx.tenantId, store.id), getAlerts(ctx.tenantId, store.id)]);
     const total = bills.filter((b) => b.status === "issued").reduce((s, b) => s + b.total, 0);
     body = (
-      <div className="grid gap-6 xl:grid-cols-[1fr_20rem]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_20rem]">
         <Panel title="Recent bills" aside={<span className="text-sm text-ink-faint">{bills.length} bills, {npr(total)}</span>} flush>
           {bills.length === 0 ? <p className="px-5 py-4 text-ink-soft">No bills yet today.</p> : (
             <table className="w-full text-left text-[0.95rem]"><tbody className="divide-y divide-line">{bills.map((b) => (

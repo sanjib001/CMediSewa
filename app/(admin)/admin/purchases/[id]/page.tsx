@@ -26,7 +26,7 @@ export default async function Purchase({ params }: { params: Promise<{ id: strin
         actions={<div className="flex gap-2 print:hidden"><PrintButton />{!isVoid && h.kind === "purchase" && can(ctx, "return_to_vendor") ? <ButtonLink tone="secondary" href={`/admin/purchases/returns/new?invoice=${id}`}>Return items from this bill</ButtonLink> : null}</div>} />
       <p className="mb-4 hidden text-lg font-semibold print:block">Goods received note: {h.purchase_no}{isVoid ? " (VOID)" : ""}</p>
       {isVoid ? <p className="mb-6 rounded-panel bg-alert-tint p-4 text-alert">Voided: {h.void_reason}</p> : null}
-      <div className="grid gap-6 xl:grid-cols-[1.7fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.7fr_1fr]">
         <Panel title="Lines" flush>
           <div className="overflow-x-auto">
             <table className="w-full min-w-[40rem] text-left text-sm">

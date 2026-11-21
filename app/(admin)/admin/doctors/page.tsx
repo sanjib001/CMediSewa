@@ -16,7 +16,7 @@ export default async function Doctors() {
     <>
       <PageHeader title="Doctors & schedules" subtitle="Who sees patients, when, and for how much. A doctor appears on your website once their NMC registration is verified."
         actions={<ButtonLink href="/admin/staff" tone="secondary">Invite a doctor</ButtonLink>} />
-      <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.6fr_1fr]">
         <Panel title="Doctors" flush>
           {doctors.length === 0 ? (
             <p className="px-5 py-4 text-ink-soft">No doctors yet. Invite them in Staff &amp; roles, then add their OPD details here.</p>

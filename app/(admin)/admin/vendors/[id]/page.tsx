@@ -30,7 +30,7 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
           {can(ctx, "return_to_vendor") ? <ButtonLink tone="secondary" href={`/admin/purchases/returns/new?vendor=${v.id}`}>Return stock</ButtonLink> : null}
           {can(ctx, "manage_purchases") ? <ButtonLink href={`/admin/purchases/new?vendor=${v.id}`}>Enter a bill</ButtonLink> : null}
         </>} />
-      <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.5fr_1fr]">
         <div className="space-y-6">
           <Panel title="Bills" aside={<span className="text-sm text-ink-faint">{open.length} unpaid</span>} flush>
             {bills.length === 0 ? <p className="px-5 py-4 text-ink-soft">No bills yet.</p> : (

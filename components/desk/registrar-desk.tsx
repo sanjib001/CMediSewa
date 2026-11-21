@@ -54,7 +54,7 @@ export function RegistrarDesk(props: {
   };
 
   return (
-    <div className="grid gap-6 xl:grid-cols-[minmax(0,27rem)_1fr]">
+    <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,27rem)_1fr]">
       <div className="space-y-5">
         <section aria-label="Patient" className="rounded-panel border border-line bg-surface p-5">
           {patient ? (
@@ -431,7 +431,7 @@ function TodayBoard({ doctors, visits, appointments, can, onCheckIn, now: server
                       </td>
                       <td className="px-5 py-2.5 text-right">
                         {asking?.id === v.id ? <ReasonBox onConfirm={() => act(() => moveVisit({ visitId: v.id, to: "cancelled", reason }))} /> : (
-                          <span className="inline-flex items-center gap-3">
+                          <span className="inline-flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
                             <Chip map={VISIT_CHIP} s={v.status} />
                             {v.status !== "cancelled" ? <Link href={`/employee/registrar/receipt/${v.id}`} className="text-sm text-pine hover:underline">Receipt</Link> : null}
                             {rxByVisit[v.id] ? <Link href={`/employee/registrar/rx/${rxByVisit[v.id]!.id}`} className="text-sm text-pine hover:underline">Print Rx</Link> : null}

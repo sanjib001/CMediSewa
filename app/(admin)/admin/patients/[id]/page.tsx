@@ -7,6 +7,7 @@ import { ActionForm, field, label } from "@/components/platform/action-form";
 import { CollectDues } from "@/components/pharmacy/bill-corrections";
 import { PageHeader, Panel } from "@/components/ui/primitives";
 import { cn } from "@/lib/cn";
+import { drName } from "@/lib/doctor-name";
 
 export const metadata = { title: "Patient" };
 export const dynamic = "force-dynamic";
@@ -43,7 +44,7 @@ export default async function Patient({ params }: { params: Promise<{ id: string
         </section>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-[1fr_1.2fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_1.2fr]">
         <div className="space-y-6">
           <Panel title="Details">
             {edit ? (
@@ -83,13 +84,13 @@ export default async function Patient({ params }: { params: Promise<{ id: string
           <Panel title="Visits" flush>
             {p.visits.length === 0 ? <p className="px-5 py-4 text-ink-soft">No visits yet.</p> : (
               <ul className="divide-y divide-line">{p.visits.map((v) => (
-                <li key={v.id} className="flex justify-between gap-3 px-5 py-2.5"><span>{when(`${v.date}T12:00:00+05:45`, false)}, Dr. {v.doctor}, token {v.token}</span><span className="text-sm text-ink-soft">{VISIT[v.status] ?? v.status}</span></li>))}</ul>
+                <li key={v.id} className="flex justify-between gap-3 px-5 py-2.5"><span>{when(`${v.date}T12:00:00+05:45`, false)}, {drName(v.doctor)}, token {v.token}</span><span className="text-sm text-ink-soft">{VISIT[v.status] ?? v.status}</span></li>))}</ul>
             )}
           </Panel>
           <Panel title="Appointments" flush>
             {p.appointments.length === 0 ? <p className="px-5 py-4 text-ink-soft">No appointments.</p> : (
               <ul className="divide-y divide-line">{p.appointments.map((a) => (
-                <li key={a.id} className="flex justify-between gap-3 px-5 py-2.5"><span>{a.at ? when(a.at) : ""}, Dr. {a.doctor}{a.source === "online" ? " (website)" : ""}</span>
+                <li key={a.id} className="flex justify-between gap-3 px-5 py-2.5"><span>{a.at ? when(a.at) : ""}, {drName(a.doctor)}{a.source === "online" ? " (website)" : ""}</span>
                   <span className={cn("text-sm", a.status === "no_show" ? "text-warn" : "text-ink-soft")}>{APPT[a.status] ?? a.status}</span></li>))}</ul>
             )}
           </Panel>

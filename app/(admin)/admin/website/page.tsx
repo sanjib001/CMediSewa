@@ -22,7 +22,7 @@ export default async function Website() {
         actions={<span className={live ? "rounded-control bg-ok-tint px-3 py-1.5 text-sm text-ok" : "rounded-control bg-sunken px-3 py-1.5 text-sm text-ink-soft"}>
           {live ? "Public now" : site?.published ? "Published, goes public when the clinic goes live" : "Not published"}</span>}
       />
-      <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.5fr_1fr]">
         <Panel title="Page content">
           <ActionForm action={saveWebsite} submitLabel="Save website" resetOnSuccess={false}>
             <div className="grid gap-3 sm:grid-cols-2">

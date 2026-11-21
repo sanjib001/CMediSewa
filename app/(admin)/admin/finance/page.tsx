@@ -68,7 +68,7 @@ export default async function Finance({ searchParams }: { searchParams: Promise<
         </section>
       ) : null}
 
-      <div className="grid gap-6 xl:grid-cols-2">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-2">
         <Panel title={`Profit and loss${store ? `: ${store.name}` : ""}`}>
           <Row label="Services and OPD" value={Number(pl.revenue_services)} sub /><Row label="Pharmacy" value={Number(pl.revenue_pharmacy)} sub />
           <Row label="Revenue" value={Number(pl.revenue)} /><Row label="Cost of medicines sold" value={-Number(pl.cogs)} />

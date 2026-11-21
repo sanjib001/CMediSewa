@@ -20,7 +20,7 @@ export default async function Notifications() {
   return (
     <>
       <PageHeader title="Notifications" subtitle={unread ? `${unread} unread` : "You're up to date."} />
-      <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.6fr_1fr]">
         <Panel title="Recent" aside={unread ? <MarkAllRead /> : null} flush>
           {list.length === 0 ? <p className="px-5 py-4 text-ink-soft">Nothing yet. Booking requests and prescriptions to dispense will appear here.</p> : (
             <ul className="divide-y divide-line">{list.map((n) => (

@@ -87,6 +87,13 @@ export default async function Settings() {
                 <Text name="shift_window_hours" title="PIN works for (hours after password)" value={s.shift_window_hours} type="number" min={1} max={24} />
               </fieldset>
               <fieldset className="grid gap-3 border-t border-line pt-4 sm:grid-cols-3">
+                <legend className="mb-2 pt-2 font-medium">Billing and reminders</legend>
+                <label className="flex items-center gap-2 self-end pb-2"><input type="checkbox" name="allow_credit" defaultChecked={s.allow_credit} />Patients may leave part of a bill unpaid</label>
+                <Text name="credit_limit_per_patient" title="Most a patient may owe (Rs.)" value={s.credit_limit_per_patient} type="number" min={0} max={10000000} step="0.01" hint="Only staff allowed to give credit can leave a due." />
+                <Text name="max_discount_pct_without_reauth" title="Discount allowed without approval (%)" value={s.max_discount_pct_without_reauth} type="number" min={0} max={100} step="0.01" hint="Above this, someone who may approve discounts must give it." />
+                <Text name="reminder_hours_before" title="Email a reminder (hours before)" value={s.reminder_hours_before} type="number" min={0} max={72} hint="0 = no reminders. Patients with an email get it." />
+              </fieldset>
+              <fieldset className="grid gap-3 border-t border-line pt-4 sm:grid-cols-3">
                 <legend className="mb-2 pt-2 font-medium">Pharmacy and printing</legend>
                 <Text name="near_expiry_days" title="Warn about expiry (days before)" value={s.near_expiry_days} type="number" min={1} max={730} />
                 <Text name="critical_expiry_days" title="Urgent expiry (days before)" value={s.critical_expiry_days} type="number" min={0} max={365} />

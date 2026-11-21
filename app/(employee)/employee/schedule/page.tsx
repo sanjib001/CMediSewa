@@ -43,7 +43,7 @@ export default async function MySchedule() {
   return (
     <>
       <PageHeader title="My schedule" subtitle={<><Link href="/employee/opd" className="text-pine hover:underline">OPD</Link> / your hours, bookings for the next two weeks, and your leave.</>} />
-      <div className="grid gap-6 xl:grid-cols-[1.3fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.3fr_1fr]">
         <div className="space-y-6">
           <Panel title="Booked, next 14 days" aside={<span className="text-sm text-ink-faint">{list.length} appointment{list.length === 1 ? "" : "s"}</span>} flush>
             {list.length === 0 ? <p className="px-5 py-4 text-ink-soft">Nothing booked yet.</p> : (

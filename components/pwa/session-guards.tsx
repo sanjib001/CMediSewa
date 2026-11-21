@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { createPortal } from "react-dom";
 import { signOutStaff } from "@/app/actions/staff-auth";
 
 const ACTIVE_KEY = "cm_last_active";
@@ -49,13 +50,16 @@ export function IdleLock({ minutes }: { minutes: number }) {
   }, [minutes]);
 
   if (left === null) return null;
-  return (
-    <div role="alertdialog" aria-modal="true" aria-labelledby="idle-title" className="fixed inset-0 z-50 grid place-items-center bg-surface/60 backdrop-blur-xl print:hidden">
+  // Rendered on <body>: inside the top bar (which has a backdrop blur) "fixed inset-0" would be
+  // confined to the bar and leave the page readable.
+  return createPortal(
+    <div role="alertdialog" aria-modal="true" aria-labelledby="idle-title" className="fixed inset-0 z-50 grid place-items-center bg-surface/70 backdrop-blur-xl print:hidden">
       <div className="mx-4 max-w-sm rounded-panel border border-line bg-surface p-6 text-center shadow-lg">
         <h2 id="idle-title" className="text-lg font-semibold">Still there?</h2>
         <p className="mt-1 text-ink-soft">For patients&apos; privacy you&apos;ll be signed out in {left} second{left === 1 ? "" : "s"}.</p>
         <button type="button" autoFocus className="mt-4 rounded-control bg-pine px-5 py-2.5 font-medium text-white">I&apos;m here</button>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }

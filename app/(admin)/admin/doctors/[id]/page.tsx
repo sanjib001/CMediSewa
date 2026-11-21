@@ -53,7 +53,7 @@ export default async function Doctor({ params }: { params: Promise<{ id: string 
   return (
     <>
       <PageHeader title={d.name} subtitle={<><Link href="/admin/doctors" className="text-pine hover:underline">Doctors</Link> / OPD schedule and profile</>} />
-      <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.5fr_1fr]">
         <div className="space-y-6">
           <Panel title="Weekly OPD" flush>
             <ul className="divide-y divide-line">

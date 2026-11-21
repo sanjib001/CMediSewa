@@ -4,6 +4,7 @@ import { requireTenant } from "@/lib/auth/context";
 import { serviceClient } from "@/lib/supabase/service";
 import { ageText } from "@/lib/desk/data";
 import { PrintButton } from "@/components/pharmacy/print-button";
+import { drName } from "@/lib/doctor-name";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Prescription" };
@@ -56,7 +57,7 @@ export default async function PrintRx({ params }: { params: Promise<{ id: string
           </li>))}</ol>
         {rx.notes ? <p className="mt-4 border-t border-line pt-3 text-sm"><span className="font-medium">Advice:</span> {rx.notes}</p> : null}
         <footer className="mt-10 text-right text-sm">
-          <div className="inline-block border-t border-ink pt-1">Dr. {rx.doctor.name}{rx.doctor.registration ? <span className="block text-xs">{rx.doctor.registration}</span> : null}</div>
+          <div className="inline-block border-t border-ink pt-1">{drName(rx.doctor.name)}{rx.doctor.registration ? <span className="block text-xs">{rx.doctor.registration}</span> : null}</div>
         </footer>
       </article>
     </div>

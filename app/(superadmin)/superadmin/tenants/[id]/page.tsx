@@ -32,7 +32,7 @@ export default async function ClinicDetail({ params }: { params: Promise<{ id: s
         title={t.name!}
         subtitle={<>/{t.slug} · <span className={cn("rounded-full px-2 py-0.5 text-sm font-medium capitalize", STATUS_STYLE[t.status!])}>{t.status}</span>{t.status_reason ? <span className="text-ink-faint"> · {t.status_reason === "subscription_expired" ? "subscription expired" : t.status_reason}</span> : null}</>}
       />
-      <div className="grid gap-6 xl:grid-cols-[1.3fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.3fr_1fr]">
         <div className="space-y-6">
           <Panel title="Subscription" aside={<span className="text-sm text-ink-faint">Paid until {d.paidUntil ?? "no period"}</span>} flush>
             <table className="w-full text-left text-[0.95rem]">

@@ -56,7 +56,7 @@ export default async function OpdDesk() {
       <PageHeader title="OPD" subtitle={[ctx.displayName, profile.room].filter(Boolean).join(", ")}
         actions={<div className="flex items-center gap-3"><Link href="/employee/schedule" className="text-pine hover:underline">My schedule</Link><QueueButtons currentVisitId={current?.id ?? null} waiting={waiting.length} /></div>} />
 
-      <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[18rem_1fr]">
         <Panel title="My queue today" aside={<span className="text-sm text-ink-faint">{waiting.length} waiting</span>} flush>
           {visits.length === 0 ? <p className="px-4 py-4 text-ink-soft">No patients checked in yet.</p> : (
             <ul className="divide-y divide-line">

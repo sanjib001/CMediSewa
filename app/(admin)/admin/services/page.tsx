@@ -38,7 +38,7 @@ export default async function Services() {
   return (
     <>
       <PageHeader title="Departments & services" subtitle="What the clinic offers and what it costs. The registrar charges these fees; services marked for the website appear on your public page." />
-      <div className="grid gap-6 xl:grid-cols-[1.6fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.6fr_1fr]">
         <Panel title="Services" aside={<span className="text-sm text-ink-faint">{services.filter((x) => x.is_active).length} in use</span>} flush>
           {services.length === 0 ? <p className="px-5 py-4 text-ink-soft">No services yet. Add a consultation with its fee to start taking patients.</p> : (
             <ul className="divide-y divide-line">

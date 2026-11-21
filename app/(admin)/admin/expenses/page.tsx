@@ -51,7 +51,7 @@ export default async function Expenses() {
   return (
     <>
       <PageHeader title="Expenses" subtitle={`Running costs, recorded as they're paid. ${live.length ? `${npr(live.reduce((s, e) => s + e.amount, 0))} across the last ${live.length} shown.` : ""}`} />
-      <div className="grid gap-6 xl:grid-cols-[1.5fr_1fr]">
+      <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.5fr_1fr]">
         <div className="space-y-6">
           <Panel title="Recent expenses" flush>
             {expenses.length ? <Entries rows={expenses} kind="expense" canCorrect={manage} /> : <p className="px-5 py-4 text-ink-soft">No expenses yet.</p>}
