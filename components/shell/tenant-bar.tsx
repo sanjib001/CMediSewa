@@ -3,6 +3,7 @@ import { Icon } from "@/components/ui/icon";
 import { signOutStaff } from "@/app/actions/staff-auth";
 import { adToBs, formatBs, isoDate, localDate } from "@/lib/clinic-time";
 import { LiveRefresh } from "@/components/notify/live-refresh";
+import { IdleLock, OfflineBanner } from "@/components/pwa/session-guards";
 
 export type TenantBarProps = {
   area: "admin" | "employee";
@@ -11,6 +12,7 @@ export type TenantBarProps = {
   levelLabel: string;
   showAdminSwitch: boolean;
   unread: number;
+  idleLockMinutes: number;
   searchHref: string | null;
   menu?: React.ReactNode;
 };
@@ -22,7 +24,7 @@ const initials = (name: string) =>
  * Top bar shared by the Admin and Employee areas: the clinic, today's date in BS and AD,
  * patient search (wired in B4), the Admin ⇄ workspace switch, and the signed-in person.
  */
-export function TenantBar({ area, tenantName, displayName, levelLabel, showAdminSwitch, unread, searchHref, menu }: TenantBarProps) {
+export function TenantBar({ area, tenantName, displayName, levelLabel, showAdminSwitch, unread, searchHref, idleLockMinutes, menu }: TenantBarProps) {
   const today = localDate(new Date());
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur">
@@ -59,6 +61,7 @@ export function TenantBar({ area, tenantName, displayName, levelLabel, showAdmin
             {unread ? <span className="absolute right-0.5 top-0.5 grid min-w-5 place-items-center rounded-full bg-alert px-1 text-xs font-semibold text-white">{unread > 99 ? "99+" : unread}</span> : null}
           </Link>
           <LiveRefresh topics={["notifications"]} />
+          <IdleLock minutes={idleLockMinutes} />
           <details className="relative">
             <summary className="flex cursor-pointer list-none items-center gap-2 rounded-control px-1.5 py-1 hover:bg-sunken [&::-webkit-details-marker]:hidden" aria-label="Account menu">
               <span className="grid size-9 place-items-center rounded-full bg-sunken text-sm font-semibold text-ink-soft">{initials(displayName)}</span>
@@ -76,6 +79,7 @@ export function TenantBar({ area, tenantName, displayName, levelLabel, showAdmin
           </details>
         </nav>
       </div>
+      <OfflineBanner />
     </header>
   );
 }

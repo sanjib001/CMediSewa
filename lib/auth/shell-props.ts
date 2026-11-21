@@ -20,6 +20,8 @@ export async function tenantBarProps(ctx: TenantContext, area: "admin" | "employ
     .eq("tenant_id", ctx.tenantId).eq("member_id", ctx.memberId).is("read_at", null);
   return {
     unread: count ?? 0,
+    // Idle lock: the clinic's setting on a trusted (PIN) device, at least 15 minutes elsewhere.
+    idleLockMinutes: ctx.deviceId ? ctx.idleLockMinutes : Math.max(15, ctx.idleLockMinutes),
     // The top-bar patient search: Admin → Patients for those who can open Admin, else the desk.
     searchHref: !ctx.permissions.has("view_patients") ? null : canEnterAdmin(ctx) ? "/admin/patients" : ctx.permissions.has("view_queue") ? "/employee/registrar" : null,
     area,
