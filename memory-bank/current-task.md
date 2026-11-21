@@ -1,7 +1,59 @@
 # Current Task
 
+## ▶ Resume here (handoff, 2026-11-21)
+Read this section first in every new conversation, then `decisions.md` (latest D-numbers) and
+`pilot-checklist.md`.
+
+**Where we are**
+- Phase 0 (backend B0–B9) and Phase 1 (screens U1–U8) are **complete and committed**. 56
+  migrations (last `20261120105500_doctor_names.sql`), decisions D-01…D-137.
+- Owner-facing guide: `docs/guides/setup-and-user-guide.md` + `CMediSewa-Setup-and-User-Guide.pdf`
+  (Super Admin setup, clinic setup in order, daily work, limits). Keep it in step with the app;
+  rebuild the PDF with `.local-tools/ui/guide-pdf.mjs`.
+- Last fixes: idle lock covers the whole window, phone-width layouts, "Dr. Dr." names (D-135);
+  medicine save accepts "500mg" / "1,000" and names the bad field (`app/actions/inventory.ts`).
+
+**Next step: Phase 2, starting with M-37 patient merge** (the owner was about to say "next").
+Phase 2 as trimmed by the owner: M-37 patient merge · M-52 patient advances · M-51 bulk recall ·
+M-46 purchase suggestions · M-45 stock reservations · Nepali UI · later online payments, patient
+documents, subdomains. **Dropped to Future:** SMS M-32 (D-136), controlled-drug register M-48 and
+cashier shifts M-47 (D-137). Controlled/narcotic items stay blocked from sale.
+
+**Database and data**
+- Only a **development** database exists (`.env.local`); no production DB yet (pilot checklist §2).
+- It holds two clinics: `arogya-demo` (seeded with one realistic day for demos; staff sign-ins in
+  gitignored `scripts/dev-users.local.json`) and the owner's own `sanjib` (real use: don't touch);
+  one real Super Admin. All test clinics were purged.
+- E2E runs create clinics named "… (safe to ignore)": **purge them after testing**
+  (`.local-tools/purge-test-clinics.mjs`, dry run first).
+
+**How the owner works**
+- Says "next": build the recommended step, then end with a grouped **commit guide** (git add +
+  message). **The owner commits and pushes; never commit.** No Co-Authored-By / Claude lines.
+- The owner does the final hands-on UI test. Their Chrome extension can't reach this PC, so test
+  with headless Chrome (playwright-core, `channel: "chrome"`).
+- Bug reports come short: reproduce first (DB in a rolled-back transaction, then the app); ask for
+  the exact error text only if that fails.
+- Never print or repeat secrets. Never modify HRestroSewa.
+
+**Testing and tools**
+- Local tools in `.local-tools/` (not committed; excluded in `.git/info/exclude`):
+  `q.mjs` (SQL on dev: `node --env-file=.env.local .local-tools/q.mjs "select …"`), `reapply2.mjs`,
+  `e2e-pilot.mjs` + `e2e-ui-body.mjs` (full journey + browser pass), `seed-demo-day.mjs`,
+  `purge-test-clinics.mjs` / `purge-test-admins.mjs` (dry run unless `--apply`), `try-item.mjs`,
+  `ui/guide-pdf.mjs` (Markdown → PDF), `pglite/server.mjs` (fresh-replay DB). Reinstall packages
+  next to them: `npm i playwright-core@1.49.1 marked@12.0.2` in `ui/`, and `npm i` in `pglite/`.
+- The long-running `next dev` goes stale after many edits (saves fail, pages loop): verify on a
+  production build (`npm run build` + `npx next start -p 3100`, stop it by port afterwards) and
+  tell the owner to restart `next dev`.
+- Before calling a step done: `npm test`, `npm run test:db`, `node scripts/check-posture.mjs`,
+  typecheck, lint, build, and the E2E journey on a production build.
+- When a step finishes, **update this section** and add decisions to `decisions.md`.
+
+---
+
 **Phase:** Phase 0 and Phase 1 complete. **Pilot preparation:** work through `memory-bank/pilot-checklist.md` (decisions, production setup, email, clinic setup, real-device pass, dry run).
-**Last updated:** 2026-11-20
+**Last updated:** 2026-11-21
 
 ## Phase 1 review (2026-11-21)
 What each U milestone asks for (roadmap) against what the B milestones already built.
