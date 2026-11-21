@@ -1,7 +1,10 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireTenant } from "@/lib/auth/context";
-import { counterServices, counterStock, counterStores, dispensingQueue, patientsWithDues, todaysBills } from "@/lib/pharmacy/data";
+import { counterServices, counterStock, counterStores, dispensingQueue, patientsWithDues, stockStores, todaysBills } from "@/lib/pharmacy/data";
+import { getOpenCount, listItems, listTransfers, packText, stockInStore } from "@/lib/inventory/data";
+import { NewTransfer, TransferList } from "@/components/inventory/transfers";
+import { CountSheet, StartCount } from "@/components/inventory/count-sheet";
 import { CollectDues } from "@/components/pharmacy/bill-corrections";
 import { getAlerts } from "@/lib/inventory/data";
 import { ageText, type PatientLite } from "@/lib/desk/data";
@@ -17,11 +20,11 @@ export const metadata = { title: "Pharmacy" };
 const npr = (n: number) => `Rs. ${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 const UUID = /^[0-9a-f-]{36}$/;
 const ALERT_TEXT = { expired: "Expired", blocked: "Blocked", near_expiry: "Near expiry", critical_stock: "Very low", low_stock: "Low stock" } as const;
-type Tab = "dispense" | "sale" | "bills" | "dues";
+type Tab = "dispense" | "sale" | "bills" | "dues" | "stock";
 
 // The pharmacy counter (W-14): the dispensing queue for pharmacists (C7: Rx items and
 // allergies only), the sale screen, and recent bills. Tabs follow the keys held (D-57).
-export default async function PharmacyDesk({ searchParams }: { searchParams: Promise<{ tab?: string; store?: string; rx?: string }> }) {
+export default async function PharmacyDesk({ searchParams }: { searchParams: Promise<{ tab?: string; store?: string; rx?: string; q?: string }> }) {
   const ctx = await requireTenant({ operation: "pharmacy.counter", next: "/employee/pharmacy" });
   if (!["pharmacy_sell", "dispense_prescription", "view_stock"].some((k) => ctx.permissions.has(k))) redirect("/employee");
   const sp = await searchParams;
@@ -29,6 +32,7 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
   const tabs: [Tab, string][] = [];
   if (canDispense) tabs.push(["dispense", "Dispense"]);
   if (canSell) tabs.push(["sale", "Sale"], ["bills", "Bills"], ["dues", "Dues"]);
+  if (ctx.permissions.has("view_stock")) tabs.push(["stock", "Stock"]);
   const tab: Tab = sp.rx && canSell ? "sale" : tabs.find(([t]) => t === sp.tab)?.[0] ?? tabs[0]?.[0] ?? "bills";
   const stores = await counterStores(ctx.tenantId, ctx.memberId);
   const store = stores.find((s) => s.id === sp.store) ?? stores[0];
@@ -51,6 +55,58 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
               </li>))}</ul>
             {canSell && store ? <div className="flex justify-end border-t border-line px-5 py-3"><Link href={qs("sale", `&rx=${rx.prescription_id}`)} className="rounded-control bg-pine px-4 py-2 font-medium text-white">Dispense and bill</Link></div> : null}
           </Panel>))}</div>;
+  } else if (tab === "stock") {
+    // Stock at PIN level (stock.operate, A1): what's on the shelf, transfers in and out, counts.
+    // Adjustments, posting a count and disposal still need a password (Admin → Stock).
+    const ss = await stockStores(ctx.tenantId, ctx.memberId);
+    const here = ss.find((x) => x.id === sp.store) ?? ss.find((x) => x.id === store?.id) ?? ss[0];
+    if (!here) {
+      body = <p className="rounded-panel border border-line bg-surface p-5 text-ink-soft">You aren&apos;t assigned to a store. Ask the admin to add you to one.</p>;
+    } else {
+      const [lots, items, transfers, open] = await Promise.all([stockInStore(ctx.tenantId, here.id), listItems(ctx.tenantId), listTransfers(ctx.tenantId), getOpenCount(ctx.tenantId, here.id)]);
+      const term = String(sp.q ?? "").trim().toLowerCase().slice(0, 60);
+      const rows = lots.map((l) => ({ l, it: items.find((i) => i.id === l.item_id) }))
+        .filter(({ it }) => !term || `${it?.name ?? ""} ${it?.generic ?? ""} ${it?.item_code ?? ""}`.toLowerCase().includes(term))
+        .sort((a, b) => (a.it?.name ?? "").localeCompare(b.it?.name ?? "") || (a.l.expiry_date ?? "9").localeCompare(b.l.expiry_date ?? "9"));
+      const mine = transfers.filter((t) => t.from_store_id === here.id || t.to_store_id === here.id);
+      const storesAll = ss.map((x) => ({ id: x.id, name: x.name }));
+      const exp = (d: string | null) => (d ? new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T00:00:00Z`)) : "none");
+      const sheet = lots.map((l) => { const it = items.find((i) => i.id === l.item_id); return { batch_id: l.batch_id, item: it?.name ?? "", batch_no: l.batch_no, expiry: exp(l.expiry_date), unit: it?.units.find((u) => u.is_base)?.name ?? "", system: l.qty_on_hand }; })
+        .sort((a, b) => a.item.localeCompare(b.item));
+      body = (
+        <div className="space-y-6">
+          <form action="/employee/pharmacy" className="flex flex-wrap items-end gap-2">
+            <input type="hidden" name="tab" value="stock" />
+            {ss.length > 1 ? <label><span className="block text-xs text-ink-faint">Store</span><select name="store" defaultValue={here.id} className="rounded-control border border-line-strong px-3 py-2">{ss.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label> : null}
+            <label className="min-w-56 flex-1"><span className="block text-xs text-ink-faint">Find</span><input type="search" name="q" defaultValue={sp.q ?? ""} placeholder="Brand, generic or code" className="w-full rounded-control border border-line-strong px-3 py-2" /></label>
+            <button className="rounded-control border border-line-strong px-3 py-2">Show</button>
+          </form>
+          <Panel title={`On hand in ${here.name}`} aside={<span className="text-sm text-ink-faint">{rows.length} batch{rows.length === 1 ? "" : "es"}</span>} flush>
+            {rows.length === 0 ? <p className="px-5 py-4 text-ink-soft">{term ? "Nothing matches." : "Nothing in this store."}</p> : (
+              <div className="overflow-x-auto">
+                <table className="w-full min-w-[36rem] text-left text-[0.95rem]">
+                  <thead className="text-sm text-ink-faint"><tr><th className="px-5 py-2 font-medium">Medicine</th><th className="py-2 font-medium">Batch</th><th className="py-2 font-medium">Expires</th><th className="px-5 py-2 text-right font-medium">On hand</th></tr></thead>
+                  <tbody className="divide-y divide-line">{rows.map(({ l, it }) => (
+                    <tr key={l.batch_id}>
+                      <td className="px-5 py-2">{it?.name}<span className="block text-xs text-ink-faint">{[it?.generic, it?.strength].filter(Boolean).join(" ")}</span></td>
+                      <td className="py-2">{l.batch_no}{l.status !== "active" ? <span className="ml-2 text-xs text-alert">{l.status}</span> : null}</td>
+                      <td className={cn("py-2", l.expired ? "text-alert" : l.near_expiry ? "text-warn" : "")}>{exp(l.expiry_date)}{l.expired ? " (expired)" : ""}</td>
+                      <td className="px-5 py-2 text-right tabular-nums">{it ? packText(l.qty_on_hand, it.units) : l.qty_on_hand}</td>
+                    </tr>))}</tbody>
+                </table>
+              </div>
+            )}
+          </Panel>
+          {ctx.permissions.has("transfer_stock") && ss.length > 1 ? <Panel title="Ask for stock or send it"><NewTransfer stores={storesAll} /></Panel> : null}
+          <Panel title="Transfers in and out">{mine.length ? <TransferList transfers={mine} stores={storesAll} /> : <p className="text-ink-soft">No transfers for this store.</p>}</Panel>
+          <Panel title={open ? `Stock count ${open.count_no}${open.blind ? " (blind)" : ""}` : "Stock count"}>
+            {open ? <CountSheet countId={open.id} blind={open.blind} lots={sheet} lines={open.lines} canPost={ctx.permissions.has("manage_stock") && ctx.level !== "A1"} />
+              : here.access !== "view" ? <StartCount storeId={here.id} /> : <p className="text-ink-soft">You can view this store only.</p>}
+            {open && ctx.level === "A1" ? <p className="mt-2 text-sm text-ink-soft">You can count with your PIN; posting the count needs your password.</p> : null}
+          </Panel>
+        </div>
+      );
+    }
   } else if (!store) {
     body = <p className="rounded-panel border border-line bg-surface p-5 text-ink-soft">You aren&apos;t assigned to a store that sells. Ask the admin to add you to the pharmacy store.</p>;
   } else if (tab === "dues") {
@@ -117,7 +173,7 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
     <>
       <LiveRefresh topics={["dispensing","billing","stock"]} />
       <PageHeader title="Pharmacy" subtitle={store ? `Selling from ${store.name}` : "Dispensing and sales"}
-        actions={stores.length > 1 ? <form action="/employee/pharmacy" className="flex gap-2"><input type="hidden" name="tab" value={tab} />
+        actions={stores.length > 1 && tab !== "stock" ? <form action="/employee/pharmacy" className="flex gap-2"><input type="hidden" name="tab" value={tab} />
           <select name="store" defaultValue={store?.id} className="rounded-control border border-line-strong px-3 py-2">{stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>
           <button className="rounded-control border border-line-strong px-3 py-2">Switch</button></form> : null} />
       <nav aria-label="Pharmacy" className="mb-6 flex gap-1 overflow-x-auto border-b border-line">

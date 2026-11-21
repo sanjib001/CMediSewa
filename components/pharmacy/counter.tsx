@@ -34,7 +34,25 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
   const [pending, start] = useTransition();
 
   const item = (id: string) => items.find((i) => i.id === id);
-  const matches = q.trim().length < 2 ? [] : items.filter((i) => `${i.name} ${i.generic ?? ""} ${i.code}`.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 8);
+  const matches = q.trim().length < 2 ? [] : items.filter((i) => `${i.name} ${i.generic ?? ""} ${i.code} ${i.barcodes.map((b) => b.code).join(" ")}`.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 8);
+  // A scanned barcode (exact match, then Enter) adds one of that unit, or one more if the line is there.
+  const scan = (code: string) => {
+    const c = code.trim().toLowerCase();
+    for (const it of items) {
+      const b = it.barcodes.find((x) => x.code.toLowerCase() === c);
+      if (!b) continue;
+      if (it.blocked) { setErr(`${it.name} can't be sold here.`); setQ(""); return true; }
+      setErr(null);
+      setRows((rs) => {
+        const at = rs.findIndex((r) => r.kind === "item" && r.itemId === it.id && r.unitId === b.unit_id && !r.batchId && !r.rxItemId);
+        if (at >= 0) return rs.map((r, n) => (n === at && r.kind === "item" ? { ...r, qty: String((Number(r.qty) || 0) + 1) } : r));
+        return [...rs, { key: nk(), kind: "item", itemId: it.id, unitId: b.unit_id, qty: "1", disc: "0", batchId: "", rxItemId: null, rxText: null }];
+      });
+      setQ("");
+      return true;
+    }
+    return false;
+  };
   const svcMatches = q.trim().length < 2 ? [] : services.filter((s) => s.name.toLowerCase().includes(q.trim().toLowerCase())).slice(0, 3);
 
   // Preview: which lots each line takes (earliest expiry first, after earlier lines of the same item).
@@ -99,7 +117,8 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
       {prefill ? <p className="rounded-control bg-pine/5 px-3 py-2 text-sm">Dispensing {prefill.rxNumber} for {prefill.patient.full_name}. Choose the medicine for each line; reduce a quantity to dispense part.</p> : null}
       <div className="relative">
         <label className="block"><span className="mb-1 block text-sm font-medium">Add medicine or service</span>
-          <input value={q} onChange={(e) => setQ(e.target.value)} className={field} placeholder="Brand, generic or code" autoFocus={!prefill} /></label>
+          <input value={q} onChange={(e) => setQ(e.target.value)} className={field} placeholder="Scan a barcode, or type a brand, generic or code" autoFocus={!prefill}
+            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (!scan(q) && matches.length === 1) addItem(matches[0]!); } }} aria-label="Add medicine or service" /></label>
         {matches.length || svcMatches.length ? (
           <ul className="absolute z-10 mt-1 w-full divide-y divide-line rounded-panel border border-line bg-surface shadow-sm">
             {matches.map((i) => (

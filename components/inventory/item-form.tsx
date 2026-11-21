@@ -121,7 +121,8 @@ export function ItemForm({ item, lists }: { item: ItemDetail | null; lists: { ge
       </section>
 
       <section className="rounded-panel border border-line bg-surface p-5">
-        <h2 className="mb-3 font-semibold">Barcodes</h2>
+        <h2 className="font-semibold">Barcodes <span className="font-normal text-ink-faint">(optional)</span></h2>
+        <p className="mb-3 text-sm text-ink-soft">Not needed: medicines without a barcode are found by name, generic or code everywhere. Add one only if you scan at the counter.</p>
         <div className="space-y-2">
           {barcodes.map((b, i) => (
             <div key={i} className="flex gap-2">

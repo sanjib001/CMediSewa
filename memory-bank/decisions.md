@@ -955,6 +955,45 @@ at the desk by `manage_billing` holders.
 
 ---
 
+## U5 Doctor schedule (2026-11-21)
+
+**D-123 A doctor's own leave:** My schedule (`/employee/schedule`, `manage_own_leave`) shows the
+weekly OPD hours (set by the admin, read-only), the next 14 days' bookings, and the doctor's
+leave: whole days over a range (up to 60 days) or part of one day, added and removed by the
+doctor (`add_own_leave`, `remove_own_leave`, today or later). Leave rows are
+`schedule_exceptions`, so free times disappear at once. Whoever adds leave (doctor or admin),
+a trigger tells `manage_appointments` holders when it lands on bookings (counts and day only;
+the doctor's note stays private). Bookings are never cancelled automatically: the desk sees
+"Appointments to move: doctor on leave" (`appointments_on_leave`) and reschedules each.
+
+**D-124 Follow-ups:** the OPD screen books a follow-up in the doctor's own diary
+(`book_follow_up`, `write_consultation`) for a patient that doctor has seen, through
+`book_appointment` (every slot rule), source `follow_up`; the patient gets the usual
+confirmation and reminder. The date defaults to the consultation's follow-up date.
+
+**D-125 Outbox × clinic status (found in U5):** the dispatcher claims messages of active or
+pending clinics only; a suspended clinic's wait; a closed clinic's are cancelled ("clinic
+closed"). Before this, a closed clinic's patients and staff could still be emailed and pushed.
+
+---
+
+## U6 Pharmacy workspace (2026-11-21)
+
+**D-126 Barcodes are optional (owner direction, 2026-11-21).** A medicine needs no barcode
+anywhere: it is found by name, generic or code at the counter, in stock, transfers, counts
+and reports. The medicine form labels Barcodes "(optional)". Where barcodes exist, the counter
+accepts a keyboard-wedge scan: an exact code + Enter adds one of that unit (or one more on
+the same line); a blocked or controlled item is refused; Enter with a single typed match adds
+it too.
+
+**D-127 Stock in the Pharmacy workspace:** a Stock tab (`view_stock`) for staff who work at a
+PIN (A1) and may not have Admin: on hand per batch in each store they're assigned to (packs
+shown as box + strip + tab, expired and blocked marked), search, transfers in and out (request
+and send/receive per their access), and stock counts (start and count at A1; posting needs a
+password and `manage_stock`). Adjustments, disposal and posting stay in Admin → Stock (A2).
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |

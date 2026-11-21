@@ -25,20 +25,23 @@ export type CounterLot = { batch_id: string; batch_no: string; expiry_date: stri
 export type CounterItem = {
   id: string; name: string; generic: string | null; strength: string | null; code: string; schedule: string | null;
   rx_only: boolean; blocked: boolean; loose: boolean; vat: boolean; units: Unit[]; lots: CounterLot[]; available: number;
+  barcodes: { code: string; unit_id: string }[];
 };
 
 /** What can be sold in a store: items with sellable lots (unexpired beyond the sale margin,
  *  active), earliest expiry first, exactly as allocate_stock will take them. */
 export async function counterStock(tenantId: string, storeId: string): Promise<CounterItem[]> {
   const db = serviceClient();
-  const [items, lots, md, it, set, tz] = await Promise.all([
+  const [items, lots, md, it, set, tz, bc] = await Promise.all([
     listItems(tenantId),
     stockInStore(tenantId, storeId),
     db.from("medicine_details").select("item_id, requires_prescription").eq("tenant_id", tenantId),
     db.from("inventory_items").select("id, allow_loose_sale, tax_category").eq("tenant_id", tenantId),
     db.from("tenant_settings").select("min_sale_shelf_days").eq("tenant_id", tenantId).single(),
     db.from("tenants").select("timezone").eq("id", tenantId).single(),
+    db.from("item_barcodes").select("item_id, unit_id, barcode").eq("tenant_id", tenantId),
   ]);
+  const codes = rows<{ item_id: string; unit_id: string; barcode: string }>(bc, "barcodes");
   const margin = Number((set.data as { min_sale_shelf_days: number } | null)?.min_sale_shelf_days ?? 0);
   const today = new Date(new Date().toLocaleString("en-US", { timeZone: (tz.data as { timezone: string } | null)?.timezone ?? "Asia/Kathmandu" }));
   const limit = new Date(today.getTime() + margin * 86_400_000).toISOString().slice(0, 10);
@@ -55,6 +58,7 @@ export async function counterStock(tenantId: string, storeId: string): Promise<C
       blocked: i.schedule_class === "controlled" || i.schedule_class === "narcotic",
       loose: f?.allow_loose_sale ?? false, vat: f?.tax_category === "vat13",
       units: i.units.filter((u) => u.can_sell), lots: sell, available: sell.reduce((s, l) => s + l.qty, 0),
+      barcodes: codes.filter((b) => b.item_id === i.id).map((b) => ({ code: b.barcode, unit_id: b.unit_id })),
     };
   }).filter((i) => i.available > 0 || i.lots.length > 0);
 }
@@ -206,4 +210,16 @@ export async function dispensingQueue(tenantId: string, memberId: string, level:
   if (error) throw new Error(`queue: ${error.message}`);
   const j = data as { queue?: QueueRx[]; error?: string };
   return j.error ? null : (j.queue ?? []);
+}
+
+/** Every store this member may see stock in (any access), for the Pharmacy Stock tab. */
+export async function stockStores(tenantId: string, memberId: string) {
+  const { stores } = await listStores(tenantId);
+  const db = serviceClient();
+  const out: { id: string; name: string; kind: string; access: string }[] = [];
+  for (const s of stores.filter((x) => x.is_active)) {
+    const { data } = await db.rpc("store_access", { p_tenant: tenantId, p_member: memberId, p_store: s.id });
+    if (data) out.push({ id: s.id, name: s.name, kind: s.kind, access: String(data) });
+  }
+  return out;
 }
