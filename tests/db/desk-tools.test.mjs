@@ -171,3 +171,24 @@ test("follow-up: a doctor books their own diary for a patient they have seen; sl
     assert.equal((await c.query(`select count(*)::int n from notification_outbox where ref_id = $1::text and kind = 'booking_confirmed'`, [id])).rows[0].n, 1, "the patient is told");
   });
 });
+
+// ── U7 manage links in emails ──
+test("emailed manage links: open and cancel the appointment like the website link; never another clinic's", async () => {
+  await withTx(async (c) => {
+    const x = await clinic(c), y = await clinic(c);
+    const { rows: [p] } = await c.query(`insert into patients (tenant_id, full_name, sex, age_years) values ($1, 'Asha Lama', 'female', 30) returning id`, [x.t]);
+    await asApp(c);
+    const { rows: [{ id: a }] } = await req(c, x, at(2, "09:00"), { token: "orig-link" });
+    await c.query(`select approve_booking_request($1, $2, $3, $4)`, [x.t, a, p.id, x.desk]);
+    await c.query(`select add_manage_link($1, 'emailed-link-hash-0001')`, [a]);
+    const s1 = (await c.query(`select public_booking_status($1, 'emailed-link-hash-0001') j`, [x.slug])).rows[0].j;
+    assert.equal(s1.status, "confirmed");
+    assert.equal((await c.query(`select public_booking_status($1, 'orig-link') j`, [x.slug])).rows[0].j.status, "confirmed", "the website link still works");
+    assert.equal((await c.query(`select public_booking_status($1, 'emailed-link-hash-0001') j`, [y.slug])).rows[0].j, null, "not under another clinic's address");
+    await expectError(c, `select cancel_booking_by_token($1, 'emailed-link-hash-0001', 'x')`, [y.slug], /BOOKING_NOT_FOUND/);
+    await expectError(c, `select appointment_by_token($1, 'x')`, [x.slug], /permission denied/);
+    await c.query(`select cancel_booking_by_token($1, 'emailed-link-hash-0001', 'Feeling better')`, [x.slug]);
+    assert.equal((await c.query(`select public_booking_status($1, 'orig-link') j`, [x.slug])).rows[0].j.status, "cancelled", "cancelled through the emailed link");
+    await asOwner(c);
+  });
+});

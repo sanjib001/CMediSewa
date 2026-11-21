@@ -215,3 +215,32 @@ test("Super Admin creates a clinic directly: same provisioning, admin + one-time
     await c.query(`reset role`);
   });
 });
+
+// ── U2 platform settings and health ──
+test("platform settings: only a platform admin changes them; audited with before and after; invalid values refused", async () => {
+  await withTx(async (c) => {
+    const op = await platformAdmin(c);
+    const t = await makeTenant(c);
+    await c.query(`set role service_role`);
+    await expectError(c, `select set_platform_settings($1, '{}'::jsonb)`, [uuid()], /NOT_PLATFORM_ADMIN/);
+    await expectError(c, `update platform_settings set registrations_open = false`, [], /permission denied/);
+    await c.query(`select set_platform_settings($1, $2)`, [op, JSON.stringify({ support_phone: "01-5551234", support_email: "Help@Example.com", support_hours: "Sun–Fri 9–6", registrations_open: false })]);
+    const { rows: [s] } = await c.query(`select support_phone, support_email, registrations_open from platform_settings`);
+    assert.deepEqual([s.support_phone, s.support_email, s.registrations_open], ["01-5551234", "help@example.com", false]);
+    await expectError(c, `select set_platform_settings($1, $2)`, [op, JSON.stringify({ support_email: "not-an-email" })], /check/);
+    await c.query(`reset role`);
+    const { rows: [a] } = await c.query(`select detail from audit_log where action = 'platform.settings' and actor_id = $1 order by id desc limit 1`, [op]);
+    assert.equal(a.detail.before.registrations_open, true);
+    assert.equal(a.detail.after.registrations_open, false);
+    // health: a clinic whose books differ is named; counts are numbers
+    await c.query(`update tenants set status = 'active' where id = $1`, [t]);
+    await c.query(`insert into finance_checks (tenant_id, mismatches, checks) values ($1, 2, '[]')`, [t]);
+    await c.query(`set role service_role`);
+    const h = (await c.query(`select platform_health() h`)).rows[0].h;
+    await c.query(`reset role`);
+    const { rows: [tn] } = await c.query(`select name from tenants where id = $1`, [t]);
+    assert.ok(h.finance_mismatch.some((m) => m.tenant === tn.name && m.mismatches === 2));
+    for (const k of ["errors_24h", "denied_24h", "outbox_waiting", "outbox_failed_7d", "stock_repaired_7d"]) assert.equal(typeof h[k], "number", k);
+    assert.ok(!JSON.stringify(h).match(/patient|mrn/i), "no patient data in the health summary");
+  });
+});

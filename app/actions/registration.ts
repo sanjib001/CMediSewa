@@ -1,6 +1,7 @@
 "use server";
 
 import { serviceClient } from "@/lib/supabase/service";
+import { getPlatformSettings } from "@/lib/platform/settings";
 import { clientIp } from "@/lib/auth/session";
 import { headers } from "next/headers";
 import { audit } from "@/lib/audit";
@@ -15,6 +16,7 @@ export type RegisterResult = { ok: true } | { ok: false; error: string };
 export async function submitRegistration(fd: FormData): Promise<RegisterResult> {
   const v = (k: string) => String(fd.get(k) ?? "").trim();
   if (v("website")) return { ok: true }; // honeypot: bots fill every field; pretend success
+  if (!(await getPlatformSettings()).registrations_open) return { ok: false, error: "We aren't taking new registrations right now. Please contact us." };
 
   const business = v("business_name"), owner = v("owner_name"), email = v("email").toLowerCase(), phone = v("phone");
   if (business.length < 2 || business.length > 120) return { ok: false, error: "Enter your clinic's name." };

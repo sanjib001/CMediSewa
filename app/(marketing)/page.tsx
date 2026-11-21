@@ -41,6 +41,7 @@ export default async function MarketingHome() {
         <span className="text-xl font-semibold">CMediSewa</span>
         <nav className="flex items-center gap-2 text-[0.95rem]">
           <a href="#pricing" className="hidden rounded-control px-3 py-2 text-ink-soft hover:text-ink sm:block">Pricing</a>
+          <Link href="/contact" className="hidden rounded-control px-3 py-2 text-ink-soft hover:text-ink sm:block">Contact</Link>
           <Link href="/login" className="rounded-control px-3 py-2 text-ink-soft hover:text-ink">Sign in</Link>
           <ButtonLink href="/register">Register your clinic</ButtonLink>
         </nav>

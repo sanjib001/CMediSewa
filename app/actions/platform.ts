@@ -210,3 +210,19 @@ export async function createClinic(input: {
   const setupLink = await inviteLink(token);
   return { ok: true, tenantId: data.tenant_id, slug, setupLink, signInLink: setupLink.replace(/\/invite\/.*$/, `/login/${slug}`) };
 }
+
+// ── platform settings (U2) ─────────────────────────────────────────────────────
+export async function savePlatformSettings(fd: FormData): Promise<{ ok: true; message: string } | { ok: false; error: string }> {
+  const { admin } = await requireSuperAdmin();
+  const g = (k: string, max: number) => String(fd.get(k) ?? "").trim().slice(0, max);
+  const phone = g("support_phone", 20), wa = g("support_whatsapp", 20), email = g("support_email", 120);
+  if ((phone && !/^[0-9+() -]{7,20}$/.test(phone)) || (wa && !/^[0-9+() -]{7,20}$/.test(wa))) return { ok: false, error: "Enter a valid phone number." };
+  if (email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(email)) return { ok: false, error: "Enter a valid email." };
+  const { error } = await serviceClient().rpc("set_platform_settings", { p_by: admin.id, p_s: {
+    support_phone: phone, support_whatsapp: wa, support_email: email, support_hours: g("support_hours", 120), office_address: g("office_address", 200),
+    registrations_open: fd.get("registrations_open") === "on",
+  } });
+  if (error) return { ok: false, error: "Couldn't save. Nothing was changed." };
+  revalidatePath("/superadmin/settings"); revalidatePath("/contact"); revalidatePath("/register");
+  return { ok: true, message: "Platform settings saved." };
+}

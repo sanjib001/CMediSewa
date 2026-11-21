@@ -56,6 +56,7 @@ uses synthetic fixtures (`scripts/seed-demo.mjs`).
 | `DB_SSL` | tooling | `"false"` only for a plain local/CI Postgres; omitted elsewhere |
 | `NEXT_PUBLIC_APP_URL` | public | canonical URL for links in messages |
 | `NEXT_PUBLIC_VAPID_PUBLIC_KEY`, `VAPID_PRIVATE_KEY`, `VAPID_SUBJECT` | mixed | web-push (B9a). Generate a pair per environment with `npx web-push generate-vapid-keys`; only the public key may be `NEXT_PUBLIC_`. Changing the pair switches off every registered device |
+| `RESEND_API_BASE` | server | optional; unset in production. Points email at a relay or a local test stub (U7 tests) |
 | `RESEND_API_KEY`, `MAIL_FROM` | server | email over HTTPS (B9a). Without them the dispatcher runs dry: emails are marked "skipped (no mail key)". `MAIL_FROM` must be on a domain verified in Resend |
 | `SMS_PROVIDER`, `SMS_API_KEY`, `SMS_SENDER_ID` | server | P2 (P-05) |
 | `CRON_SECRET` | server | constant-time compared on `/api/cron/*` |
