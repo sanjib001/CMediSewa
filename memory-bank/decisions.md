@@ -1080,6 +1080,15 @@ add the title only when missing.
 fail, pages reload in loops). Final checks run against a fresh production build
 (`next build` + `next start -p 3100`); restart `next dev` before manual testing.
 
+**D-136 SMS dropped from Phase 2 (owner, 2026-11-21):** M-32 (SMS reminders and SMS OTP)
+moves to Future and may never be built. Patient messages stay email (dry run until a mail key
+is set) plus in-app and web push. P-05 (SMS provider) is parked, not pending.
+
+**D-137 Controlled-drug register (M-48) and cashier shifts (M-47) dropped from Phase 2 (owner,
+2026-11-21):** both move to Future. Consequence kept on purpose: items marked controlled or
+narcotic stay **blocked from sale** in the system (P-22 unchanged); clinics sell those outside it
+until M-48 is built. Cash is reconciled per day (daily summary, cash book), not per shift.
+
 ---
 
 ## Pending decisions

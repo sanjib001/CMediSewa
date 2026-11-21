@@ -35,6 +35,9 @@ const ERRORS: [RegExp, string][] = [
   [/expiry_date > mfg_date|item_batches_check/, "The expiry must be after the manufacturing date."],
   [/batch_no_check/, "Batch numbers use letters, numbers, / . _ - only."],
   [/barcode_check/, "Barcodes are 4–40 letters or numbers."],
+  [/inventory_items_name_check/, "The name must be 2 to 120 characters."],
+  [/inventory_items_sku_check/, "The SKU is too long (40 characters at most)."],
+  [/22P02|invalid input syntax for type numeric/, "A number field has letters in it. Use plain numbers, e.g. 500 or 100."],
   [/check constraint/, "Some values are out of range (e.g. minimum stock above the reorder level)."],
 ];
 function friendly(e: { message?: string; code?: string } | null): string {
@@ -55,7 +58,32 @@ export async function saveItem(id: string | null, input: ItemInput): Promise<{ o
   if (!types.includes(String(input.item_type))) return { ok: false, error: "Choose what kind of item this is." };
   const units = (input.units ?? []).slice(0, 8).map((u) => ({ ...u, name: String(u.name ?? "").trim(), factor: Number(u.factor) }));
   if (units.some((u) => !Number.isFinite(u.factor) || u.factor <= 0)) return { ok: false, error: "Each unit needs a size of more than zero." };
-  const { data, error } = await serviceClient().rpc("save_item", { p_tenant: ctx.tenantId, p_item: id, p_d: { ...input, units }, p_by: ctx.memberId });
+  const name = String(input.name ?? "").trim();
+  if (name.length < 2) return { ok: false, error: "Enter the name on the shelf (at least 2 characters)." };
+  if (name.length > 120) return { ok: false, error: "The name is too long (120 characters at most)." };
+  // Number fields arrive as typed text: accept "1,000" and "500 mg" (the unit picker holds the unit);
+  // anything else is refused naming the field, instead of a database error.
+  const d: Record<string, unknown> = { ...input, name, units };
+  const numeric: [string, string][] = [["strength_value", "Strength"], ["reorder_level", "Reorder at"], ["reorder_qty", "Reorder quantity"], ["min_stock_level", "Critical below"], ["max_stock_level", "Maximum"]];
+  const num: Record<string, number | null> = {};
+  for (const [key, label] of numeric) {
+    const raw = String(d[key] ?? "").trim();
+    if (!raw) { d[key] = ""; num[key] = null; continue; }
+    const m = /^(\d[\d,]*(?:\.\d+)?)\s*([a-zA-Zµ%]+)?$/.exec(raw);
+    const n = m?.[1] ? Number(m[1].replace(/,/g, "")) : NaN;
+    if (!Number.isFinite(n)) {
+      return { ok: false, error: key === "strength_value"
+        ? `Strength must be a number, e.g. 500 (choose mg, ml… next to it). For combinations like "500 mg + 65 mg", leave it empty and use "strength as text".`
+        : `${label} must be a number, e.g. 100.` };
+    }
+    d[key] = String(n); num[key] = n;
+  }
+  const lo = num.min_stock_level ?? null, ro = num.reorder_level ?? null, hi = num.max_stock_level ?? null, rq = num.reorder_qty ?? null;
+  if (rq !== null && rq <= 0) return { ok: false, error: "Reorder quantity must be more than zero." };
+  if (hi !== null && hi <= 0) return { ok: false, error: "Maximum must be more than zero." };
+  if (lo !== null && ro !== null && lo > ro) return { ok: false, error: "Critical below can't be higher than Reorder at." };
+  if (ro !== null && hi !== null && ro > hi) return { ok: false, error: "Reorder at can't be higher than Maximum." };
+  const { data, error } = await serviceClient().rpc("save_item", { p_tenant: ctx.tenantId, p_item: id, p_d: d, p_by: ctx.memberId });
   if (error) return { ok: false, error: friendly(error) };
   revalidatePath("/admin/medicines");
   revalidatePath("/admin/stock");

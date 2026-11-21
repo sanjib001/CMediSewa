@@ -8,7 +8,7 @@ green.
 |---|---|---|
 | **Phase 0** | **Database + backend first**: schema, migrations, RPCs, Server Actions, auth backend, permissions engine, posting core, background jobs, automated tests. No product UI | "in phase 0 let's set the database and backend first" |
 | **Phase 1** | **Initial outline (UI) + MVP**: the five areas and four staff dashboards (Admin, Registrar, Doctor OPD, Pharmacy) built on the Phase 0 backend; pilot go-live | "in phase 1 the initial outline and MVP of the system" |
-| **Phase 2** | Next features after the pilot (SMS, online documents, online payments, controlled-drug register…) | "then we will move on" |
+| **Phase 2** | Next features after the pilot (online documents, online payments, controlled-drug register…) | "then we will move on" |
 | **Phase 3** | **Laboratory** + Lab dashboard (+ clinical files) | "we will work on lab in phase 3" |
 | Future | insurance, multi-branch, telemedicine… | — |
 Older labels: "R1/R2", "MS0–MS13" and "Gate A/B" from Revision 4 are **retired**. Every
@@ -67,8 +67,7 @@ backups + PITR + off-site; restore drill; monitoring; security review; counsel o
 `security.md` §10–§11. Then go-live and 2–4 weeks of stabilisation.
 
 ## Phase 2: next features (order follows pilot feedback)
-M-48 controlled-drug register (first if the pilot stocks controlled items) · M-32 SMS + SMS
-OTP · M-33 patient documents online · M-34 online payments · M-47 cashier shifts · M-46
+M-33 patient documents online · M-34 online payments · M-46
 purchase suggestions & supplier performance · M-45 reservations · M-52 patient advances ·
 M-35 follow-ups/referrals · M-36 daily summary email · M-37 patient merge · M-49 advanced
 barcode · M-51 bulk recall · M-06 support desk · M-38 instant self-serve · M-39 subdomain

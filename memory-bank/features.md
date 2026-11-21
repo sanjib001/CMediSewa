@@ -71,7 +71,7 @@ the same MVP.
 |---|---|---|---|
 | M-30 | Laboratory + Lab dashboard | **Phase 3** | test catalogue, orders, samples, results, report PDF (plan feature) |
 | M-31 | Clinical files | **Phase 3** (with lab) | private bucket, signed URLs, audited |
-| M-32 | SMS / messaging | P2 | outbox channel; patient OTP by SMS (P-05, P-20) |
+| M-32 | SMS / messaging | **F (dropped from P2, D-136)** | maybe later: outbox channel; patient OTP by SMS (P-05, P-20) |
 | M-33 | Patient clinical documents online | P2 | Rx (and later lab) for **verified** account links |
 | M-34 | Online payments | P2 | eSewa/Khalti/Fonepay (verify) for bookings, invoices, subscriptions (P-12) |
 | M-35 | Follow-ups & referrals | P2 | follow-up booking; referral grants (C4) |
@@ -86,8 +86,8 @@ the same MVP.
 | M-44 | Payroll & attendance | F | HRestroSewa payroll/rota patterns are available as a reference |
 | M-45 | Stock reservations | P2 | hold lots for a patient or Rx awaiting collection; `qty_reserved`; expiry auto-release (`database.md` §9.5) |
 | M-46 | Purchase suggestions & supplier performance | P2 | velocity × lead-time reorder suggestions per store; supplier fill rate, on-time rate, return rate, price trend, shelf life at receipt; PO approvals + email to vendor |
-| M-47 | Cashier shifts & till reconciliation | P2 | open/close shift per counter, expected vs counted cash, variance posting |
-| M-48 | Controlled-drug register | P2 (**required before controlled/narcotic items can be sold**, P-22) | register of receipt, dispensing, balance, prescriber; stricter disposal |
+| M-47 | Cashier shifts & till reconciliation | **F (dropped from P2, D-137)** | open/close shift per counter, expected vs counted cash, variance posting |
+| M-48 | Controlled-drug register | **F (dropped from P2, D-137)**; still **required before controlled/narcotic items can be sold** (P-22) | register of receipt, dispensing, balance, prescriber; stricter disposal |
 | M-49 | Advanced barcode | P2 | GS1 DataMatrix parsing (GTIN + batch + expiry), camera scanning on phones, shelf and price label printing |
 | M-50 | Accounting export & e-billing integration | F | export journal (CSV/Tally-style); IRD/CBMS real-time invoice reporting if required (P-08) |
 | M-52 | Patient advances / deposits | P2 | deposits before procedures, applied to invoices (`PATIENT_ADVANCES` liability; HRestroSewa room-advance pattern) |
@@ -171,9 +171,9 @@ booking.
 Inventory scope detail is in §3a.
 **MVP dashboards (D-56):** Admin (`(admin)`), Registrar, Doctor OPD and Pharmacy
 (`(employee)` workspaces), plus Marketing, Super Admin and the public clinic site.
-**Phase 2:** M-32 SMS, M-33 online documents, M-34 online payments, M-35–M-39, M-45–M-49,
+**Phase 2:** M-33 online documents, M-34 online payments, M-35–M-39, M-45, M-46, M-49,
 M-51, M-52, M-06. **Phase 3:** M-30 lab + Lab dashboard, M-31 clinical files.
-**Future:** M-40–M-44, M-50.
+**Future:** M-32 SMS (dropped from P2, may or may not come, D-136), M-47 cashier shifts and M-48 controlled-drug register (dropped from P2, D-137), M-40–M-44, M-50.
 **Why later:** lab is Phase 3 by owner decision; SMS (provider pending); online clinical
 documents (the verification workflow must be proven first); online payments (gateway
 contract); instant self-serve (manual approval is safer for the first tenants); support
