@@ -1,6 +1,6 @@
 // B8a finance: expenses and other income (reversal only), openings, finance report, P&L, daily summary,
 // carry-forward, the integrity check catching tampering, isolation.
-// access, isolation. RPCs run as service_role, like the app.
+// RPCs run as service_role, like the app.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { withTx, expectError, makeTenant, uuid } from "./helpers.mjs";

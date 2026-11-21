@@ -1,7 +1,15 @@
 # Current Task
 
-**Phase:** Phase 0 backend: B1–B7 done. **B8 Finance & reports in progress:** B8a finance done. Next: **B8b** stock, expiry, purchase, vendor and sales reports.
+**Phase:** Phase 0 backend: B1–B8 done. Next: **B9 Realtime, notifications & jobs** (SSE bus, outbox + email dispatch, web push, expiry/low-stock/no-show/subscription jobs), the last Phase 0 milestone.
 **Last updated:** 2026-11-20
+
+## B8b Reports: done (2026-11-21)
+| Item | Status |
+|---|---|
+| Migration 0047: stock_report, batch_history, expiry_report, sales_register, item_sales, purchase_register, cash_book; stock_today callable by the app (fixes the B7b return page silently using the UTC date) | done |
+| Admin Reports: tabs per permission, period / day / expiry window, store picker (store-scoped), cost columns only with view_cost_prices, totals; batch history page; Download CSV (A3, audited, formula-safe) | done |
+| Checks | DB 90/90 · fresh replay of all 47 migrations ✓ · **end-to-end purchasing → counter → returns → finance → reports 112/112** · all earlier journeys ✓ · typecheck/lint/build ✓ · posture ✓ |
+| Not yet | PDF/print layouts for reports; opening patient dues (D-109) |
 
 ## B8a Finance: done (2026-11-21)
 | Item | Status |

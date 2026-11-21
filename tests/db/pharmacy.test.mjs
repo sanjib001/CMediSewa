@@ -1,6 +1,6 @@
-// B7a pharmacy counter: FEFO across lots at lot prices, exact COGS, Rx rules (internal / external),
+// B7 pharmacy counter (B7a) and returns, void, dues (B7b): FEFO across lots at lot prices, exact COGS, Rx rules (internal / external),
 // controlled items blocked, discounts, dues, the pharmacist's dispensing queue (C7), isolation.
-// access, isolation. RPCs run as service_role, like the app.
+// RPCs run as service_role, like the app.
 import { test } from "node:test";
 import assert from "node:assert/strict";
 import { withTx, expectError, makeTenant, uuid } from "./helpers.mjs";

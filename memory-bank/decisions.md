@@ -843,6 +843,26 @@ and payables checks and on demand.
 
 ---
 
+## B8b Reports (2026-11-21)
+
+**D-112 Reports as built:** read-only SQL functions over business days: stock movement per
+item (opening + received − sold net of returns − other out = closing, at lot cost), batch
+history (every movement, running balance per store and overall), expiry (on hand, expired or
+within N days), sales register (bills with returns, net paid, owed), item sales (void bills
+excluded, returns subtracted; cost only for restocked returns), purchase register, cash book
+(running cash balance). Access per report: stock and expiry `view_stock_reports` (store
+scoped: someone without every store must pick one); sales and item sales `view_reports`;
+purchases `manage_purchases` or `view_financial_reports`; cash book
+`view_financial_reports`. Cost, value and margin columns appear only with
+`view_cost_prices`. The vendor ledger stays the statement on each vendor's page (B6a).
+
+**D-113 CSV export:** `/admin/reports/export`, the same report, permissions and store rules as
+the page, needs an A3 session (`export`), is written to the audit log (`report.export`
+with the filters and row count), UTF-8 with BOM for Excel, and defuses spreadsheet formulas
+(a cell starting with = + - @ that isn't a number gets a leading ').
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |
