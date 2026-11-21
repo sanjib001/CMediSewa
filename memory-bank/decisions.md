@@ -994,6 +994,20 @@ password and `manage_stock`). Adjustments, disposal and posting stay in Admin â†
 
 ---
 
+## Vercel deployment fix (2026-11-21)
+
+**D-128 Vercel Hobby: both crons once a day.** The every-5-minutes dispatcher schedule (D-119)
+made every Vercel deployment from 668a705 on fail (Hobby allows only once-a-day crons, and a
+more frequent one rejects the whole deployment; the last good deploy was 4c0c77a, before
+vercel.json existed). vercel.json now runs `/api/cron/daily` at 18:30 UTC and
+`/api/cron/dispatch-notifications` at 18:45 UTC (00:15 and 00:30 in Nepal). Effect: queued
+emails and pushes go out once a night until either the project moves to Vercel Pro (then set
+the dispatcher back to `*/5 * * * *`) or an external pinger calls the dispatcher every 5
+minutes with `x-cron-secret` (no deployment change needed). In-app notifications and live
+updates are unaffected: they never wait for a cron.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |
