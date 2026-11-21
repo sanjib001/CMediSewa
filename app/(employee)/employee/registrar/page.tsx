@@ -3,6 +3,7 @@ import { getDeskSetup, getToday, listBookingRequests, todayIn } from "@/lib/desk
 import { BookingRequests } from "@/components/desk/booking-requests";
 import { PageHeader } from "@/components/ui/primitives";
 import { RegistrarDesk } from "@/components/desk/registrar-desk";
+import { LiveRefresh } from "@/components/notify/live-refresh";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Registrar" };
@@ -17,6 +18,7 @@ export default async function RegistrarDeskPage() {
   const fmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kathmandu", weekday: "long", day: "numeric", month: "long" }).format(renderedAt);
   return (
     <>
+      <LiveRefresh topics={["queue", "bookings", "billing"]} />
       <PageHeader title="Registrar" subtitle={`${fmt}. ${board.visits.filter((v) => v.status !== "cancelled").length} checked in, ${board.appointments.filter((a) => a.status === "confirmed").length} still expected.`} />
       <BookingRequests requests={requests} canAct={can(ctx, "manage_appointments") && can(ctx, "manage_patients")} />
       {setup.doctors.length === 0 ? (

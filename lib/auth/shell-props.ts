@@ -1,5 +1,6 @@
 import "server-only";
 import type { TenantContext } from "./context";
+import { serviceClient } from "@/lib/supabase/service";
 
 const LEVEL_LABEL = { A1: "Signed in with PIN", A2: "Signed in with password", A3: "Signed in with password + code" } as const;
 
@@ -14,8 +15,11 @@ export function canEnterAdmin(ctx: TenantContext): boolean {
   return ctx.membershipRole === "tenant_admin" || ADMIN_AREA_KEYS.some((k) => ctx.permissions.has(k));
 }
 
-export function tenantBarProps(ctx: TenantContext, area: "admin" | "employee") {
+export async function tenantBarProps(ctx: TenantContext, area: "admin" | "employee") {
+  const { count } = await serviceClient().from("notifications").select("id", { count: "exact", head: true })
+    .eq("tenant_id", ctx.tenantId).eq("member_id", ctx.memberId).is("read_at", null);
   return {
+    unread: count ?? 0,
     area,
     tenantName: ctx.tenantName,
     displayName: ctx.displayName,

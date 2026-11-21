@@ -9,6 +9,7 @@ import { serviceClient } from "@/lib/supabase/service";
 import { CounterSale, type RxPrefill } from "@/components/pharmacy/counter";
 import { AllergyBanner, PageHeader, Panel } from "@/components/ui/primitives";
 import { cn } from "@/lib/cn";
+import { LiveRefresh } from "@/components/notify/live-refresh";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "Pharmacy" };
@@ -114,6 +115,7 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
 
   return (
     <>
+      <LiveRefresh topics={["dispensing","billing","stock"]} />
       <PageHeader title="Pharmacy" subtitle={store ? `Selling from ${store.name}` : "Dispensing and sales"}
         actions={stores.length > 1 ? <form action="/employee/pharmacy" className="flex gap-2"><input type="hidden" name="tab" value={tab} />
           <select name="store" defaultValue={store?.id} className="rounded-control border border-line-strong px-3 py-2">{stores.map((s) => <option key={s.id} value={s.id}>{s.name}</option>)}</select>

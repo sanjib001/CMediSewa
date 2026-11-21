@@ -1,7 +1,16 @@
 # Current Task
 
-**Phase:** Phase 0 backend: B1–B8 done. Next: **B9 Realtime, notifications & jobs** (SSE bus, outbox + email dispatch, web push, expiry/low-stock/no-show/subscription jobs), the last Phase 0 milestone.
+**Phase:** Phase 0 backend: B1–B8 done. **B9 in progress:** B9a realtime & notifications done. Next: **B9b** scheduled jobs (reminders, no-show, expiry/low-stock alerts, subscription expiry, nightly checks) + vercel.json crons. Then Phase 0 is complete.
 **Last updated:** 2026-11-20
+
+## B9a Realtime & notifications: done (2026-11-21)
+| Item | Status |
+|---|---|
+| Migration 0048: realtime_events (+emit_event, events_since), notifications, push_subscriptions, notification_outbox (+notify_members, queue_email, claim_outbox, complete_outbox, prune); triggers on appointments, visits, prescriptions, invoices, stock_balances | done |
+| /api/realtime (short SSE, Last-Event-ID), LiveRefresh on Registrar, OPD and Pharmacy, bell with unread count in both areas, My notifications page, push on/off per device, /sw.js | done |
+| /api/cron/dispatch-notifications (email via Resend or dry run; push via web-push 3.6.7); lib/cron.ts accepts x-cron-secret or Vercel's Bearer | done |
+| Checks | DB 94/94 · fresh replay of all 48 migrations ✓ · **end-to-end 133/133** incl. a prescription arriving on the live stream within seconds with no patient data, booking request → admin, approve → queued email → dry-run skip, a real push attempt with retry · VAPID private key absent from client bundles · all earlier journeys ✓ · typecheck/lint/build ✓ · posture ✓ |
+| Not yet | real email until a Resend key + verified domain; push tested end to end in a real browser; per-person notification preferences; push_shows_patient_name opt-in |
 
 ## B8b Reports: done (2026-11-21)
 | Item | Status |

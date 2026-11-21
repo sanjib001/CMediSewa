@@ -7,6 +7,7 @@ import { PageHeader, Panel } from "@/components/ui/primitives";
 import { QueueButtons } from "@/components/desk/queue-buttons";
 import { AllergyPanel, ConsultationEditor, PastVisits, VitalsPanel } from "@/components/clinical/consultation";
 import { cn } from "@/lib/cn";
+import { LiveRefresh } from "@/components/notify/live-refresh";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "OPD" };
@@ -49,6 +50,7 @@ export default async function OpdDesk() {
 
   return (
     <>
+      <LiveRefresh topics={["queue"]} />
       <PageHeader title="OPD" subtitle={[ctx.displayName, profile.room].filter(Boolean).join(", ")}
         actions={<QueueButtons currentVisitId={current?.id ?? null} waiting={waiting.length} />} />
 

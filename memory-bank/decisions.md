@@ -863,6 +863,41 @@ with the filters and row count), UTF-8 with BOM for Excel, and defuses spreadshe
 
 ---
 
+## B9a Realtime & notifications (2026-11-21)
+
+**D-114 Realtime as built (owner choice, 2026-11-21): short SSE + an event table.** Triggers
+write a topic-only row (`queue`, `bookings`, `dispensing`, `billing`, `stock`, or a person's
+`notifications`), one per topic per transaction. `/api/realtime` streams new event ids for
+the topics the person may see, checking every 2 s for ~50 s, then ends; the browser
+reconnects at once with Last-Event-ID, so nothing is missed. Pages refresh through their own
+permission-checked render; no data travels on the stream. Works on Vercel now; when
+self-hosted the same contract can be fed by LISTEN/NOTIFY (D-09). Events are kept a day.
+
+**D-115 Notifications and outbox as built:** in-app notifications per member (once per event
+and kind), a bell with the unread count, push to each registered device, and an outbox with
+one row per event, kind, channel and recipient, written in the same transaction as the event.
+The dispatcher (`/api/cron/dispatch-notifications`) claims due rows with SKIP LOCKED,
+retries with backoff (2, 8, 18, 32 min) and gives up after 5 tries; a row stuck in "sending"
+for 10 minutes is claimed again (so a crash mid-send can repeat that one message once).
+Cancelling an appointment cancels anything about it still waiting to go out, including an
+unsent confirmation, so a patient never gets "confirmed" then "cancelled" out of order.
+
+**D-116 What notifications say (PHI-minimal):** booking request → people with
+`manage_appointments` ("New booking request", doctor and time, never the reason); prescription
+issued → verified pharmacists (number and doctor only); patient emails → clinic, doctor, date
+and time, clinic phone (confirmed, declined with the clinic's note only if the patient gave
+it, cancelled, reminder). Never a reason for visit, diagnosis or medicine; push shows no
+patient names (`push_shows_patient_name` is left for a later opt-in).
+
+**D-117 Email and push delivery (owner choice, 2026-11-21):** email goes over Resend's HTTPS
+API; until `RESEND_API_KEY` and `MAIL_FROM` are set, the dispatcher runs dry and marks emails
+"skipped (no mail key, dry run)" so nothing is lost silently. Web push uses `web-push` 3.6.7
+with VAPID keys generated into `.env.local` (the private key is server-only, checked absent
+from client bundles); a device the push service reports gone (404/410) is switched off. Cron
+routes accept `x-cron-secret` or Vercel Cron's `Authorization: Bearer` (lib/cron.ts).
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |

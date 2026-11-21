@@ -12,7 +12,7 @@ export const dynamic = "force-dynamic";
 export default async function EmployeeLayout({ children }: { children: React.ReactNode }) {
   const ctx = await requireTenant({ operation: "employee.area", next: "/employee" });
   return (
-    <EmployeeShell bar={tenantBarProps(ctx, "employee")} workspaces={allowedWorkspaces(ctx.permissions, ctx.modules)}>
+    <EmployeeShell bar={await tenantBarProps(ctx, "employee")} workspaces={allowedWorkspaces(ctx.permissions, ctx.modules)}>
       {children}
     </EmployeeShell>
   );

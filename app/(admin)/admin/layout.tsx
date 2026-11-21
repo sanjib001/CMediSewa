@@ -14,7 +14,7 @@ export default async function AdminLayout({ children }: { children: React.ReactN
   const ctx = await requireTenant({ operation: "admin.area", allowPendingTenant: true, next: "/admin" });
   if (!canEnterAdmin(ctx)) redirect("/employee");
   return (
-    <AdminShell bar={tenantBarProps(ctx, "admin")} permissions={[...ctx.permissions]} modules={[...ctx.modules]}>
+    <AdminShell bar={await tenantBarProps(ctx, "admin")} permissions={[...ctx.permissions]} modules={[...ctx.modules]}>
       {children}
     </AdminShell>
   );
