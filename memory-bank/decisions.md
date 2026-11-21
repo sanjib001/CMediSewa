@@ -898,6 +898,29 @@ routes accept `x-cron-secret` or Vercel Cron's `Authorization: Bearer` (lib/cron
 
 ---
 
+## B9b Scheduled jobs (2026-11-21)
+
+**D-118 Jobs as built:** appointment reminders are queued the moment an appointment is
+confirmed, due `reminder_hours_before` ahead (tenant setting, default 24, 0 = off; skipped if
+that moment is under 30 minutes away) and sent by the 5-minute dispatcher; cancelling the
+appointment cancels them. `run_daily_jobs()`: subscription expiry → suspend; booking requests
+not reviewed before their time are released (the requester is told if they gave an email);
+confirmed appointments whose business day passed without a check-in → no-show; one stock
+notice per clinic per day to `manage_stock` holders (counts only: expired, expiring soon,
+low); a subscription-ending notice to admins within 7 days of the paid-until date (once per
+date); sign-in housekeeping (PIN and password attempts after 90 days, expired session
+records after a day; P-10 defaults until a retention policy is set).
+
+**D-119 Schedules (owner choice: Vercel Cron, 2026-11-21):** `vercel.json` runs
+`/api/cron/dispatch-notifications` every 5 minutes and `/api/cron/daily` at 18:30 UTC
+(00:15 in Nepal), which runs the daily jobs and then the ledger, payables and books checks.
+Every cron route accepts Vercel's `Authorization: Bearer CRON_SECRET` or `x-cron-secret`.
+**Vercel's Hobby plan only allows once-a-day crons and rejects the deployment otherwise:**
+on Hobby either upgrade, or set the dispatcher's schedule to daily and point an external
+pinger at it every 5 minutes. Self-hosting can call the same routes from any scheduler.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |

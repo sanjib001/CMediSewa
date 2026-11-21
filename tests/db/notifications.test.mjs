@@ -68,8 +68,7 @@ test("booking request → staff notification; approve / decline / cancel → one
     await c.query(`select approve_booking_request($1, $2, $3, $4)`, [x.t, a1, p.id, x.desk]);
     await asOwner(c);
     let mail = await outbox(c, x.t, "channel = 'email'");
-    assert.equal(mail.length, 1);
-    assert.equal(mail[0].kind, "booking_confirmed");
+    assert.deepEqual(mail.map((m) => m.kind), ["booking_confirmed", "booking_reminder"], "confirmation now, reminder for later (B9b)");
     assert.equal(mail[0].recipient, "asha.lama@example.com");
     assert.equal(mail[0].payload.time, "09:00");
     assert.ok(!JSON.stringify(mail[0].payload).includes("Fever"), "the email never carries the reason");
@@ -180,5 +179,54 @@ test("live events: topic only, one per transaction, a person's own topic stays t
     const evBOther = (await c.query(`select count(*)::int n from realtime_events where tenant_id = $1 and topic = 'bookings'`, [a.t])).rows[0]?.n;
     assert.equal(evB, evBOther, "never another clinic's events");
     await asOwner(c);
+  });
+});
+
+// ── B9b reminders and daily appointment jobs ──
+test("reminder queued on confirmation, due N hours before; 0 = off; cancelled with the appointment", async () => {
+  await withTx(async (c) => {
+    const x = await clinic(c);
+    const p = (await c.query(`insert into patients (tenant_id, full_name, sex, age_years, email) values ($1, 'Asha Lama', 'female', 30, 'asha@example.com') returning id`, [x.t])).rows[0].id;
+    await asApp(c);
+    const { rows: [{ id: a1 }] } = await req(c, x, at(2, "09:00"), { token: "r-1" });
+    await c.query(`select approve_booking_request($1, $2, $3, $4)`, [x.t, a1, p, x.desk]);
+    await asOwner(c);
+    const { rows: [r] } = await c.query(`select status, recipient, next_attempt_at, (select lower(scheduled_range) from appointments where id = $2) starts
+                                           from notification_outbox where tenant_id = $1 and kind = 'booking_reminder' and ref_id = $2::text`, [x.t, a1]);
+    assert.equal(r.status, "pending");
+    assert.equal(r.recipient, "asha@example.com", "the patient's own email when the record has one");
+    assert.equal(r.starts.getTime() - r.next_attempt_at.getTime(), 24 * 3600_000, "due 24 hours before");
+    await c.query(`update tenant_settings set reminder_hours_before = 0 where tenant_id = $1`, [x.t]);
+    await asApp(c);
+    const { rows: [{ id: a2 }] } = await req(c, x, at(2, "10:00"), { token: "r-2" });
+    await asOwner(c);
+    const { rows: [q] } = await c.query(`insert into patients (tenant_id, full_name, sex, age_years, email) values ($1, 'Ram Thapa', 'male', 40, 'ram@example.com') returning id`, [x.t]);
+    await asApp(c);
+    await c.query(`select approve_booking_request($1, $2, $3, $4)`, [x.t, a2, q.id, x.desk]);
+    await asOwner(c);
+    assert.equal((await c.query(`select count(*)::int n from notification_outbox where kind = 'booking_reminder' and ref_id = $1::text`, [a2])).rows[0].n, 0, "reminders off");
+  });
+});
+
+test("daily jobs: confirmed but never came → no-show; unreviewed requests released; only this clinic when asked", async () => {
+  await withTx(async (c) => {
+    const x = await clinic(c), y = await clinic(c);
+    const p = (await c.query(`insert into patients (tenant_id, full_name, sex, age_years) values ($1, 'Asha Lama', 'female', 30) returning id`, [x.t])).rows[0].id;
+    await asApp(c);
+    const { rows: [{ id: a1 }] } = await req(c, x, at(2, "09:00"), { token: "d-1" });
+    await c.query(`select approve_booking_request($1, $2, $3, $4)`, [x.t, a1, p, x.desk]);
+    const { rows: [{ id: a2 }] } = await req(c, x, at(2, "09:15"), { token: "d-2" });
+    const { rows: [{ id: b1 }] } = await req(c, y, at(2, "09:00"), { token: "d-3" });
+    await asOwner(c);
+    // move both of x's appointments two days into the past (as if time went by)
+    await c.query(`update appointments set appointment_date = appointment_date - 4, scheduled_range = tstzrange(lower(scheduled_range) - interval '4 days', upper(scheduled_range) - interval '4 days') where id = any($1)`, [[a1, a2]]);
+    await asApp(c);
+    const r = (await c.query(`select run_daily_jobs($1) r`, [x.t])).rows[0].r;
+    assert.deepEqual([r.no_shows, r.requests_expired], [1, 1]);
+    await asOwner(c);
+    const st = Object.fromEntries((await c.query(`select id, status from appointments where id = any($1)`, [[a1, a2, b1]])).rows.map((a) => [a.id, a.status]));
+    assert.deepEqual([st[a1], st[a2], st[b1]], ["no_show", "cancelled", "requested"], "the other clinic untouched");
+    const { rows: [m] } = await c.query(`select kind, payload from notification_outbox where ref_id = $1::text and channel = 'email'`, [a2]);
+    assert.ok(!m || m.kind === "booking_declined", "a released request tells the requester (if they gave an email)");
   });
 });

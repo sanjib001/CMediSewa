@@ -1,7 +1,15 @@
 # Current Task
 
-**Phase:** Phase 0 backend: B1–B8 done. **B9 in progress:** B9a realtime & notifications done. Next: **B9b** scheduled jobs (reminders, no-show, expiry/low-stock alerts, subscription expiry, nightly checks) + vercel.json crons. Then Phase 0 is complete.
+**Phase:** **Phase 0 (B0–B9) is complete** (2026-11-21). Next: Phase 1 (U2–U8): review what the B-milestones already built against each U milestone, then finish the remaining screens and the PWA (U8) toward the pilot.
 **Last updated:** 2026-11-20
+
+## B9b Scheduled jobs: done (2026-11-21), Phase 0 complete
+| Item | Status |
+|---|---|
+| Migration 0049: tenant_settings.reminder_hours_before; reminders queued on confirmation; mark_no_shows, daily_stock_scan, warn_subscriptions_ending, prune_sign_in_records, run_daily_jobs | done |
+| /api/cron/daily (jobs + reconcile_all_tenants); stock and subscriptions routes accept Vercel's Bearer; vercel.json (dispatcher every 5 min, daily at 00:15 NPT) | done |
+| Checks | DB 98/98 · fresh replay of all 49 migrations ✓ · **end-to-end 140/140** (purchasing → counter → returns → finance → reports → realtime/notifications → daily jobs) · all earlier journeys ✓ · typecheck/lint/build ✓ · posture ✓ |
+| Not yet | a reminder setting on the Settings screen (default 24 h applies); real sends need a Resend key; Hobby-plan cron limit (D-119) |
 
 ## B9a Realtime & notifications: done (2026-11-21)
 | Item | Status |

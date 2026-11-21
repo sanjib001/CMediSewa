@@ -51,7 +51,7 @@ uses synthetic fixtures (`scripts/seed-demo.mjs`).
 | `SUPABASE_SECRET_KEY` | server | new-format secret key (acts as `service_role`; replaces the legacy service-role key). Server-only; CI greps the client bundle for it |
 | `SUPABASE_DB_URL` (+ `REALTIME_DB_URL` from B9) | server | Postgres connection for migrations, DB tests and the LISTEN bus. **Quoted**, with the password URL-encoded (`@` → `%40`) |
 | `AUTH_HMAC_SECRET` | server | HMAC key for trusted-device tokens and login-attempt hashes (B1). Rotating it un-trusts every device |
-| `CRON_SECRET` | server | `x-cron-secret` for `/api/cron/*`: `subscriptions` (daily expiry, B2) and `stock` (nightly balance reconciliation, B5c); constant-time compare; 404 without it |
+| `CRON_SECRET` | server | guards `/api/cron/*` (constant-time; 404 otherwise). Sent by Vercel Cron as `Authorization: Bearer …` (set the same name in the Vercel project) or by hand as `x-cron-secret`. Scheduled (vercel.json, B9b): `dispatch-notifications` every 5 min, `daily` at 18:30 UTC = 00:15 NPT (jobs + ledger/payables/books checks). `subscriptions` and `stock` remain for manual runs. Hobby plan: crons once a day only (see D-119) |
 | `NEXT_PUBLIC_APP_URL` | public | base URL for invite links |
 | `DB_SSL` | tooling | `"false"` only for a plain local/CI Postgres; omitted elsewhere |
 | `NEXT_PUBLIC_APP_URL` | public | canonical URL for links in messages |
