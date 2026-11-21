@@ -1,7 +1,28 @@
 # Current Task
 
-**Phase:** **Phase 0 (B0–B9) is complete** (2026-11-21). Next: Phase 1 (U2–U8): review what the B-milestones already built against each U milestone, then finish the remaining screens and the PWA (U8) toward the pilot.
+**Phase:** Phase 0 complete. **Phase 1 in progress:** U3a done (dashboard on real data, Billing, Audit log). Next: **U3b Patients**, then the gaps listed under "Phase 1 review".
 **Last updated:** 2026-11-20
+
+## Phase 1 review (2026-11-21)
+What each U milestone asks for (roadmap) against what the B milestones already built.
+| Milestone | Already there | Still to do |
+|---|---|---|
+| U2 Marketing + Super Admin | landing, registration, applications, clinics (+ direct creation), plans | pricing from published plans and a contact page; Super Admin **Audit**, **Settings**, platform billing view, monitoring |
+| U3 Admin | setup + go-live, settings, staff/roles/devices, services, doctors/schedules, website, appointments, medicines, stock, purchases, vendors, expenses, finance, reports; **U3a: dashboard on real data, Billing, Audit log** | **Patients** (list, record, merge duplicates); reminder hours on Settings |
+| U4 Registrar | today's board, register/search, book, check-in with OPD fee + token, queue, booking requests, live refresh | the top-bar patient search isn't wired; dues collection at the desk; print OPD receipt/token and Rx; reschedule from the desk |
+| U5 Doctor OPD | queue, call next, chart + allergies, consultation, e-Rx → pharmacy queue, live refresh | follow-up booking from the consultation; **my schedule and leave** (manage_own_leave exists, no leave data yet: needs a migration) |
+| U6 Pharmacy | dispensing queue, sale (FEFO, units, batch choice), bills, returns, void, dues, stock alerts, live refresh | barcode scan at the counter; stock tasks reachable from the pharmacy workspace for staff without Admin |
+| U7 Public site | site, doctors, services, slots, booking requests, status link | optional patient account; manage link in patient emails |
+| U8 PWA & polish | push opt-in, service worker | web app manifest + icons, install, offline gate, iOS standalone sign-in, idle lock, print layouts (OPD bill, token, Rx, GRN) |
+
+## U3a Admin dashboard, Billing, Audit log: done (2026-11-21)
+| Item | Status |
+|---|---|
+| Dashboard: money today from the accounts (services, pharmacy, cash and online received, owed by patients, owed to vendors) for finance/report holders; requests waiting, books check; live refresh; no demo data left anywhere | done |
+| Admin Billing: bills of a period (OPD and pharmacy, filter), patients who owe with Collect; bill page shared with the pharmacy (components/billing/bill-view.tsx) with collect, return, void today | done |
+| Audit log: grouped kinds, person, outcome, dates, 100 at a time; chart reads by patient number only | done |
+| Fixed | a bill with a return showed "due" as total − paid; it now shows what is really owed |
+| Checks | **end-to-end 151/151** · all earlier journeys ✓ · typecheck/lint/build ✓ · posture ✓ (no migration) |
 
 ## B9b Scheduled jobs: done (2026-11-21), Phase 0 complete
 | Item | Status |

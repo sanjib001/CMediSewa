@@ -107,7 +107,7 @@ export async function findPatient(q: string): Promise<PatientLite[]> {
   return (data ?? []).map(toLite);
 }
 
-const after = (id: string) => { revalidatePath("/employee/pharmacy"); revalidatePath(`/employee/pharmacy/bills/${id}`); };
+const after = (id: string) => { revalidatePath("/employee/pharmacy"); revalidatePath(`/employee/pharmacy/bills/${id}`); revalidatePath("/admin/billing"); revalidatePath(`/admin/billing/${id}`); };
 
 /** Void a whole bill: today only, nothing returned yet, password confirmed in the last 5 minutes. */
 export async function voidBill(input: { id: string; reason: string }): Promise<{ ok: true } | Fail> {
@@ -151,7 +151,7 @@ export async function collectDues(input: { idempotencyKey: string; patientId: st
     p_channel: input.channel || null, p_reference: null, p_by: ctx.memberId, p_session_level: ctx.level, p_device: ctx.deviceId,
   });
   if (error) return { ok: false, error: /OVERPAYMENT/.test(error.message ?? "") ? "That's more than the patient owes." : friendly(error) };
-  revalidatePath("/employee/pharmacy");
+  revalidatePath("/employee/pharmacy"); revalidatePath("/admin/billing");
   const r = data as { receipt_no: string; amount: number };
   return { ok: true, receipt: r.receipt_no, amount: Number(r.amount) };
 }
