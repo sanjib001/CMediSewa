@@ -2,7 +2,8 @@
 
 import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { bookAppointment, checkIn, listSlots, moveVisit, registerPatient, searchPatients, setAppointmentStatus, type Slot } from "@/app/actions/desk";
+import { bookAppointment, checkIn, listSlots, moveVisit, registerPatient, rescheduleAppointment, searchPatients, setAppointmentStatus, type Slot } from "@/app/actions/desk";
+import Link from "next/link";
 import type { DeskDoctor, DeskService, DeskSettings, PatientLite, QueueVisit, TodayAppointment } from "@/lib/desk/data";
 import { Button } from "@/components/ui/primitives";
 import { OpdTicket } from "@/components/ui/opd-ticket";
@@ -34,6 +35,7 @@ export function RegistrarDesk(props: {
   today: string; doctors: DeskDoctor[]; services: DeskService[]; settings: DeskSettings;
   visits: QueueVisit[]; appointments: TodayAppointment[]; now: number;
   can: { register: boolean; book: boolean; checkIn: boolean; cancel: boolean };
+  rxByVisit?: Record<string, { id: string; no: string }>; initialQuery?: string;
 }) {
   const router = useRouter();
   const [patient, setPatient] = useState<PatientLite | null>(null);
@@ -64,7 +66,7 @@ export function RegistrarDesk(props: {
               </div>
               <button type="button" className="text-sm text-pine hover:underline" onClick={() => { setPatient(null); setAppointmentId(null); }}>Change</button>
             </div>
-          ) : <PatientFinder canRegister={props.can.register} onPick={pick} />}
+          ) : <PatientFinder canRegister={props.can.register} onPick={pick} initialQuery={props.initialQuery} />}
         </section>
 
         {patient ? (
@@ -92,14 +94,14 @@ export function RegistrarDesk(props: {
         ) : null}
       </div>
 
-      <TodayBoard {...props} onCheckIn={(a) => pick(a.patient, a)} />
+      <TodayBoard {...props} rxByVisit={props.rxByVisit} onCheckIn={(a) => pick(a.patient, a)} />
     </div>
   );
 }
 
 // ── find or register ─────────────────────────────────────────────────────────
-function PatientFinder({ canRegister, onPick }: { canRegister: boolean; onPick: (p: PatientLite) => void }) {
-  const [q, setQ] = useState("");
+function PatientFinder({ canRegister, onPick, initialQuery }: { canRegister: boolean; onPick: (p: PatientLite) => void; initialQuery?: string }) {
+  const [q, setQ] = useState(initialQuery ?? "");
   const [results, setResults] = useState<PatientLite[] | null>(null);
   const [adding, setAdding] = useState(false);
   const [pending, start] = useTransition();
@@ -219,7 +221,7 @@ function CheckInForm({ patient, doctors, services, settings, doctorId, setDoctor
           {result.replayed ? " (already recorded)" : ""}
         </p>
         <div className="flex justify-center gap-2">
-          <Button type="button" onClick={() => window.print()} tone="secondary">Print token</Button>
+          <Link href={`/employee/registrar/receipt/${result.visitId}`} className="rounded-control border border-line-strong px-4 py-2 font-medium">Print token{result.invoiceNo ? " and receipt" : ""}</Link>
           <Button type="button" onClick={onDone}>Next patient</Button>
         </div>
       </div>
@@ -348,10 +350,11 @@ function BookForm({ patient, doctors, services, today, onDone }: { patient: Pati
 }
 
 // ── today's board ────────────────────────────────────────────────────────────
-function TodayBoard({ doctors, visits, appointments, can, onCheckIn, now: serverNow }: {
+function TodayBoard({ doctors, visits, appointments, can, onCheckIn, now: serverNow, rxByVisit = {} }: {
   doctors: DeskDoctor[]; visits: QueueVisit[]; appointments: TodayAppointment[]; can: { cancel: boolean; book: boolean; checkIn: boolean };
-  onCheckIn: (a: TodayAppointment) => void; now: number;
+  onCheckIn: (a: TodayAppointment) => void; now: number; rxByVisit?: Record<string, { id: string; no: string }>;
 }) {
+  const [moving, setMoving] = useState<string | null>(null);
   const [now, setNow] = useState(serverNow);
   useEffect(() => { const t = setInterval(() => setNow(Date.now()), 30_000); return () => clearInterval(t); }, []);
   const router = useRouter();
@@ -387,9 +390,10 @@ function TodayBoard({ doctors, visits, appointments, can, onCheckIn, now: server
                 <span className="w-14 font-medium tabular-nums">{hm(a.start)}</span>
                 <span className="min-w-0 flex-1"><span className="font-medium">{a.patient.full_name}</span> <span className="text-sm text-ink-faint">{a.patient.age}, {doctors.find((d) => d.id === a.doctorId)?.name}{a.mode === "token" ? ", token session" : ""}</span></span>
                 <Chip map={APPT_CHIP} s={a.status} />
-                {asking?.id === a.id ? <ReasonBox onConfirm={() => act(() => setAppointmentStatus({ appointmentId: a.id, status: "cancelled", reason }))} /> : (
+                {moving === a.id ? <Reschedule appointment={a} doctors={doctors} onClose={() => setMoving(null)} onDone={() => { setMoving(null); router.refresh(); }} /> : asking?.id === a.id ? <ReasonBox onConfirm={() => act(() => setAppointmentStatus({ appointmentId: a.id, status: "cancelled", reason }))} /> : (
                   <span className="flex gap-3 text-sm">
                     {can.checkIn && a.status === "confirmed" ? <button type="button" className="font-medium text-pine hover:underline" onClick={() => onCheckIn(a)}>Check in</button> : null}
+                    {can.book && a.status === "confirmed" ? <button type="button" className="text-ink-soft hover:underline" onClick={() => setMoving(a.id)}>Reschedule</button> : null}
                     {can.book ? <button type="button" className="text-ink-soft hover:underline" onClick={() => { setAsking({ kind: "appt", id: a.id }); setReason(""); }}>Cancel</button> : null}
                     {can.book && Date.parse(a.start) < now ? <button type="button" className="text-ink-soft hover:underline" disabled={busy} onClick={() => act(() => setAppointmentStatus({ appointmentId: a.id, status: "no_show" }))}>No-show</button> : null}
                   </span>
@@ -429,6 +433,8 @@ function TodayBoard({ doctors, visits, appointments, can, onCheckIn, now: server
                         {asking?.id === v.id ? <ReasonBox onConfirm={() => act(() => moveVisit({ visitId: v.id, to: "cancelled", reason }))} /> : (
                           <span className="inline-flex items-center gap-3">
                             <Chip map={VISIT_CHIP} s={v.status} />
+                            {v.status !== "cancelled" ? <Link href={`/employee/registrar/receipt/${v.id}`} className="text-sm text-pine hover:underline">Receipt</Link> : null}
+                            {rxByVisit[v.id] ? <Link href={`/employee/registrar/rx/${rxByVisit[v.id]!.id}`} className="text-sm text-pine hover:underline">Print Rx</Link> : null}
                             {can.cancel && v.status === "waiting" ? <button type="button" className="text-sm text-ink-soft hover:underline" onClick={() => { setAsking({ kind: "visit", id: v.id }); setReason(""); }}>Cancel</button> : null}
                           </span>
                         )}
@@ -442,5 +448,33 @@ function TodayBoard({ doctors, visits, appointments, can, onCheckIn, now: server
         );
       })}
     </div>
+  );
+}
+
+// ── reschedule ────────────────────────────────────────────────────────────────
+function Reschedule({ appointment, doctors, onClose, onDone }: { appointment: TodayAppointment; doctors: DeskDoctor[]; onClose: () => void; onDone: () => void }) {
+  const [doctorId, setDoctorId] = useState(appointment.doctorId);
+  const [date, setDate] = useState(() => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kathmandu" }).format(new Date(appointment.start)));
+  const [slots, setSlots] = useState<Slot[] | null>(null);
+  const [chosen, setChosen] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const load = (d: string, doc: string) => start(async () => { setChosen(null); setError(null); setSlots(await listSlots(doc, d)); });
+  return (
+    <span className="flex w-full flex-wrap items-center gap-2 text-sm">
+      <select value={doctorId} onChange={(e) => { setDoctorId(e.target.value); load(date, e.target.value); }} className="rounded-control border border-line-strong px-2 py-1" aria-label="Doctor">
+        {doctors.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}</select>
+      <input type="date" value={date} onChange={(e) => { setDate(e.target.value); load(e.target.value, doctorId); }} className="rounded-control border border-line-strong px-2 py-1" aria-label="New date" />
+      {slots === null ? <button type="button" className="text-pine hover:underline" onClick={() => load(date, doctorId)}>Show times</button>
+        : slots.length === 0 ? <span className="text-ink-soft">No free times that day.</span>
+        : <select value={chosen ?? ""} onChange={(e) => setChosen(e.target.value || null)} className="rounded-control border border-line-strong px-2 py-1" aria-label="New time">
+            <option value="">Choose a time</option>{slots.filter((s) => s.mode === "token" ? s.booked < s.capacity : s.booked === 0).map((s) => <option key={s.start} value={s.start}>{hm(s.start)}{s.mode === "token" ? " (token)" : ""}</option>)}</select>}
+      <button type="button" disabled={!chosen || pending} className="font-medium text-pine disabled:opacity-40" onClick={() => start(async () => {
+        const r = await rescheduleAppointment({ appointmentId: appointment.id, start: chosen!, doctorId: doctorId !== appointment.doctorId ? doctorId : null });
+        if (r.ok) onDone(); else setError(r.error);
+      })}>{pending ? "Moving…" : "Move"}</button>
+      <button type="button" onClick={onClose} className="text-ink-soft">Keep</button>
+      {error ? <span role="alert" className="w-full text-alert">{error}</span> : null}
+    </span>
   );
 }

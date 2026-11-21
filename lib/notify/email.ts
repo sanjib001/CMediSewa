@@ -28,6 +28,10 @@ export function renderEmail(kind: string, p: EmailPayload): { subject: string; t
       subject = `Reminder: your appointment at ${p.clinic}`;
       lines = [hello, `This is a reminder of your appointment with Dr. ${p.doctor} at ${p.clinic} on ${when(p)}.`, call];
       break;
+    case "booking_rescheduled":
+      subject = `Appointment moved: ${p.clinic}`;
+      lines = [hello, `Your appointment with Dr. ${p.doctor} at ${p.clinic} has been moved to ${when(p)}.`, "Please arrive 10 minutes early.", call];
+      break;
     case "booking_declined":
       subject = `About your booking request at ${p.clinic}`;
       lines = [hello, `${p.clinic} couldn't confirm your request to see Dr. ${p.doctor} on ${when(p)}.${p.cancel_reason ? ` ${p.cancel_reason}.` : ""}`, "You're welcome to request another time.", call];

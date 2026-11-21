@@ -935,6 +935,26 @@ reversible); until then the desk keeps using the older record.
 
 ---
 
+## U4 Registrar desk (2026-11-21)
+
+**D-121 Printing at the desk:** the token and receipt print from their own narrow page per
+visit (`/employee/registrar/receipt/[visit]`, 80 mm friendly), not the whole desk. An issued
+prescription prints through `print_prescription` (`print_prescriptions`, A1): clinic,
+patient, the medicines with dose and duration, the doctor's advice and their verified council
+registration; never the complaint, diagnosis or notes. Every print (and every refusal) is
+audited against the patient. The desk learns which visits have one through
+`visit_prescriptions` (ids and numbers only).
+
+**D-122 Rescheduling:** `reschedule_appointment` moves a confirmed appointment (optionally to
+another doctor) in one transaction: the old one is cancelled as "Rescheduled to …", the new one
+is booked through `book_appointment` (all slot rules) and points back via
+`rescheduled_from_id`; a taken slot leaves everything as it was. The patient gets one "moved"
+email (and the new reminder), never "cancelled" + "confirmed". The top-bar search goes to
+Admin → Patients (or the desk, pre-filled, for desk staff without Admin); dues are collected
+at the desk by `manage_billing` holders.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |

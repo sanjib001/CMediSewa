@@ -1,6 +1,6 @@
 # Current Task
 
-**Phase:** Phase 0 complete. **Phase 1 in progress:** U3 Admin done (U3a + U3b). Next from the Phase 1 review: **U4 registrar gaps** (top-bar patient search, dues at the desk, print receipt/token/Rx, reschedule).
+**Phase:** Phase 0 complete. **Phase 1 in progress:** U3 and U4 done. Next from the Phase 1 review: **U5 doctor gaps** (my schedule and leave, follow-up booking from the consultation).
 **Last updated:** 2026-11-20
 
 ## Phase 1 review (2026-11-21)
@@ -9,11 +9,19 @@ What each U milestone asks for (roadmap) against what the B milestones already b
 |---|---|---|
 | U2 Marketing + Super Admin | landing, registration, applications, clinics (+ direct creation), plans | pricing from published plans and a contact page; Super Admin **Audit**, **Settings**, platform billing view, monitoring |
 | U3 Admin | setup + go-live, settings, staff/roles/devices, services, doctors/schedules, website, appointments, medicines, stock, purchases, vendors, expenses, finance, reports; **U3a: dashboard on real data, Billing, Audit log** ~~Patients~~ (U3b done; merging is P2, M-37); reminder hours on Settings |
-| U4 Registrar | today's board, register/search, book, check-in with OPD fee + token, queue, booking requests, live refresh | the top-bar patient search isn't wired; dues collection at the desk; print OPD receipt/token and Rx; reschedule from the desk |
+| U4 Registrar | today's board, register/search, book, check-in with OPD fee + token, queue, booking requests, live refresh ~~all four~~ done in U4 |
 | U5 Doctor OPD | queue, call next, chart + allergies, consultation, e-Rx → pharmacy queue, live refresh | follow-up booking from the consultation; **my schedule and leave** (manage_own_leave exists, no leave data yet: needs a migration) |
 | U6 Pharmacy | dispensing queue, sale (FEFO, units, batch choice), bills, returns, void, dues, stock alerts, live refresh | barcode scan at the counter; stock tasks reachable from the pharmacy workspace for staff without Admin |
 | U7 Public site | site, doctors, services, slots, booking requests, status link | optional patient account; manage link in patient emails |
 | U8 PWA & polish | push opt-in, service worker | web app manifest + icons, install, offline gate, iOS standalone sign-in, idle lock, print layouts (OPD bill, token, Rx, GRN) |
+
+## U4 Registrar desk: done (2026-11-21)
+| Item | Status |
+|---|---|
+| Migration 0051: visit_prescriptions, print_prescription (audited), reschedule_appointment | done |
+| Token + receipt print page per visit; Print Rx page; Receipt and Print Rx links on the queue; Reschedule picker on today's appointments; dues panel with Collect; top-bar patient search (Admin → Patients, or the desk pre-filled); "rescheduled" email | done |
+| Checks | DB 102/102 · fresh replay of all 51 migrations ✓ · **end-to-end 178/178** · all earlier journeys ✓ · typecheck/lint/build ✓ · posture ✓ |
+| Fixed before use | the printed prescription read a non-existent "revoked" column for the doctor's registration (would have failed on first print); the reschedule picker took the UTC date |
 
 ## U3b Patients: done (2026-11-21)
 | Item | Status |

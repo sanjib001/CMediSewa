@@ -20,6 +20,8 @@ export async function tenantBarProps(ctx: TenantContext, area: "admin" | "employ
     .eq("tenant_id", ctx.tenantId).eq("member_id", ctx.memberId).is("read_at", null);
   return {
     unread: count ?? 0,
+    // The top-bar patient search: Admin → Patients for those who can open Admin, else the desk.
+    searchHref: !ctx.permissions.has("view_patients") ? null : canEnterAdmin(ctx) ? "/admin/patients" : ctx.permissions.has("view_queue") ? "/employee/registrar" : null,
     area,
     tenantName: ctx.tenantName,
     displayName: ctx.displayName,

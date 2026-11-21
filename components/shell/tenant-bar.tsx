@@ -11,6 +11,7 @@ export type TenantBarProps = {
   levelLabel: string;
   showAdminSwitch: boolean;
   unread: number;
+  searchHref: string | null;
   menu?: React.ReactNode;
 };
 
@@ -21,7 +22,7 @@ const initials = (name: string) =>
  * Top bar shared by the Admin and Employee areas: the clinic, today's date in BS and AD,
  * patient search (wired in B4), the Admin ⇄ workspace switch, and the signed-in person.
  */
-export function TenantBar({ area, tenantName, displayName, levelLabel, showAdminSwitch, unread, menu }: TenantBarProps) {
+export function TenantBar({ area, tenantName, displayName, levelLabel, showAdminSwitch, unread, searchHref, menu }: TenantBarProps) {
   const today = localDate(new Date());
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur">
@@ -39,11 +40,13 @@ export function TenantBar({ area, tenantName, displayName, levelLabel, showAdmin
           </span>
         </Link>
 
-        <label className="ml-auto hidden min-w-0 max-w-sm flex-1 items-center gap-2 rounded-control border border-line bg-canvas px-3 py-2 text-ink-faint md:flex">
-          <Icon name="Search" />
-          <input type="search" placeholder="Find a patient by name, phone or MRN" aria-label="Find a patient"
-            className="w-full bg-transparent text-ink placeholder:text-ink-faint focus:outline-none" />
-        </label>
+        {searchHref ? (
+          <form action={searchHref} role="search" className="ml-auto hidden min-w-0 max-w-sm flex-1 items-center gap-2 rounded-control border border-line bg-canvas px-3 py-2 text-ink-faint md:flex">
+            <Icon name="Search" />
+            <input type="search" name="q" minLength={1} maxLength={60} placeholder="Find a patient by name, phone or MRN" aria-label="Find a patient"
+              className="w-full bg-transparent text-ink placeholder:text-ink-faint focus:outline-none" />
+          </form>
+        ) : <span className="ml-auto" />}
 
         <nav className="ml-auto flex items-center gap-1 md:ml-2" aria-label="Account">
           {showAdminSwitch ? (
