@@ -8,6 +8,8 @@ import { QueueButtons } from "@/components/desk/queue-buttons";
 import { AllergyPanel, ConsultationEditor, PastVisits, VitalsPanel } from "@/components/clinical/consultation";
 import { cn } from "@/lib/cn";
 import { LiveRefresh } from "@/components/notify/live-refresh";
+import { FollowUpBooker } from "@/components/clinical/follow-up";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 export const metadata = { title: "OPD" };
@@ -52,7 +54,7 @@ export default async function OpdDesk() {
     <>
       <LiveRefresh topics={["queue"]} />
       <PageHeader title="OPD" subtitle={[ctx.displayName, profile.room].filter(Boolean).join(", ")}
-        actions={<QueueButtons currentVisitId={current?.id ?? null} waiting={waiting.length} />} />
+        actions={<div className="flex items-center gap-3"><Link href="/employee/schedule" className="text-pine hover:underline">My schedule</Link><QueueButtons currentVisitId={current?.id ?? null} waiting={waiting.length} /></div>} />
 
       <div className="grid gap-6 lg:grid-cols-[18rem_1fr]">
         <Panel title="My queue today" aside={<span className="text-sm text-ink-faint">{waiting.length} waiting</span>} flush>
@@ -93,6 +95,9 @@ export default async function OpdDesk() {
               {draft && draft.status === "draft" ? <ConsultationEditor key={draft.id} encounter={draft} visitId={current.id} /> : (
                 <p className="rounded-panel border border-line bg-surface p-5 text-ink-soft">This consultation is finalized. Press &ldquo;Done&rdquo; to finish the visit.</p>
               )}
+              <Panel title="Follow-up">
+                <FollowUpBooker key={ok.patient.id} patientId={ok.patient.id} defaultDate={draft?.follow_up_on ?? new Date(renderedAt + 7 * 86_400_000 + 5.75 * 3600_000).toISOString().slice(0, 10)} />
+              </Panel>
               <Panel title="Earlier consultations">
                 <PastVisits encounters={past} />
               </Panel>

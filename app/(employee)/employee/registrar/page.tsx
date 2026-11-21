@@ -5,7 +5,7 @@ import { serviceClient } from "@/lib/supabase/service";
 import { BookingRequests } from "@/components/desk/booking-requests";
 import { CollectDues } from "@/components/pharmacy/bill-corrections";
 import { PageHeader, Panel } from "@/components/ui/primitives";
-import { RegistrarDesk } from "@/components/desk/registrar-desk";
+import { LeaveMoves, RegistrarDesk, type LeaveMove } from "@/components/desk/registrar-desk";
 import { LiveRefresh } from "@/components/notify/live-refresh";
 
 export const dynamic = "force-dynamic";
@@ -21,12 +21,15 @@ export default async function RegistrarDeskPage({ searchParams }: { searchParams
   const sp = await searchParams;
   const today = todayIn();
   const canCollect = can(ctx, "manage_billing");
-  const [setup, board, requests, rx, dues] = await Promise.all([
+  const [setup, board, requests, rx, dues, moves] = await Promise.all([
     getDeskSetup(ctx.tenantId), getToday(ctx.tenantId, today),
     can(ctx, "view_appointments") ? listBookingRequests(ctx.tenantId) : Promise.resolve([]),
     can(ctx, "print_prescriptions") ? serviceClient().rpc("visit_prescriptions", { p_tenant: ctx.tenantId, p_member: ctx.memberId, p_day: today }) : Promise.resolve({ data: [] }),
     canCollect ? patientsWithDues(ctx.tenantId) : Promise.resolve([]),
+    can(ctx, "view_appointments") ? serviceClient().rpc("appointments_on_leave", { p_tenant: ctx.tenantId, p_days: 30 }) : Promise.resolve({ data: [] }),
   ]);
+  const toMove: LeaveMove[] = ((moves.data ?? []) as { appointment_id: string; starts_at: string; doctor_member_id: string; doctor: string; patient: string; mrn: string | null; phone: string | null }[])
+    .map((m) => ({ id: m.appointment_id, start: m.starts_at, doctorId: m.doctor_member_id, doctor: m.doctor, patient: m.patient, mrn: m.mrn, phone: m.phone }));
   const rxByVisit = Object.fromEntries(((rx.data ?? []) as { visit_id: string; prescription_id: string; rx_number: string }[]).map((r) => [r.visit_id, { id: r.prescription_id, no: r.rx_number }]));
   const renderedAt = new Date();
   const fmt = new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kathmandu", weekday: "long", day: "numeric", month: "long" }).format(renderedAt);
@@ -35,6 +38,11 @@ export default async function RegistrarDeskPage({ searchParams }: { searchParams
       <LiveRefresh topics={["queue", "bookings", "billing"]} />
       <PageHeader title="Registrar" subtitle={`${fmt}. ${board.visits.filter((v) => v.status !== "cancelled").length} checked in, ${board.appointments.filter((a) => a.status === "confirmed").length} still expected.`} />
       <BookingRequests requests={requests} canAct={can(ctx, "manage_appointments") && can(ctx, "manage_patients")} />
+      {toMove.length ? (
+        <Panel title="Appointments to move: doctor on leave" aside={<span className="text-sm text-warn">{toMove.length} to move</span>} flush className="mb-6 border-warn/50">
+          <LeaveMoves rows={toMove} doctors={setup.doctors} canMove={can(ctx, "manage_appointments")} />
+        </Panel>
+      ) : null}
       {setup.doctors.length === 0 ? (
         <p className="rounded-panel border border-line bg-surface p-5 text-ink-soft">No doctors are set up yet. An admin adds them in Admin, Doctors &amp; schedules.</p>
       ) : (

@@ -452,7 +452,7 @@ function TodayBoard({ doctors, visits, appointments, can, onCheckIn, now: server
 }
 
 // ── reschedule ────────────────────────────────────────────────────────────────
-function Reschedule({ appointment, doctors, onClose, onDone }: { appointment: TodayAppointment; doctors: DeskDoctor[]; onClose: () => void; onDone: () => void }) {
+function Reschedule({ appointment, doctors, onClose, onDone }: { appointment: { id: string; doctorId: string; start: string }; doctors: DeskDoctor[]; onClose: () => void; onDone: () => void }) {
   const [doctorId, setDoctorId] = useState(appointment.doctorId);
   const [date, setDate] = useState(() => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kathmandu" }).format(new Date(appointment.start)));
   const [slots, setSlots] = useState<Slot[] | null>(null);
@@ -476,5 +476,22 @@ function Reschedule({ appointment, doctors, onClose, onDone }: { appointment: To
       <button type="button" onClick={onClose} className="text-ink-soft">Keep</button>
       {error ? <span role="alert" className="w-full text-alert">{error}</span> : null}
     </span>
+  );
+}
+
+// ── appointments on a doctor's leave (U5): listed for the desk to move, never auto-cancelled ──
+export type LeaveMove = { id: string; start: string; doctorId: string; doctor: string; patient: string; mrn: string | null; phone: string | null };
+export function LeaveMoves({ rows, doctors, canMove }: { rows: LeaveMove[]; doctors: DeskDoctor[]; canMove: boolean }) {
+  const router = useRouter();
+  const [moving, setMoving] = useState<string | null>(null);
+  const day = (iso: string) => new Intl.DateTimeFormat("en-GB", { timeZone: "Asia/Kathmandu", weekday: "short", day: "numeric", month: "short" }).format(new Date(iso));
+  return (
+    <ul className="divide-y divide-line">{rows.map((r) => (
+      <li key={r.id} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-3">
+        <span className="w-32 font-medium">{day(r.start)} {hm(r.start)}</span>
+        <span className="min-w-0 flex-1"><span className="font-medium">{r.patient}</span> <span className="text-sm text-ink-faint">{[r.mrn, r.phone, r.doctor].filter(Boolean).join(", ")}</span></span>
+        {moving === r.id ? <Reschedule appointment={r} doctors={doctors} onClose={() => setMoving(null)} onDone={() => { setMoving(null); router.refresh(); }} />
+          : canMove ? <button type="button" className="text-sm font-medium text-pine hover:underline" onClick={() => setMoving(r.id)}>Reschedule</button> : null}
+      </li>))}</ul>
   );
 }

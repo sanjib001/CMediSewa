@@ -97,7 +97,7 @@ test("outbox: claimed once (skip locked), retried with backoff, failed after 5, 
     await c.query(`select queue_email($1, 'test_kind', 'test', 'r2', 'not-an-address', '{}'::jsonb)`, [x.t]);
     assert.equal((await outbox(c, x.t)).length, 1, "same event and address once; a bad address never");
     await asApp(c);
-    const take = async () => (await c.query(`select id, attempts from claim_outbox(50) where tenant_id = $1`, [x.t])).rows;
+    const take = async () => (await c.query(`select id, attempts from claim_outbox(200) where tenant_id = $1`, [x.t])).rows;
     const [row] = await take();
     assert.ok(row);
     assert.equal((await take()).length, 0, "a claimed row isn't handed out again");
@@ -149,7 +149,7 @@ test("Rx issued → verified pharmacists only (no patient, no medicines); push p
     assert.equal(push.length, 1);
     assert.equal(push[0].payload.title, "Prescription to dispense");
     await asApp(c);
-    const [p1] = (await c.query(`select id from claim_outbox(10) where tenant_id = $1 and channel = 'push'`, [x.t])).rows;
+    const [p1] = (await c.query(`select id from claim_outbox(200) where tenant_id = $1 and channel = 'push'`, [x.t])).rows;
     await c.query(`select complete_outbox($1, 'failed', 'gone (410)', true)`, [p1.id]);
     await asOwner(c);
     await rx("RX-N0002");
@@ -228,5 +228,20 @@ test("daily jobs: confirmed but never came → no-show; unreviewed requests rele
     assert.deepEqual([st[a1], st[a2], st[b1]], ["no_show", "cancelled", "requested"], "the other clinic untouched");
     const { rows: [m] } = await c.query(`select kind, payload from notification_outbox where ref_id = $1::text and channel = 'email'`, [a2]);
     assert.ok(!m || m.kind === "booking_declined", "a released request tells the requester (if they gave an email)");
+  });
+});
+
+test("outbox respects the clinic: closed → cancelled, suspended → waits, active → sent", async () => {
+  await withTx(async (c) => {
+    const a = await clinic(c), s = await clinic(c), z = await clinic(c);
+    for (const x of [a, s, z]) await c.query(`select queue_email($1, 'test_kind', 'test', $2, 'p@example.com', '{}'::jsonb)`, [x.t, x.t]);
+    await c.query(`update tenants set status = 'suspended' where id = $1`, [s.t]);
+    await c.query(`update tenants set status = 'closed' where id = $1`, [z.t]);
+    await asApp(c);
+    const got = (await c.query(`select tenant_id from claim_outbox(200) where tenant_id = any($1)`, [[a.t, s.t, z.t]])).rows.map((r) => r.tenant_id);
+    await asOwner(c);
+    assert.deepEqual(got, [a.t], "only the active clinic's message is claimed");
+    const st = Object.fromEntries((await c.query(`select tenant_id, status from notification_outbox where tenant_id = any($1)`, [[a.t, s.t, z.t]])).rows.map((r) => [r.tenant_id, r.status]));
+    assert.deepEqual([st[a.t], st[s.t], st[z.t]], ["sending", "pending", "cancelled"]);
   });
 });

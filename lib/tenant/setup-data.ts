@@ -124,9 +124,10 @@ export type ExceptionRow = {
   id: string; on_date: string; kind: "leave" | "extra" | "modified"; start_time: string | null; end_time: string | null;
   slot_minutes: number | null; max_tokens: number | null; reason: string | null;
 };
+const ktmDate = (d: Date) => new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Kathmandu" }).format(d);
 export async function getDoctorSchedule(tenantId: string, memberId: string) {
   const db = serviceClient();
-  const today = new Date().toISOString().slice(0, 10);
+  const today = ktmDate(new Date());
   const [s, e] = await Promise.all([
     db.from("doctor_schedules").select("id, weekday, start_time, end_time, slot_minutes, max_tokens, room, effective_from, effective_to")
       .eq("tenant_id", tenantId).eq("member_id", memberId).or(`effective_to.is.null,effective_to.gte.${today}`).order("weekday").order("start_time"),
@@ -140,7 +141,7 @@ export async function upcomingSlots(tenantId: string, memberId: string, days = 7
   const from = new Date();
   const to = new Date(from.getTime() + (days - 1) * 86_400_000);
   const { data, error } = await serviceClient().rpc("available_slots", {
-    p_tenant: tenantId, p_doctor: memberId, p_from: from.toISOString().slice(0, 10), p_to: to.toISOString().slice(0, 10),
+    p_tenant: tenantId, p_doctor: memberId, p_from: ktmDate(from), p_to: ktmDate(to),
   });
   if (error) throw new Error(`slots: ${error.message}`);
   return (data ?? []) as { slot_start: string; slot_end: string; mode: "slot" | "token"; capacity: number; room: string | null }[];
