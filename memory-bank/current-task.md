@@ -1,6 +1,6 @@
 # Current Task
 
-**Phase:** Phase 0 complete. **Phase 1 in progress:** U3a done (dashboard on real data, Billing, Audit log). Next: **U3b Patients**, then the gaps listed under "Phase 1 review".
+**Phase:** Phase 0 complete. **Phase 1 in progress:** U3 Admin done (U3a + U3b). Next from the Phase 1 review: **U4 registrar gaps** (top-bar patient search, dues at the desk, print receipt/token/Rx, reschedule).
 **Last updated:** 2026-11-20
 
 ## Phase 1 review (2026-11-21)
@@ -8,12 +8,20 @@ What each U milestone asks for (roadmap) against what the B milestones already b
 | Milestone | Already there | Still to do |
 |---|---|---|
 | U2 Marketing + Super Admin | landing, registration, applications, clinics (+ direct creation), plans | pricing from published plans and a contact page; Super Admin **Audit**, **Settings**, platform billing view, monitoring |
-| U3 Admin | setup + go-live, settings, staff/roles/devices, services, doctors/schedules, website, appointments, medicines, stock, purchases, vendors, expenses, finance, reports; **U3a: dashboard on real data, Billing, Audit log** | **Patients** (list, record, merge duplicates); reminder hours on Settings |
+| U3 Admin | setup + go-live, settings, staff/roles/devices, services, doctors/schedules, website, appointments, medicines, stock, purchases, vendors, expenses, finance, reports; **U3a: dashboard on real data, Billing, Audit log** ~~Patients~~ (U3b done; merging is P2, M-37); reminder hours on Settings |
 | U4 Registrar | today's board, register/search, book, check-in with OPD fee + token, queue, booking requests, live refresh | the top-bar patient search isn't wired; dues collection at the desk; print OPD receipt/token and Rx; reschedule from the desk |
 | U5 Doctor OPD | queue, call next, chart + allergies, consultation, e-Rx → pharmacy queue, live refresh | follow-up booking from the consultation; **my schedule and leave** (manage_own_leave exists, no leave data yet: needs a migration) |
 | U6 Pharmacy | dispensing queue, sale (FEFO, units, batch choice), bills, returns, void, dues, stock alerts, live refresh | barcode scan at the counter; stock tasks reachable from the pharmacy workspace for staff without Admin |
 | U7 Public site | site, doctors, services, slots, booking requests, status link | optional patient account; manage link in patient emails |
 | U8 PWA & polish | push opt-in, service worker | web app manifest + icons, install, offline gate, iOS standalone sign-in, idle lock, print layouts (OPD bill, token, Rx, GRN) |
+
+## U3b Patients: done (2026-11-21)
+| Item | Status |
+|---|---|
+| Migration 0050: patient_duplicate_candidates, clear_duplicate_flag | done |
+| Admin Patients: search, newest, possible duplicates; patient page: details (edit), duplicate check with matches and "different people", visits, appointments, bills, owed + Collect | done |
+| Checks | DB 100/100 · fresh replay of all 50 migrations ✓ · **end-to-end 165/165** · all earlier journeys ✓ · typecheck/lint/build ✓ · posture ✓ |
+| Not yet | merging records (M-37, P2) |
 
 ## U3a Admin dashboard, Billing, Audit log: done (2026-11-21)
 | Item | Status |

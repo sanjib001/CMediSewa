@@ -921,6 +921,20 @@ pinger at it every 5 minutes. Self-hosting can call the same routes from any sch
 
 ---
 
+## U3b Patients (2026-11-21)
+
+**D-120 Patients screen as built; duplicates are resolved, not merged.** Admin → Patients:
+search (name, phone, MRN), newest registrations, and a possible-duplicates list. A patient's
+page shows details (editable by `manage_patients`: demographics only, the MRN never changes;
+the audit records which fields changed, never the values), visits, appointments, bills and
+what is owed (with Collect); no clinical content. A flagged patient shows the matching
+records and why (same phone and first name, or same name and birth date); "they are different
+people" clears the flag (`clear_duplicate_flag`, `manage_patients`, audited with the note).
+Editing never re-flags. Combining two records of one person stays M-37 (P2: audited,
+reversible); until then the desk keeps using the older record.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |
