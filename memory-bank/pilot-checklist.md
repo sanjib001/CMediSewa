@@ -76,7 +76,6 @@ Automated tests check what the server sends; these need a real browser and print
 - Controlled/narcotic medicines can't be sold (P-22).
 - No patient accounts; patients use the private link in their email (D-134).
 - Opening patient dues from before go-live can't be entered yet (D-109).
-- Two records of one patient can't be merged yet; duplicates are flagged and resolved (M-37, Phase 2).
 - No SMS (P-05); online payments recorded manually (P-12); English only (P-13).
 - Emails go out nightly on Vercel Hobby (D-128).
 

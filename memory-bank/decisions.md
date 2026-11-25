@@ -1091,6 +1091,36 @@ until M-48 is built. Cash is reconciled per day (daily summary, cash book), not 
 
 ---
 
+## M-37 Patient merge (2026-11-25, Phase 2)
+
+**D-138 Two records of one person are combined by moving rows, recorded so it can be undone.**
+`merge_patients(tenant, kept, merged, by, reason)` (migration 0057, `manage_patients`) moves
+every row of the merged record to the kept one: appointments, visits, invoices, payments,
+sale returns, allergies, vitals, encounters, prescriptions, outside prescriptions and care
+grants. Each moved row is listed in `patient_merge_rows` (with the appointment's status at
+the time). The merged record gets `merged_into` + `deleted_at`, so every list, search, booking
+and check-in already treats it as gone; `search_patients` still finds the kept record by
+the merged record's MRN (old cards keep working). Locked rows (signed consultations, issued
+prescriptions, vitals) may change only their patient, and only between the two records of a
+merge in either direction (`patient_merge_move_ok`, data-based, no session flag); any other
+change is still refused. **Not moved:** `ledger_entries` (append-only journal; its patient
+column is never read by patient: dues come from invoices) and `audit_log` (history stays as it
+happened). Refused while the merged record is in today's queue (`MERGE_LIVE_VISIT`: a doctor
+may have its chart open) or when both have overlapping live bookings
+(`MERGE_APPOINTMENT_CLASH`). The kept record's demographics are not touched; staff copy
+missing details first. The kept record's duplicate flag clears once no other likely match is
+left. **Undo** (`undo_patient_merge`) moves exactly the listed rows back and unhides the record.
+Rows created on the kept record since then stay there, and so does an appointment whose
+status changed since the merge, so it stays with the visit it made. Undo is refused if the
+kept record was itself merged later (undo that first). A payment collected after the merge
+can end up allocated to a bill that moves back; allocations are by bill, so the books stay
+right. Both steps are audited against the kept patient. Screen: Admin → Patients → a patient:
+"Same person: combine" on each likely match, "Combine with another record" (by MRN, choose
+which to keep, a confirmation tick), "Combined records" with Undo; the merged record's page
+says where everything went.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |

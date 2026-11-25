@@ -76,7 +76,7 @@ the same MVP.
 | M-34 | Online payments | P2 | eSewa/Khalti/Fonepay (verify) for bookings, invoices, subscriptions (P-12) |
 | M-35 | Follow-ups & referrals | P2 | follow-up booking; referral grants (C4) |
 | M-36 | Daily summary email | P2 | HRestroSewa reporting-service shape |
-| M-37 | Patient merge | P2 | audited, reversible |
+| M-37 | Patient merge | P2 | audited, reversible: **done** (D-138) |
 | M-38 | Instant self-serve signup & trial | P2 | auto-provision on verification, trial plan |
 | M-39 | Subdomain / custom domain sites | P2 / F | `<slug>.<domain>`, then custom domains |
 | M-40 | Insurance (HIB/SSF) | F | verify eligibility and claim rules |

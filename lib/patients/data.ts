@@ -70,3 +70,33 @@ export async function getPatient(tenantId: string, id: string): Promise<PatientR
       .map((x) => ({ id: x.id, mrn: x.mrn, full_name: x.full_name, age: ageText(x.date_of_birth, x.age_years, x.created_at), phone: x.phone, why: x.why })),
   };
 }
+
+export type MergeInfo = { id: string; other_id: string; other_mrn: string; other_name: string; at: string; by: string; reason: string | null };
+
+/** Records combined into this one (not undone), newest first. */
+export async function patientMerges(tenantId: string, keptId: string): Promise<MergeInfo[]> {
+  const db = serviceClient();
+  const ms = rows<{ id: string; merged_patient_id: string; merged_at: string; merged_by: string; reason: string | null }>(
+    await db.from("patient_merges").select("id, merged_patient_id, merged_at, merged_by, reason").eq("tenant_id", tenantId).eq("kept_patient_id", keptId).is("undone_at", null).order("merged_at", { ascending: false }), "merges");
+  if (!ms.length) return [];
+  const [pts, mem] = await Promise.all([
+    db.from("patients").select("id, mrn, full_name").eq("tenant_id", tenantId).in("id", ms.map((m) => m.merged_patient_id)),
+    db.from("tenant_members").select("id, display_name").eq("tenant_id", tenantId).in("id", ms.map((m) => m.merged_by)),
+  ]);
+  const p = new Map(rows<{ id: string; mrn: string; full_name: string }>(pts, "patients").map((x) => [x.id, x]));
+  const by = new Map(rows<{ id: string; display_name: string }>(mem, "members").map((x) => [x.id, x.display_name]));
+  return ms.map((m) => ({ id: m.id, other_id: m.merged_patient_id, other_mrn: p.get(m.merged_patient_id)?.mrn ?? "", other_name: p.get(m.merged_patient_id)?.full_name ?? "",
+    at: m.merged_at, by: by.get(m.merged_by) ?? "", reason: m.reason }));
+}
+
+/** A record that was combined into another: where it went, and the merge that can be undone. */
+export async function mergedRecord(tenantId: string, id: string) {
+  const db = serviceClient();
+  const { data: p } = await db.from("patients").select("id, mrn, full_name, merged_into, merged_at").eq("tenant_id", tenantId).eq("id", id).not("merged_into", "is", null).maybeSingle();
+  if (!p) return null;
+  const [{ data: kept }, { data: m }] = await Promise.all([
+    db.from("patients").select("id, mrn, full_name, deleted_at").eq("tenant_id", tenantId).eq("id", p.merged_into).maybeSingle(),
+    db.from("patient_merges").select("id").eq("tenant_id", tenantId).eq("merged_patient_id", id).is("undone_at", null).maybeSingle(),
+  ]);
+  return { mrn: p.mrn as string, full_name: p.full_name as string, at: p.merged_at as string, kept: kept as { id: string; mrn: string; full_name: string; deleted_at: string | null } | null, mergeId: (m?.id as string | undefined) ?? null };
+}

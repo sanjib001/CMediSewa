@@ -1,8 +1,8 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { requireTenant, can } from "@/lib/auth/context";
-import { getPatient } from "@/lib/patients/data";
-import { clearDuplicate, updatePatient } from "@/app/actions/patients";
+import { getPatient, mergedRecord, patientMerges } from "@/lib/patients/data";
+import { clearDuplicate, mergePatients, undoPatientMerge, updatePatient } from "@/app/actions/patients";
 import { ActionForm, field, label } from "@/components/platform/action-form";
 import { CollectDues } from "@/components/pharmacy/bill-corrections";
 import { PageHeader, Panel } from "@/components/ui/primitives";
@@ -20,13 +20,21 @@ const when = (iso: string, time = true) => new Date(iso).toLocaleString("en-GB",
 
 // One patient's record (U3b): details (editable by manage_patients), the duplicate check,
 // visits, appointments, bills and what is owed. Clinical notes stay in the doctor's chart.
-export default async function Patient({ params }: { params: Promise<{ id: string }> }) {
+// Two records of one person can be combined (M-37) and the combination undone.
+export default async function Patient({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ combine?: string }> }) {
   const { id } = await params;
+  const { combine } = await searchParams;
   const ctx = await requireTenant({ operation: "admin.area", permission: "view_patients", allowPendingTenant: true, next: `/admin/patients/${id}` });
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const p = await getPatient(ctx.tenantId, id);
-  if (!p) notFound();
+  if (!p) {
+    const m = await mergedRecord(ctx.tenantId, id);
+    if (!m) notFound();
+    return <MergedAway id={id} m={m} edit={can(ctx, "manage_patients")} />;
+  }
   const edit = can(ctx, "manage_patients"), bills = can(ctx, "view_billing");
+  const merges = await patientMerges(ctx.tenantId, id);
+  const otherMrn = /^\d{1,6}$/.test(combine ?? "") ? combine!.padStart(6, "0") : "";
   return (
     <>
       <PageHeader title={p.full_name} subtitle={<><Link href="/admin/patients" className="text-pine hover:underline">Patients</Link> / MRN {p.mrn}, {p.age} {SEX[p.sex]}, registered {when(p.created_at, false)}{p.created_via === "online" ? " from the website" : ""}</>} />
@@ -34,9 +42,10 @@ export default async function Patient({ params }: { params: Promise<{ id: string
         <section aria-label="Possible duplicate" className="mb-6 rounded-panel border border-warn/50 bg-surface p-5">
           <h2 className="font-semibold">This may be the same person as another record</h2>
           {p.candidates.length ? <ul className="mt-2 space-y-1">{p.candidates.map((c) => (
-            <li key={c.id}><Link href={`/admin/patients/${c.id}`} className="text-pine hover:underline">{c.full_name}</Link> <span className="text-sm text-ink-soft">MRN {c.mrn}, {c.age}{c.phone ? `, ${c.phone}` : ""} ({c.why})</span></li>))}</ul>
+            <li key={c.id}><Link href={`/admin/patients/${c.id}`} className="text-pine hover:underline">{c.full_name}</Link> <span className="text-sm text-ink-soft">MRN {c.mrn}, {c.age}{c.phone ? `, ${c.phone}` : ""} ({c.why})</span>
+              {edit ? <> · <Link href={`/admin/patients/${p.id}?combine=${c.mrn}#combine`} className="text-sm text-pine hover:underline">Same person: combine</Link></> : null}</li>))}</ul>
             : <p className="mt-2 text-sm text-ink-soft">The matching record has since changed or been removed.</p>}
-          <p className="mt-3 text-sm text-ink-soft">If they are different people (for example family members sharing a phone), mark it so the desk stops warning. Combining two records of the same person comes in a later release; until then, keep using the older record.</p>
+          <p className="mt-3 text-sm text-ink-soft">If it is the same person, combine the two records. If they are different people (for example family members sharing a phone), mark it so the desk stops warning.</p>
           {edit ? <ActionForm action={clearDuplicate} submitLabel="They are different people" tone="secondary" className="mt-3">
             <input type="hidden" name="id" value={p.id} />
             <label className="block"><span className={label}>Note (optional)</span><input name="note" maxLength={200} className={field} placeholder="e.g. Mother and daughter, same phone" /></label>
@@ -72,6 +81,37 @@ export default async function Patient({ params }: { params: Promise<{ id: string
               </dl>
             )}
           </Panel>
+          {edit ? (
+            <section id="combine" aria-label="Combine with another record" className="scroll-mt-6">
+              <Panel title="Combine with another record">
+                <p className="mb-3 text-sm text-ink-soft">For the same person registered twice. Visits, appointments, bills, payments, allergies, vitals, consultations and prescriptions all move to the record you keep; the other record&apos;s MRN still finds them. It can be undone.</p>
+                <ActionForm key={otherMrn} action={mergePatients} submitLabel="Combine records" tone="danger" confirm="Combine these two records into one? Everything moves to the record you keep.">
+                  <input type="hidden" name="id" value={p.id} />
+                  <label className="block"><span className={label}>MRN of the other record</span><input name="other_mrn" required inputMode="numeric" pattern="[0-9]{1,6}" maxLength={6} defaultValue={otherMrn} className={field} placeholder="e.g. 000123" /></label>
+                  <fieldset><legend className={label}>Keep</legend>
+                    <div className="flex flex-wrap gap-x-5 gap-y-1">
+                      <label className="flex items-center gap-2"><input type="radio" name="keep" value="this" defaultChecked={!otherMrn || otherMrn > p.mrn} /> This record (MRN {p.mrn})</label>
+                      <label className="flex items-center gap-2"><input type="radio" name="keep" value="other" defaultChecked={!!otherMrn && otherMrn < p.mrn} /> The other record</label>
+                    </div>
+                    <span className="mt-1 block text-xs text-ink-soft">Usually the older record (lower MRN). The kept record&apos;s details stay; copy anything missing from the other first.</span>
+                  </fieldset>
+                  <label className="block"><span className={label}>Reason (optional)</span><input name="reason" maxLength={200} className={field} placeholder="e.g. Registered again at the desk" /></label>
+                  <label className="flex items-start gap-2 text-sm"><input type="checkbox" name="confirm" value="yes" required className="mt-1" /> I have checked these are the same person.</label>
+                </ActionForm>
+              </Panel>
+            </section>
+          ) : null}
+          {merges.length ? (
+            <Panel title="Combined records" flush>
+              <ul className="divide-y divide-line">{merges.map((m) => (
+                <li key={m.id} className="px-5 py-3">
+                  <p><Link href={`/admin/patients/${m.other_id}`} className="text-pine hover:underline">MRN {m.other_mrn}</Link> {m.other_name} <span className="text-sm text-ink-soft">combined {when(m.at)}{m.by ? ` by ${m.by}` : ""}{m.reason ? ` (${m.reason})` : ""}</span></p>
+                  {edit ? <ActionForm action={undoPatientMerge} submitLabel="Undo" tone="secondary" className="mt-2" confirm={`Separate MRN ${m.other_mrn} again? Its own records move back to it.`}>
+                    <input type="hidden" name="id" value={p.id} /><input type="hidden" name="merge" value={m.id} />
+                  </ActionForm> : null}
+                </li>))}</ul>
+            </Panel>
+          ) : null}
           {p.owed > 0 ? (
             <Panel title={`Owes ${npr(p.owed)}`}>
               <p className="mb-3 text-sm text-ink-soft">Payments clear the oldest bill first.</p>
@@ -105,6 +145,26 @@ export default async function Patient({ params }: { params: Promise<{ id: string
           </Panel>
         </div>
       </div>
+    </>
+  );
+}
+
+function MergedAway({ id, m, edit }: { id: string; m: NonNullable<Awaited<ReturnType<typeof mergedRecord>>>; edit: boolean }) {
+  return (
+    <>
+      <PageHeader title={m.full_name} subtitle={<><Link href="/admin/patients" className="text-pine hover:underline">Patients</Link> / MRN {m.mrn}</>} />
+      <section aria-label="Combined record" className="rounded-panel border border-line bg-surface p-5">
+        <h2 className="font-semibold">This record was combined into another</h2>
+        <p className="mt-2">
+          {m.kept && !m.kept.deleted_at ? <>Everything is now on <Link href={`/admin/patients/${m.kept.id}`} className="text-pine hover:underline">{m.kept.full_name} (MRN {m.kept.mrn})</Link>.</> : <>Everything moved on to the record it was combined into, which has since been combined again.</>}
+          <span className="block text-sm text-ink-soft">Combined {when(m.at)}.</span>
+        </p>
+        {edit && m.mergeId && m.kept && !m.kept.deleted_at ? (
+          <ActionForm action={undoPatientMerge} submitLabel="Undo: make them separate again" tone="secondary" className="mt-3" confirm={`Separate MRN ${m.mrn} again? Its own records move back to it.`}>
+            <input type="hidden" name="id" value={id} /><input type="hidden" name="merge" value={m.mergeId} />
+          </ActionForm>
+        ) : null}
+      </section>
     </>
   );
 }

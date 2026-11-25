@@ -313,7 +313,7 @@ issued prescription appears in the pharmacy, within seconds.
 | Menu | Use it to |
 |---|---|
 | **Dashboard** | Today: patients booked/registered/waiting/seen, cash and online received, owed by patients, owed to vendors, alerts. |
-| **Patients** | Search, open a patient (visits, appointments, bills), edit details, resolve duplicate flags. |
+| **Patients** | Search, open a patient (visits, appointments, bills), edit details, resolve duplicate flags, **combine two records of the same person** (and undo it). |
 | **Appointments** | All bookings by day and doctor. |
 | **Purchases** | **New purchase**: enter the supplier's bill (batches, expiry, cost, MRP, free qty, discount, VAT); pay now or on credit. **Orders** (purchase orders), **Returns** to the vendor, void a purchase. |
 | **Vendors** | Supplier list, what you owe each, **record payments** against bills, payables check. |
@@ -324,6 +324,18 @@ issued prescription appears in the pharmacy, within seconds.
 | **Reports** | Stock, batch history, expiry, sales register, item sales, purchase register, cash book. Each can be filtered by dates and store, and downloaded as a spreadsheet (**Download CSV**, asks for your authenticator code and is logged). |
 | **Audit log** | Who did what and when, including who opened patient records. |
 | **Notifications** | Prescriptions to dispense, stock needing attention, booking requests, leave notices. Turn on push for this device to get them when the app is closed. |
+
+**Same patient registered twice.** Open either record in **Patients**. A flagged record lists
+the likely match, with a **Same person: combine** link; otherwise use **Combine with another
+record** and type the other MRN. Choose which record to keep (usually the older one, with the
+lower MRN), tick "I have checked these are the same person" and press **Combine records**.
+Visits, appointments, bills, payments, allergies, vitals, consultations and prescriptions all
+move to the kept record. The other record disappears from lists, but searching its MRN still
+finds the person, so an old card keeps working. The kept record's own details stay, so copy
+anything missing (an email, a second phone) before you combine. You can't combine while the
+record is in today's queue, or while both records have a booking at the same time. A mistake
+can be undone with **Undo** under **Combined records**: the moved records go back. Both steps
+are recorded in the audit log, and you need the **manage patients** permission for either.
 
 ---
 
@@ -352,7 +364,6 @@ issued prescription appears in the pharmacy, within seconds.
 - **Email** goes out once a night on the current hosting plan, and only after a mail service is
   connected; until then it runs "dry" (nothing is sent).
 - **No SMS** for now. **Online payments** are recorded manually (eSewa/Khalti/Fonepay reference).
-- **Two records of the same patient can't be merged yet**; duplicates are flagged.
 - **Patient dues from before go-live** can't be entered yet.
 - **English only** for now.
 - **Lab** comes in Phase 3.

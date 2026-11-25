@@ -189,8 +189,9 @@ CROSS      audit_log   notifications   push_subscriptions   notification_outbox 
 - **patients**: `id, tenant_id, mrn (unique per tenant, trigger-stamped), full_name,
   full_name_ne, sex, date_of_birth | age_years_at_registration, phone, alt_phone, email,
   address, guardian_name/relation, blood_group, created_via (desk|online), possible_duplicate
-  bool, deleted_at`. Per-tenant identity (D-20). Duplicate detection runs on phone + name +
-  age.
+  bool, deleted_at, merged_into, merged_at`. Per-tenant identity (D-20). Duplicate detection runs on phone + name +
+  age. **patient_merges** + **patient_merge_rows** record each combination and exactly which
+  rows moved, so it can be undone (M-37, D-138).
 - **patient_allergies**, **patient_conditions**, **consents** (`kind, given_at, method,
   withdrawn_at`; consent text versioned, P-10).
 - **patient_accounts**: per tenant (D-31): `id, tenant_id, email, phone, display_name,

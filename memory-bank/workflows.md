@@ -106,7 +106,9 @@ on that device are revoked. Audit `device.revoke`.
 On create, a trigger stamps the MRN and consent is recorded.
 **Online, guest:** the booking (W-08) matches or creates the patient by phone + name + age.
 A fuzzy match is never auto-merged. It is flagged `possible_duplicate` for reception to
-resolve at check-in.
+resolve at check-in. Admin → Patients either clears the flag (different people) or combines
+the two records (`merge_patients`, M-37, D-138): everything moves to the kept record, the
+other hides and its MRN still finds the person; `undo_patient_merge` reverses it.
 **Online, optional account:**
 1. The patient chooses **Create account / Sign in** on `/c/<slug>` and enters an email (or
    phone once P-05/P-20 allow). **RPC `issue_patient_otp`** is rate-limited, sends a 6-digit

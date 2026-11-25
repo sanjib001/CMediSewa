@@ -1,20 +1,21 @@
 # Current Task
 
-## ▶ Resume here (handoff, 2026-11-21)
+## ▶ Resume here (handoff, 2026-11-25)
 Read this section first in every new conversation, then `decisions.md` (latest D-numbers) and
 `pilot-checklist.md`.
 
 **Where we are**
-- Phase 0 (backend B0–B9) and Phase 1 (screens U1–U8) are **complete and committed**. 56
-  migrations (last `20261120105500_doctor_names.sql`), decisions D-01…D-137.
+- Phase 0 (backend B0–B9) and Phase 1 (screens U1–U8) are **complete and committed**.
+- Phase 2: **M-37 patient merge done** (2026-11-25; the owner commits it). 57 migrations (last
+  `20261125100000_patient_merge.sql`, applied to dev), decisions D-01…D-138.
 - Owner-facing guide: `docs/guides/setup-and-user-guide.md` + `CMediSewa-Setup-and-User-Guide.pdf`
   (Super Admin setup, clinic setup in order, daily work, limits). Keep it in step with the app;
   rebuild the PDF with `.local-tools/ui/guide-pdf.mjs`.
 - Last fixes: idle lock covers the whole window, phone-width layouts, "Dr. Dr." names (D-135);
   medicine save accepts "500mg" / "1,000" and names the bad field (`app/actions/inventory.ts`).
 
-**Next step: Phase 2, starting with M-37 patient merge** (the owner was about to say "next").
-Phase 2 as trimmed by the owner: M-37 patient merge · M-52 patient advances · M-51 bulk recall ·
+**Next step: M-52 patient advances** (deposits held for a patient, used against later bills).
+Phase 2 as trimmed by the owner: ~~M-37 patient merge~~ · M-52 patient advances · M-51 bulk recall ·
 M-46 purchase suggestions · M-45 stock reservations · Nepali UI · later online payments, patient
 documents, subdomains. **Dropped to Future:** SMS M-32 (D-136), controlled-drug register M-48 and
 cashier shifts M-47 (D-137). Controlled/narcotic items stay blocked from sale.
@@ -39,7 +40,8 @@ cashier shifts M-47 (D-137). Controlled/narcotic items stay blocked from sale.
 **Testing and tools**
 - Local tools in `.local-tools/` (not committed; excluded in `.git/info/exclude`):
   `q.mjs` (SQL on dev: `node --env-file=.env.local .local-tools/q.mjs "select …"`), `reapply2.mjs`,
-  `e2e-pilot.mjs` + `e2e-ui-body.mjs` (full journey + browser pass), `seed-demo-day.mjs`,
+  `e2e-pilot.mjs` + `e2e-ui-body.mjs` (full journey + browser pass; on a production build run
+  `E2E_BASE=http://localhost:3100 node --env-file=.env.local .local-tools/e2e-pilot.mjs`), `seed-demo-day.mjs`,
   `purge-test-clinics.mjs` / `purge-test-admins.mjs` (dry run unless `--apply`), `try-item.mjs`,
   `ui/guide-pdf.mjs` (Markdown → PDF), `pglite/server.mjs` (fresh-replay DB). Reinstall packages
   next to them: `npm i playwright-core@1.49.1 marked@12.0.2` in `ui/`, and `npm i` in `pglite/`.
@@ -53,7 +55,15 @@ cashier shifts M-47 (D-137). Controlled/narcotic items stay blocked from sale.
 ---
 
 **Phase:** Phase 0 and Phase 1 complete. **Pilot preparation:** work through `memory-bank/pilot-checklist.md` (decisions, production setup, email, clinic setup, real-device pass, dry run).
-**Last updated:** 2026-11-21
+**Last updated:** 2026-11-25
+
+## M-37 Patient merge: done (2026-11-25)
+| Item | Status |
+|---|---|
+| Migration 0057: patients.merged_into/merged_at, patient_merges, patient_merge_rows, merge_patients, undo_patient_merge, merge-only exception in the locked-row triggers (encounters, prescriptions, vitals), old MRN still found by search_patients | done |
+| Admin → Patients → patient: "Same person: combine" on each match, "Combine with another record" (MRN, which to keep, confirmation), "Combined records" with Undo; a merged record's page says where everything went; guide updated (E4) | done |
+| Checks | DB **112/112** (5 new) · fresh replay of all 57 migrations + posture ✓ · **E2E 235/235 on a production build** incl. combine and undo in headless Chrome, phone width · typecheck/lint/build ✓ · posture ✓ · test clinics purged |
+| Not moved on purpose | ledger_entries (append-only, never read by patient), audit_log (D-138) |
 
 ## Phase 1 review (2026-11-21)
 What each U milestone asks for (roadmap) against what the B milestones already built.
