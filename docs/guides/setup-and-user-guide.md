@@ -322,8 +322,8 @@ issued prescription appears in the pharmacy, within seconds.
 | **Patients** | Search, open a patient (visits, appointments, bills), edit details, resolve duplicate flags, **combine two records of the same person** (and undo it), the patient's **advance** (take, use, give back). |
 | **Appointments** | All bookings by day and doctor. |
 | **Purchases** | **New purchase**: enter the supplier's bill (batches, expiry, cost, MRP, free qty, discount, VAT); pay now or on credit. **Orders** (purchase orders), **Returns** to the vendor, void a purchase. |
-| **Vendors** | Supplier list, what you owe each, **record payments** against bills, payables check. |
-| **Stock & stores** | Needs attention (low, expiring, expired), on the shelf, **transfers**, **counts**, **reorder** list, **dispose** expired or damaged stock, opening stock, **Recalls**. |
+| **Vendors** | Supplier list, what you owe each, **record payments** against bills, payables check. If you paid ahead or have unused credit notes, the vendor page shows **Credit with this vendor** and **Use … of credit** on the bills you owe, oldest first. |
+| **Stock & stores** | Needs attention (low, expiring, expired), on the shelf, **transfers**, **counts**, **reorder** list, **dispose** expired or damaged stock, opening stock, **found stock** (a batch on the shelf with no lot on file: batch, expiry, cost, MRP), **Recalls**. Each medicine can have its own **levels per store** (Medicines → the item). |
 | **Billing** | Every bill; open, print, see returns and payments. |
 | **Expenses** | Record expenses (electricity, rent, salaries, transport…) paid in cash or online; reverse a mistake. |
 | **Finance** | Profit and loss for any period, money in and out, cash and bank balances, expenses by category, the nightly **books check**, opening cash and bank. |

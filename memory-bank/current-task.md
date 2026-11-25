@@ -8,17 +8,19 @@ Read this section first in every new conversation, then `decisions.md` (latest D
 - Phase 0 (backend B0–B9) and Phase 1 (screens U1–U8) are **complete and committed**.
 - Phase 2: M-37 patient merge, M-52 patient advances, M-51 bulk recall committed.
 - **Pharmacy track (owner, D-142): finish the pharmacy completely, then the UI.** Step 1
-  (counter and dispensing gaps, D-141) done 2026-11-25; the owner commits it. 60 migrations
-  (last `20261125130000_pharmacy_gaps.sql`, applied to dev), decisions D-01…D-142.
+  (counter and dispensing gaps, D-141) committed; step 2 (purchasing gaps, D-143) done
+  2026-11-25, the owner commits it. 61 migrations (last `20261125140000_purchasing_gaps.sql`,
+  applied to dev), decisions D-01…D-143.
 - Owner-facing guide: `docs/guides/setup-and-user-guide.md` + `CMediSewa-Setup-and-User-Guide.pdf`
   (Super Admin setup, clinic setup in order, daily work, limits). Keep it in step with the app;
   rebuild the PDF with `.local-tools/ui/guide-pdf.mjs`.
 - Last fixes: idle lock covers the whole window, phone-width layouts, "Dr. Dr." names (D-135);
   medicine save accepts "500mg" / "1,000" and names the bad field (`app/actions/inventory.ts`).
 
-**Next step: pharmacy track step 2, purchasing gaps:** apply a vendor's advance and unused
-credit notes to later bills; per-store reorder levels on screen; a "found stock" screen. Then
-step 3 M-46, step 4 M-45, step 5 M-49, step 6 substitutes (D-142), then the UI.
+**Next step: pharmacy track step 3, M-46 purchase suggestions and supplier performance**
+(sales speed × the vendor's delivery time per store, one-click draft orders per vendor,
+supplier fill rate, on-time rate, returns, price trend, shelf life at receipt, a PO approval
+limit). Then step 4 M-45, step 5 M-49, step 6 substitutes (D-142), then the UI.
 Phase 2 as trimmed by the owner: ~~M-37 patient merge~~ · ~~M-52 patient advances~~ · ~~M-51 bulk recall~~ ·
 M-46 purchase suggestions · M-45 stock reservations · Nepali UI · later online payments, patient
 documents, subdomains. **Dropped to Future:** SMS M-32 (D-136), controlled-drug register M-48 and
@@ -60,6 +62,13 @@ cashier shifts M-47 (D-137). Controlled/narcotic items stay blocked from sale.
 
 **Phase:** Phase 0 and Phase 1 complete. **Pilot preparation:** work through `memory-bank/pilot-checklist.md` (decisions, production setup, email, clinic setup, real-device pass, dry run).
 **Last updated:** 2026-11-25
+
+## Pharmacy step 2, purchasing gaps: done (2026-11-25)
+| Item | Status |
+|---|---|
+| Migration 0061: apply_vendor_credit (payments and credit notes → open bills, oldest first, one posting); post_stock_adjustment makes found lots properly (capital batch, expiry for medicines, MRP and sale price) | done |
+| Vendor page "Credit with this vendor" + Use credit; Medicines → item "Levels per store"; Stock "Found stock" form; guide updated (E4) | done |
+| Checks | DB **129/129** (2 new) · fresh replay of all 61 migrations + posture ✓ · **E2E 285/285 on a production build** incl. found stock in headless Chrome · typecheck/lint/build ✓ · posture ✓ · test clinics purged |
 
 ## Pharmacy step 1, counter and dispensing gaps: done (2026-11-25)
 | Item | Status |

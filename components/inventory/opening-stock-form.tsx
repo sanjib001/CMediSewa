@@ -11,7 +11,7 @@ const small = "w-full rounded-control border border-line-strong bg-surface px-2 
 type Row = { item: ItemRow | null; unit_id: string; qty: string; batch_no: string; expiry_date: string; unit_cost: string; mrp: string; override_reason: string };
 const blank = (): Row => ({ item: null, unit_id: "", qty: "", batch_no: "", expiry_date: "", unit_cost: "", mrp: "", override_reason: "" });
 
-function ItemPicker({ onPick }: { onPick: (i: ItemRow) => void }) {
+export function ItemPicker({ onPick }: { onPick: (i: ItemRow) => void }) {
   const [q, setQ] = useState("");
   const [list, setList] = useState<ItemRow[]>([]);
   useEffect(() => {

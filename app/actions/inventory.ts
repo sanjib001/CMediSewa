@@ -204,7 +204,7 @@ export async function moveToQuarantine(input: { fromStoreId: string; batchId: st
   return { ok: true, message: "Moved to quarantine." };
 }
 
-export type AdjustLine = { batch_id?: string; qty_base?: number; item_id?: string; unit_id?: string; qty?: number | string; batch_no?: string; expiry_date?: string; unit_cost?: number | string };
+export type AdjustLine = { batch_id?: string; qty_base?: number; item_id?: string; unit_id?: string; qty?: number | string; batch_no?: string; expiry_date?: string; unit_cost?: number | string; mrp?: number | string; sale_price?: number | string };
 export async function adjustStock(input: { idempotencyKey: string; storeId: string; reason: string; note?: string; lines: AdjustLine[] }): Promise<R> {
   const ctx = await stockPost("manage_stock");
   const r = await rpc("post_stock_adjustment", { p_tenant: ctx.tenantId, p_idempotency_key: input.idempotencyKey, p_store: input.storeId, p_reason: input.reason,
@@ -293,4 +293,32 @@ export async function recallBatch(input: { itemId: string; batchNo: string; reas
   refresh(); revalidatePath("/admin/stock/recalls");
   const d = r.data as { recall_id: string; lots: number; bills: number };
   return { ok: true, id: d.recall_id, message: `Recalled: ${d.lots} lot${d.lots === 1 ? "" : "s"}, sold on ${d.bills} bill${d.bills === 1 ? "" : "s"}.` };
+}
+
+// ── Pharmacy track step 2 (D-143): per-store stock levels for an item ─────────
+/** Set (or clear, when all are blank) one store's min / reorder / max for an item, in base units. */
+export async function saveStoreLevels(fd: FormData): Promise<{ ok: true; message: string } | Fail> {
+  const itemId = String(fd.get("item_id") ?? ""), storeId = String(fd.get("store_id") ?? "");
+  const ctx = await requireTenant({ operation: "admin.area", permission: "manage_items", allowPendingTenant: true, next: `/admin/medicines/${itemId}` });
+  if (!UUID.test(itemId) || !UUID.test(storeId)) return { ok: false, error: "Reload the page and try again." };
+  const n = (k: string) => { const v = String(fd.get(k) ?? "").replace(/,/g, "").trim(); return v === "" ? null : Number(v); };
+  const min = n("min"), reorder = n("reorder"), max = n("max");
+  if ([min, reorder, max].some((v) => v !== null && (!Number.isFinite(v) || v < 0))) return { ok: false, error: "Use plain numbers of 0 or more." };
+  if (max === 0) return { ok: false, error: "The maximum must be more than 0, or blank." };
+  if (min !== null && reorder !== null && reorder < min) return { ok: false, error: "Reorder at should be at least the minimum." };
+  if (max !== null && reorder !== null && max < reorder) return { ok: false, error: "The maximum should be at least the reorder level." };
+  const db = serviceClient();
+  const [{ data: st }, { data: it }] = await Promise.all([
+    db.from("stores").select("id").eq("tenant_id", ctx.tenantId).eq("id", storeId).maybeSingle(),
+    db.from("inventory_items").select("id").eq("tenant_id", ctx.tenantId).eq("id", itemId).maybeSingle(),
+  ]);
+  if (!st || !it) return { ok: false, error: "Reload the page and try again." };
+  const { error } = min === null && reorder === null && max === null
+    ? await db.from("store_item_levels").delete().eq("tenant_id", ctx.tenantId).eq("store_id", storeId).eq("item_id", itemId)
+    : await db.from("store_item_levels").upsert({ tenant_id: ctx.tenantId, store_id: storeId, item_id: itemId, min_stock_level: min, reorder_level: reorder, max_stock_level: max }, { onConflict: "store_id,item_id" });
+  if (error) return { ok: false, error: "Couldn't save. Nothing was changed." };
+  await audit({ tenantId: ctx.tenantId, actorKind: "member", actorId: ctx.memberId, sessionLevel: ctx.level, action: "item.store_levels", targetType: "inventory_item", targetId: itemId,
+    detail: { store: storeId, min, reorder, max } });
+  refresh();
+  return { ok: true, message: min === null && reorder === null && max === null ? "Cleared: this store uses the item's own levels." : "Saved for this store." };
 }

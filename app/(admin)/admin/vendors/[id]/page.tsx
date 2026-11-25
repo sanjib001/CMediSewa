@@ -3,7 +3,7 @@ import { notFound } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { requireTenant, can } from "@/lib/auth/context";
 import { listPurchases, listVendorPayments, listVendors, vendorStatement } from "@/lib/purchasing/data";
-import { payVendor, postVendorOpening, saveVendor } from "@/app/actions/purchasing";
+import { applyVendorCredit, payVendor, postVendorOpening, saveVendor } from "@/app/actions/purchasing";
 import { ActionForm, field, label } from "@/components/platform/action-form";
 import { ButtonLink, PageHeader, Panel } from "@/components/ui/primitives";
 
@@ -68,6 +68,14 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
         </div>
 
         <div className="space-y-6">
+          {can(ctx, "pay_vendors") && v.advance > 0 ? (
+            <Panel title={`Credit with this vendor: ${npr(v.advance)}`}>
+              <p className="mb-3 text-sm text-ink-soft">Money paid ahead and unused credit notes. {v.payable > 0 ? `Use it on the ${npr(v.payable)} you owe, oldest bill first.` : "It will be available when the next bill comes in on credit."}</p>
+              {v.payable > 0 ? <ActionForm action={applyVendorCredit} submitLabel={`Use ${npr(Math.min(v.advance, v.payable))} of credit`}>
+                <input type="hidden" name="vendor_id" value={v.id} /><input type="hidden" name="key" value={randomUUID()} />
+              </ActionForm> : null}
+            </Panel>
+          ) : null}
           {can(ctx, "pay_vendors") ? (
             <Panel title="Pay this vendor" aside={<span className="text-sm text-ink-faint">Oldest bills first</span>}>
               <ActionForm action={payVendor} submitLabel="Record payment">

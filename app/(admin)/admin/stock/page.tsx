@@ -4,6 +4,7 @@ import { getAlerts, listItems, listStores, packText, stockInStore } from "@/lib/
 import { AlertList } from "@/components/inventory/alert-list";
 import { serviceClient } from "@/lib/supabase/service";
 import { OpeningStockForm } from "@/components/inventory/opening-stock-form";
+import { FoundStockForm } from "@/components/inventory/found-stock-form";
 import { StoreAccess } from "@/components/inventory/store-access";
 import { LotActions } from "@/components/inventory/lot-actions";
 import { DisposalForm } from "@/components/inventory/disposal-form";
@@ -104,9 +105,15 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
         ) : null}
 
         {canPost && store.kind !== "quarantine" ? (
-          <Panel title="Opening stock" aside={<span className="text-sm text-ink-faint">Day-one stock, lot by lot. Purchases come in B6.</span>}>
+          <Panel title="Opening stock" aside={<span className="text-sm text-ink-faint">Day-one stock, lot by lot. Later stock comes in through Purchases.</span>}>
             {items.length === 0 ? <p className="text-ink-soft">Add your items first in <Link href="/admin/medicines" className="text-pine underline">Medicines</Link>.</p>
               : <OpeningStockForm storeId={store.id} storeName={store.name} />}
+          </Panel>
+        ) : null}
+
+        {canPost && store.kind !== "quarantine" && items.length ? (
+          <Panel title="Found stock" aside={<span className="text-sm text-ink-faint">A batch on the shelf with no lot on file</span>}>
+            <FoundStockForm storeId={store.id} />
           </Panel>
         ) : null}
 

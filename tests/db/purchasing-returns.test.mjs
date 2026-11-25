@@ -165,3 +165,57 @@ test("ISOLATION: orders and returns can't use another clinic's vendor, store, it
     await asOwner(c);
   });
 });
+
+// ── Pharmacy track step 2 (D-143): vendor credit used on later bills, found stock as a proper lot ──
+test("vendor credit: an overpayment and an unused credit note pay later bills, oldest first; payables still reconcile", async () => {
+  await withTx(async (c) => {
+    const x = await setup(c);
+    await asApp(c);
+    const b1 = (await bill(c, x, { no: "VC-1" })).rows[0].id;                         // 460.50 on credit
+    await c.query(`select post_vendor_payment($1, $2, $3, 600, 0, null, null, null, null, $4, 'A2', null)`, [x.t, uuid(), x.vendor, x.admin]);
+    const owed = async (b) => Number((await c.query(`select purchase_outstanding($1) o`, [b])).rows[0].o);
+    assert.equal(await owed(b1), 0);
+    const adv = async () => Number((await c.query(`select advance::numeric a from vendor_balances($1) where vendor_id = $2`, [x.t, x.vendor])).rows[0].a);
+    assert.equal(await adv(), 139.5, "600 − 460.50 held as an advance");
+    await expectError(c, `select apply_vendor_credit($1, $2, $3, $4, 'A2', null)`, [x.t, uuid(), x.vendor, x.admin], /NOTHING_TO_APPLY/);
+    // a credit note with no bill to settle adds to the credit
+    const { rows: [l1] } = await c.query(`select batch_id from purchase_invoice_lines where purchase_id = $1`, [b1]);
+    await c.query(`select post_purchase_return($1, $2, $3, $4, null, 'credit_note', null, null, $5, $6, 'A2', null)`,
+      [x.t, uuid(), x.vendor, x.store, JSON.stringify([{ batch_id: l1.batch_id, qty_base: 20, reason: "damaged" }]), x.admin]);
+    assert.equal(await adv(), 314.14, "plus the 174.64 credit note");
+    const b2 = (await bill(c, x, { no: "VC-2", cash: 700 })).rows[0].id;              // 260.50 on credit
+    const b3 = (await bill(c, x, { no: "VC-3", cash: 700 })).rows[0].id;              // 260.50 on credit
+    await expectError(c, `select apply_vendor_credit($1, $2, $3, $4, 'A2', null)`, [x.t, uuid(), x.vendor, x.pharmacist], /NO_PERMISSION/);
+    await expectError(c, `select apply_vendor_credit($1, $2, $3, $4, 'A1', null)`, [x.t, uuid(), x.vendor, x.admin], /PASSWORD_REQUIRED/);
+    const key = uuid();
+    const r = (await c.query(`select apply_vendor_credit($1, $2, $3, $4, 'A2', null) r`, [x.t, key, x.vendor, x.admin])).rows[0].r;
+    assert.deepEqual([Number(r.applied), r.bills], [314.14, 2]);
+    assert.equal((await c.query(`select apply_vendor_credit($1, $2, $3, $4, 'A2', null) r`, [x.t, key, x.vendor, x.admin])).rows[0].r.replayed, true);
+    assert.deepEqual([await owed(b2), await owed(b3)], [0, 206.86], "the older bill is cleared first");
+    assert.equal(await adv(), 0);
+    const { rows: [bal] } = await c.query(`select payable::numeric p from vendor_balances($1) where vendor_id = $2`, [x.t, x.vendor]);
+    assert.equal(Number(bal.p), 206.86);
+    assert.equal((await c.query(`select reconcile_vendor_payables($1) r`, [x.t])).rows[0].r.mismatches, 0, "documents and journal agree");
+    await asOwner(c);
+    assert.equal((await c.query(`select count(*)::int n from audit_log where tenant_id = $1 and action = 'vendor.credit_applied'`, [x.t])).rows[0].n, 1);
+  });
+});
+
+test("found stock: a proper lot (capital batch, expiry needed for medicines, MRP and sale price)", async () => {
+  await withTx(async (c) => {
+    const x = await setup(c);
+    await asApp(c);
+    const found = (line) => c.query(`select post_stock_adjustment($1, $2, $3, 'found', 'Behind the shelf', $4, $5, 'A2', null) id`,
+      [x.t, uuid(), x.store, JSON.stringify([{ item_id: x.item, unit_id: x.u.strip, qty: 2, unit_cost: 80, ...line }]), x.admin]);
+    await expectError(c, `select post_stock_adjustment($1, $2, $3, 'found', null, $4, $5, 'A2', null)`,
+      [x.t, uuid(), x.store, JSON.stringify([{ item_id: x.item, unit_id: x.u.strip, qty: 1, unit_cost: 80, batch_no: "x1" }]), x.admin], /EXPIRY_REQUIRED/);
+    await expectError(c, `select post_stock_adjustment($1, $2, $3, 'found', null, $4, $5, 'A2', null)`,
+      [x.t, uuid(), x.store, JSON.stringify([{ item_id: x.item, unit_id: x.u.strip, qty: 1, unit_cost: 80, expiry_date: d(300) }]), x.admin], /BATCH_REQUIRED/);
+    await expectError(c, `select post_stock_adjustment($1, $2, $3, 'found', null, $4, $5, 'A2', null)`,
+      [x.t, uuid(), x.store, JSON.stringify([{ item_id: x.item, unit_id: x.u.strip, qty: 1, unit_cost: 80, batch_no: "f1", expiry_date: d(300), mrp: 100, sale_price: 120 }]), x.admin], /PRICE_ABOVE_MRP/);
+    await found({ batch_no: " fd 22 ", expiry_date: d(300), mrp: 150 });
+    await asOwner(c);
+    const { rows: [lot] } = await c.query(`select batch_no, source, unit_cost_base::numeric c, mrp_base::numeric m, sale_price_base::numeric s from item_batches where tenant_id = $1 and source = 'found'`, [x.t]);
+    assert.deepEqual([lot.batch_no, Number(lot.c), Number(lot.m), Number(lot.s)], ["FD22", 8, 15, 15], "per tablet: cost 8, MRP and price 15 (not the cost)");
+  });
+});

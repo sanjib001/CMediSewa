@@ -396,6 +396,8 @@ returned to a vendor (W-23) or disposed of (W-26).
    excess becomes a **vendor advance**.
 4. **`record_vendor_payment`**: journal (Dr payable/advance; Cr cash/bank). The voucher
    prints. A mistaken payment is reversed by a reversal posting (A2 + re-auth).
+5. **Using credit later (D-143):** `apply_vendor_credit` allocates unallocated payments and
+   unused credit notes to open bills, oldest first (Dr AP_VENDORS / Cr VENDOR_ADVANCES).
 
 ## W-25 Sales return & cancellation (M-24) [request A1; post A2 + re-auth, `sale_returns`]
 1. Find the original invoice (number, patient, scan the receipt). **No return without the

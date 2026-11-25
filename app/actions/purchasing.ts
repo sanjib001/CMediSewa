@@ -189,3 +189,19 @@ export async function runPayableCheck(): Promise<{ ok: true; message: string } |
   revalidatePath("/admin/vendors");
   return { ok: true, message: r.mismatches ? `${r.mismatches} vendor(s) don't match their documents. Logged for review.` : `All ${r.vendors} vendors match their bills, payments and returns.` };
 }
+
+// ── Pharmacy track step 2 (D-143): use a vendor's credit on their open bills ──
+export async function applyVendorCredit(fd: FormData): Promise<{ ok: true; message: string } | Fail> {
+  const ctx = await requireTenant({ operation: "stock.post", permission: "pay_vendors", allowPendingTenant: true, next: "/admin/vendors" });
+  const vendorId = String(fd.get("vendor_id") ?? "");
+  if (!/^[0-9a-f-]{36}$/.test(vendorId)) return { ok: false, error: "That vendor wasn't found." };
+  const { data, error } = await serviceClient().rpc("apply_vendor_credit", {
+    p_tenant: ctx.tenantId, p_idempotency_key: String(fd.get("key") ?? "") || crypto.randomUUID(), p_vendor: vendorId,
+    p_by: ctx.memberId, p_session_level: ctx.level, p_device: ctx.deviceId,
+  });
+  if (error) return { ok: false, error: /NOTHING_TO_APPLY/.test(error.message) ? "There is no credit to use, or no unpaid bill to use it on." : friendlier(error) };
+  refresh(vendorId);
+  const r = data as { applied?: number; bills?: number; replayed?: boolean };
+  if (r.replayed) return { ok: true, message: "Already done." };
+  return { ok: true, message: `Rs. ${Number(r.applied).toLocaleString("en-IN", { maximumFractionDigits: 2 })} of credit used on ${r.bills} bill${r.bills === 1 ? "" : "s"}, oldest first.` };
+}

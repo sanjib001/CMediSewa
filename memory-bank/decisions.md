@@ -1206,6 +1206,30 @@ interaction checks (need a licensed drug database). Then the UI (Nepali and the 
 
 ---
 
+## Pharmacy track, step 2 (2026-11-25)
+
+**D-143 Purchasing gaps closed (migration 0061).**
+- **Vendor credit used on later bills:** `apply_vendor_credit` (A2, `pay_vendors`) takes the
+  vendor's credit sources oldest first: payments with an unallocated remainder and credit
+  notes with an unused remainder. It allocates them to the oldest open bills on the existing
+  allocation tables and posts once: Dr AP_VENDORS / Cr VENDOR_ADVANCES. The nightly payables
+  check reads the same documents, so it stays in step. It is a button on the vendor page, not
+  automatic when a bill is posted: the buyer sees and decides. One run at a time per vendor
+  (advisory lock); a retry with the same key replays.
+- **Per-store levels on screen:** Medicines → the item → "Levels per store" (min, reorder at,
+  max, in the base unit), only when there are two or more non-quarantine stores. All blank =
+  the store uses the item's own levels (the row is deleted). `manage_items`, audited
+  (`item.store_levels`). Alerts and the reorder list already read them (`item_levels`).
+- **Found stock:** Stock → "Found stock" makes a new lot through the existing adjustment
+  (reason `found`, A2, `manage_stock`). The lot is now made properly: batch number in capitals
+  and no spaces, batch and expiry required for medicines, MRP and sale price kept (default
+  sale price = MRP, then cost; never above the MRP). It used to sell at cost. Stock already on
+  file is corrected from the lot's own Adjust action.
+- **Testing note:** the M-37 browser check clicked Undo while the window was resizing and
+  sometimes missed; it now waits and prints the page's message on failure.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |
