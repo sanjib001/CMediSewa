@@ -415,6 +415,11 @@ qty_reserved numeric(14,3) CHECK (>= 0 and <= qty_on_hand), updated_at`.
 - **Blocking:** `block_batch(batch, reason)` sets status `blocked`/`recalled` for every
   store. The stock stays counted but becomes unsellable. Typical next step: transfer to
   quarantine, then a purchase return or disposal.
+- **Bulk recall (M-51, D-140):** **batch_recalls** (item, batch_no, reason, notice
+  reference, who, when) + **batch_recall_lots** (each lot covered, its status before).
+  `recall_batch` marks every lot of the item with that batch number recalled;
+  `recall_affected_sales` lists the issued bills that sold them, net of returns, with the
+  patient or walk-in contact (audited read).
 
 ### 9.5 Reservations (P2, designed now)
 `stock_reservations (store_id, batch_id, qty_base, ref_type (prescription|invoice_draft|

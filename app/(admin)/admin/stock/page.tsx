@@ -57,6 +57,7 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
         <Link href="/admin/stock/transfers" className="rounded-control border border-line-strong px-3 py-1.5 text-sm">Transfers</Link>
         <Link href={`/admin/stock/counts?store=${store.id}`} className="rounded-control border border-line-strong px-3 py-1.5 text-sm">Stock count</Link>
         <Link href="/admin/stock/reorder" className="rounded-control border border-line-strong px-3 py-1.5 text-sm">Reorder</Link>
+        <Link href="/admin/stock/recalls" className="rounded-control border border-line-strong px-3 py-1.5 text-sm">Recalls</Link>
       </nav>
 
       <div className="space-y-6">

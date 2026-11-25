@@ -143,6 +143,9 @@ const MORE_ERRORS: [RegExp, string][] = [
   [/OTHER_MEMBER_MUST_POST/, "Someone other than the counter must post this count (clinic setting)."],
   [/DISPOSE_FROM_QUARANTINE/, "Stock is disposed from the quarantine store. Move it there first."],
   [/LOT_REQUIRED/, "Choose the lot."],
+  [/BATCH_NOT_FOUND/, "No lot of this medicine has that batch number. Check the label."],
+  [/BAD_BATCH_NO/, "Batch numbers use letters, numbers, / . _ - only."],
+  [/RECALL_NOT_FOUND/, "That recall wasn't found."],
   [/REASON_REQUIRED/, "Give a reason."],
   [/stores_tenant_id_code_key|stores_code/, "A store with that code already exists."],
 ];
@@ -274,4 +277,20 @@ export async function runReconciliation(): Promise<{ ok: true; message: string }
   const r = data as { checked: number; mismatches: number };
   revalidatePath("/admin/stock/reorder");
   return { ok: true, message: r.mismatches ? `${r.mismatches} balance(s) differed from the ledger and were repaired (logged for review).` : `All ${r.checked} balances match the stock ledger.` };
+}
+
+// ── M-51 bulk recall ─────────────────────────────────────────────────────────
+/** Recall one batch number of a medicine in every store (all its lots); staff are notified. */
+export async function recallBatch(input: { itemId: string; batchNo: string; reason: string; reference?: string }): Promise<R & { id?: string }> {
+  const ctx = await stockPost("block_batches");
+  if (!UUID.test(input.itemId ?? "")) return { ok: false, error: "Choose the medicine." };
+  const batch = String(input.batchNo ?? "").trim().toUpperCase().slice(0, 30);
+  if (!batch) return { ok: false, error: "Enter the batch number." };
+  if (String(input.reason ?? "").trim().length < 3) return { ok: false, error: "Give the reason for the recall." };
+  const r = await rpc("recall_batch", { p_tenant: ctx.tenantId, p_by: ctx.memberId, p_item: input.itemId, p_batch_no: batch, p_reason: String(input.reason).slice(0, 300),
+    p_reference: String(input.reference ?? "").slice(0, 80) || null, p_session_level: ctx.level });
+  if (!r.ok) return r;
+  refresh(); revalidatePath("/admin/stock/recalls");
+  const d = r.data as { recall_id: string; lots: number; bills: number };
+  return { ok: true, id: d.recall_id, message: `Recalled: ${d.lots} lot${d.lots === 1 ? "" : "s"}, sold on ${d.bills} bill${d.bills === 1 ? "" : "s"}.` };
 }

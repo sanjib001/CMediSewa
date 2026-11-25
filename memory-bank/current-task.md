@@ -6,18 +6,19 @@ Read this section first in every new conversation, then `decisions.md` (latest D
 
 **Where we are**
 - Phase 0 (backend B0–B9) and Phase 1 (screens U1–U8) are **complete and committed**.
-- Phase 2: **M-37 patient merge** and **M-52 patient advances done** (2026-11-25; the owner
-  commits them). 58 migrations (last `20261125110000_patient_advances.sql`, applied to dev),
-  decisions D-01…D-139.
+- Phase 2: **M-37 patient merge** and **M-52 patient advances** committed; **M-51 bulk recall
+  done** (2026-11-25; the owner commits it). 59 migrations (last
+  `20261125120000_batch_recalls.sql`, applied to dev), decisions D-01…D-140.
 - Owner-facing guide: `docs/guides/setup-and-user-guide.md` + `CMediSewa-Setup-and-User-Guide.pdf`
   (Super Admin setup, clinic setup in order, daily work, limits). Keep it in step with the app;
   rebuild the PDF with `.local-tools/ui/guide-pdf.mjs`.
 - Last fixes: idle lock covers the whole window, phone-width layouts, "Dr. Dr." names (D-135);
   medicine save accepts "500mg" / "1,000" and names the bad field (`app/actions/inventory.ts`).
 
-**Next step: M-51 bulk recall** (block a batch number across all stores, notify, list affected
-sales by patient).
-Phase 2 as trimmed by the owner: ~~M-37 patient merge~~ · ~~M-52 patient advances~~ · M-51 bulk recall ·
+**Next step: M-46 purchase suggestions** (velocity × lead-time reorder suggestions per store;
+supplier fill rate, on-time rate, return rate, price trend, shelf life at receipt; PO approvals;
+emailing a PO waits for a mail key).
+Phase 2 as trimmed by the owner: ~~M-37 patient merge~~ · ~~M-52 patient advances~~ · ~~M-51 bulk recall~~ ·
 M-46 purchase suggestions · M-45 stock reservations · Nepali UI · later online payments, patient
 documents, subdomains. **Dropped to Future:** SMS M-32 (D-136), controlled-drug register M-48 and
 cashier shifts M-47 (D-137). Controlled/narcotic items stay blocked from sale.
@@ -58,6 +59,13 @@ cashier shifts M-47 (D-137). Controlled/narcotic items stay blocked from sale.
 
 **Phase:** Phase 0 and Phase 1 complete. **Pilot preparation:** work through `memory-bank/pilot-checklist.md` (decisions, production setup, email, clinic setup, real-device pass, dry run).
 **Last updated:** 2026-11-25
+
+## M-51 Bulk recall: done (2026-11-25)
+| Item | Status |
+|---|---|
+| Migration 0059: batch_recalls, batch_recall_lots, recall_batch (every lot of the medicine with that batch number → recalled, history, audit, notifications), recall_affected_sales (bills that sold it with patient/walk-in phone, net of returns; audited read) | done |
+| Admin → Stock → Recalls (form with medicine search and the batch numbers on file, past recalls); recall page (notice, lots and stock left per store, who bought it with tel: links, print); guide updated (E4) | done |
+| Checks | DB **124/124** (4 new) · fresh replay of all 59 migrations + posture ✓ · **E2E 263/263 on a production build** incl. recall from the form in headless Chrome, phone width · typecheck/lint/build ✓ · posture ✓ · test clinics purged |
 
 ## M-52 Patient advances: done (2026-11-25)
 | Item | Status |

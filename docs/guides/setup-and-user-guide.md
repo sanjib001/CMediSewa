@@ -323,13 +323,23 @@ issued prescription appears in the pharmacy, within seconds.
 | **Appointments** | All bookings by day and doctor. |
 | **Purchases** | **New purchase**: enter the supplier's bill (batches, expiry, cost, MRP, free qty, discount, VAT); pay now or on credit. **Orders** (purchase orders), **Returns** to the vendor, void a purchase. |
 | **Vendors** | Supplier list, what you owe each, **record payments** against bills, payables check. |
-| **Stock & stores** | Needs attention (low, expiring, expired), on the shelf, **transfers**, **counts**, **reorder** list, **dispose** expired or damaged stock, opening stock. |
+| **Stock & stores** | Needs attention (low, expiring, expired), on the shelf, **transfers**, **counts**, **reorder** list, **dispose** expired or damaged stock, opening stock, **Recalls**. |
 | **Billing** | Every bill; open, print, see returns and payments. |
 | **Expenses** | Record expenses (electricity, rent, salaries, transport…) paid in cash or online; reverse a mistake. |
 | **Finance** | Profit and loss for any period, money in and out, cash and bank balances, expenses by category, the nightly **books check**, opening cash and bank. |
 | **Reports** | Stock, batch history, expiry, sales register, item sales, purchase register, cash book. Each can be filtered by dates and store, and downloaded as a spreadsheet (**Download CSV**, asks for your authenticator code and is logged). |
 | **Audit log** | Who did what and when, including who opened patient records. |
 | **Notifications** | Prescriptions to dispense, stock needing attention, booking requests, leave notices. Turn on push for this device to get them when the app is closed. |
+
+**A batch is recalled** (by the maker or the DDA). Go to **Stock & stores → Recalls**, type
+the medicine, the batch number on the notice, the reason and the notice number, and press
+**Recall in every store** (you need your password session and the *block batches*
+permission). Every lot of that medicine with that batch number stops being sold at once,
+everywhere, even if someone picks the lot by hand. Pharmacy and stock staff get a
+notification. The recall page shows what is left in each store (move it to the quarantine
+store, then return it to the vendor or dispose of it) and **who bought it**: each bill with
+the patient or walk-in name and phone, so you can call them. **Print this list** for the
+file. Opening the list of buyers is recorded in the audit log.
 
 **Same patient registered twice.** Open either record in **Patients**. A flagged record lists
 the likely match, with a **Same person: combine** link; otherwise use **Combine with another

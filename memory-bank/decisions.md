@@ -1157,6 +1157,28 @@ Dr PATIENT_ADVANCES / Cr AR_PATIENTS. Held = deposits − refunds − advance le
 
 ---
 
+## M-51 Bulk recall (2026-11-25, Phase 2)
+
+**D-140 A recall covers one medicine and one batch number, in every store, in one step.**
+Migration 0059. Lots are per receipt, so the same printed batch can be several lots (other
+purchases, other stores). `recall_batch(item, batch_no, reason, reference)` needs a password
+session (A2) and `block_batches`, the same as blocking one lot. It records a `batch_recalls`
+row and each lot covered (`batch_recall_lots`, with its status before) and marks every lot
+`recalled` with history and audit. Lots already recalled are listed but not changed again.
+Batch numbers are matched upper-case without spaces. Another medicine's identical batch
+number is untouched (a notice names the product). An unknown batch number is refused rather
+than recorded. Allocation already refused recalled lots; a lot chosen by hand is refused too
+(`LOT_NOT_SELLABLE`). Holders of `block_batches` are notified with a link to the recall page,
+and holders of `pharmacy_sell` with a link to the pharmacy stock tab. **Who bought it:**
+`recall_affected_sales` lists issued bills with a recalled lot, quantity sold and returned,
+and the patient (name, MRN, phone) or walk-in name and phone. It needs `block_batches` and
+every read is audited (`batch.recall_sales_read`), because it is a contact list. There is no
+"undo recall": a lot recalled by mistake is unblocked one by one from the stock page
+(audited). Stock left is moved to quarantine with the existing lot action; contacting
+patients is by phone (no SMS, D-136).
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |

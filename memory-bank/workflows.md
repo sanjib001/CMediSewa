@@ -427,6 +427,16 @@ returned to a vendor (W-23) or disposed of (W-26).
    `post_disposal` with method, contractor, witness and date → `disposal` movements + journal
    (Dr INV_LOSS) → a disposal certificate upload (P2). Controlled drugs follow M-48 / P-22.
 
+## W-26a Batch recall (M-51) [A2, `block_batches`]
+1. A recall notice names a medicine and a batch. Admin → Stock → Recalls: medicine, batch
+   number, reason, notice reference → `recall_batch`: every lot of that item with that batch
+   number becomes `recalled` in every store (history + audit), so FEFO and a chosen lot both
+   refuse it.
+2. Holders of `block_batches` and `pharmacy_sell` are notified (in-app + push).
+3. The recall page lists stock left per store (→ quarantine → vendor return or disposal,
+   W-23 / W-26) and the bills that sold it with the patient or walk-in phone (audited read),
+   printable for the file.
+
 ## W-27 Stock audit / physical count (M-21) [count A1; post A2, `manage_stock`]
 1. Create the count: store, scope (full, category or selected items), **blind** (the system
    quantity is hidden from counters) or open.
