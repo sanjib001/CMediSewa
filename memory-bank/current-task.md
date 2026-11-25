@@ -6,18 +6,19 @@ Read this section first in every new conversation, then `decisions.md` (latest D
 
 **Where we are**
 - Phase 0 (backend B0–B9) and Phase 1 (screens U1–U8) are **complete and committed**.
-- Phase 2: **M-37 patient merge** and **M-52 patient advances** committed; **M-51 bulk recall
-  done** (2026-11-25; the owner commits it). 59 migrations (last
-  `20261125120000_batch_recalls.sql`, applied to dev), decisions D-01…D-140.
+- Phase 2: M-37 patient merge, M-52 patient advances, M-51 bulk recall committed.
+- **Pharmacy track (owner, D-142): finish the pharmacy completely, then the UI.** Step 1
+  (counter and dispensing gaps, D-141) done 2026-11-25; the owner commits it. 60 migrations
+  (last `20261125130000_pharmacy_gaps.sql`, applied to dev), decisions D-01…D-142.
 - Owner-facing guide: `docs/guides/setup-and-user-guide.md` + `CMediSewa-Setup-and-User-Guide.pdf`
   (Super Admin setup, clinic setup in order, daily work, limits). Keep it in step with the app;
   rebuild the PDF with `.local-tools/ui/guide-pdf.mjs`.
 - Last fixes: idle lock covers the whole window, phone-width layouts, "Dr. Dr." names (D-135);
   medicine save accepts "500mg" / "1,000" and names the bad field (`app/actions/inventory.ts`).
 
-**Next step: M-46 purchase suggestions** (velocity × lead-time reorder suggestions per store;
-supplier fill rate, on-time rate, return rate, price trend, shelf life at receipt; PO approvals;
-emailing a PO waits for a mail key).
+**Next step: pharmacy track step 2, purchasing gaps:** apply a vendor's advance and unused
+credit notes to later bills; per-store reorder levels on screen; a "found stock" screen. Then
+step 3 M-46, step 4 M-45, step 5 M-49, step 6 substitutes (D-142), then the UI.
 Phase 2 as trimmed by the owner: ~~M-37 patient merge~~ · ~~M-52 patient advances~~ · ~~M-51 bulk recall~~ ·
 M-46 purchase suggestions · M-45 stock reservations · Nepali UI · later online payments, patient
 documents, subdomains. **Dropped to Future:** SMS M-32 (D-136), controlled-drug register M-48 and
@@ -59,6 +60,14 @@ cashier shifts M-47 (D-137). Controlled/narcotic items stay blocked from sale.
 
 **Phase:** Phase 0 and Phase 1 complete. **Pilot preparation:** work through `memory-bank/pilot-checklist.md` (decisions, production setup, email, clinic setup, real-device pass, dry run).
 **Last updated:** 2026-11-25
+
+## Pharmacy step 1, counter and dispensing gaps: done (2026-11-25)
+| Item | Status |
+|---|---|
+| Migration 0060: rx_item_dispensed_base / rx_item_done, dispensing queue with given/left, credit limit counts invoice_outstanding (check-in and counter), post_sale_return 'to_advance' | done |
+| Dispense tab "N given, M left" and prefill of what is left; return form "Into the patient's advance"; return slip page and links on the bill; guide updated (E3) | done |
+| Fixed | an M-37 test booked "2 hours from now" and failed after 22:00 Nepal time (check-in needs today); it now books "now" |
+| Checks | DB **127/127** (3 new) · fresh replay of all 60 migrations + posture ✓ · **E2E 272/272 on a production build** · typecheck/lint/build ✓ · posture ✓ · test clinics purged |
 
 ## M-51 Bulk recall: done (2026-11-25)
 | Item | Status |

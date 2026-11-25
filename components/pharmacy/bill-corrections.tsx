@@ -28,12 +28,12 @@ export function VoidBill({ id }: { id: string }) {
   );
 }
 
-export function ReturnForm({ invoiceId, lots, paid, owed }: { invoiceId: string; lots: ReturnableLot[]; paid: number; owed: number }) {
+export function ReturnForm({ invoiceId, lots, paid, owed, canAdvance = false }: { invoiceId: string; lots: ReturnableLot[]; paid: number; owed: number; canAdvance?: boolean }) {
   const router = useRouter();
   const key = useRef(crypto.randomUUID());
   const [qty, setQty] = useState<Record<string, string>>({});
   const [restock, setRestock] = useState<Record<string, "sellable" | "quarantine" | "none">>(() => Object.fromEntries(lots.map((l) => [l.allocation_id, l.can_shelve ? "sellable" : "quarantine"])));
-  const [settlement, setSettlement] = useState<"refund_cash" | "refund_online" | "reduce_due">(owed > 0 ? "reduce_due" : "refund_cash");
+  const [settlement, setSettlement] = useState<"refund_cash" | "refund_online" | "reduce_due" | "to_advance">(owed > 0 ? "reduce_due" : "refund_cash");
   const [channel, setChannel] = useState("");
   const [reason, setReason] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -42,7 +42,7 @@ export function ReturnForm({ invoiceId, lots, paid, owed }: { invoiceId: string;
   const estimate = lots.reduce((s, l) => s + (Number(qty[l.allocation_id]) || 0) * l.price, 0);
   if (done) return (
     <div role="status" className="rounded-panel border border-ok/40 bg-ok/5 p-4">
-      <p className="font-medium">Return {done.no} posted: {npr(done.total)} {settlement === "reduce_due" ? "taken off what the patient owes" : "refunded"}.</p>
+      <p className="font-medium">Return {done.no} posted: {npr(done.total)} {settlement === "reduce_due" ? "taken off what the patient owes" : settlement === "to_advance" ? "put into the patient's advance" : "refunded"}.</p>
       <button type="button" className="mt-2 text-pine underline" onClick={() => router.push(`/employee/pharmacy/bills/${invoiceId}`)}>Back to the bill</button>
     </div>
   );
@@ -77,6 +77,7 @@ export function ReturnForm({ invoiceId, lots, paid, owed }: { invoiceId: string;
           <select value={settlement} onChange={(e) => setSettlement(e.target.value as "refund_cash")} className={field}>
             {owed > 0 ? <option value="reduce_due">Reduce what they owe ({npr(owed)})</option> : null}
             {paid > 0 ? <><option value="refund_cash">Cash refund</option><option value="refund_online">Online refund</option></> : null}
+            {paid > 0 && canAdvance ? <option value="to_advance">Into the patient&apos;s advance</option> : null}
           </select></label>
         {settlement === "refund_online" ? <label><span className="mb-1 block text-sm font-medium">Refunded by</span>
           <select required value={channel} onChange={(e) => setChannel(e.target.value)} className={field}><option value="">Choose</option>{CHANNELS.map(([v, t]) => <option key={v} value={v}>{t}</option>)}</select></label> : null}

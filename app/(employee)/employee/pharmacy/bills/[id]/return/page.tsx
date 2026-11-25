@@ -22,7 +22,7 @@ export default async function ReturnItems({ params }: { params: Promise<{ id: st
       <PageHeader title="Return items" subtitle={<><Link href={`/employee/pharmacy/bills/${id}`} className="text-pine hover:underline">Bill {b.invoice_no}</Link> / {b.customer}</>} />
       <Panel title="What is coming back">
         {b.status !== "issued" ? <p className="text-ink-soft">This bill is void.</p> : lots.length === 0 ? <p className="text-ink-soft">This bill has no medicines to return.</p>
-          : <ReturnForm invoiceId={id} lots={lots} paid={b.paid} owed={b.outstanding} />}
+          : <ReturnForm invoiceId={id} lots={lots} paid={b.paid} owed={b.outstanding} canAdvance={!!b.patient_id} />}
       </Panel>
     </>
   );

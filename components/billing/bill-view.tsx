@@ -4,7 +4,7 @@ import { PrintButton } from "@/components/pharmacy/print-button";
 import { CollectDues, VoidBill } from "@/components/pharmacy/bill-corrections";
 import { Panel } from "@/components/ui/primitives";
 
-const SETTLED = { refund_cash: "cash refund", refund_online: "online refund", reduce_due: "taken off the due" } as const;
+const SETTLED = { refund_cash: "cash refund", refund_online: "online refund", reduce_due: "taken off the due", to_advance: "into the advance" } as const;
 const n2 = (n: number) => n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 /**
@@ -49,7 +49,7 @@ export function BillView({ b, back, canCollect, canReturn, canVoid }: {
           <div className="text-base font-semibold">Total Rs. {n2(b.total)}</div>
           <div>Paid {n2(b.paid)}{b.outstanding > 0 ? `, due ${n2(b.outstanding)}` : ""}</div>
         </dl>
-        {b.returns.length ? <div className="mt-3 border-t border-line pt-2 text-sm">{b.returns.map((r) => <div key={r.return_no}>Return {r.return_no}: Rs. {n2(r.total)} ({SETTLED[r.settlement as keyof typeof SETTLED] ?? r.settlement})</div>)}</div> : null}
+        {b.returns.length ? <div className="mt-3 border-t border-line pt-2 text-sm">{b.returns.map((r) => <div key={r.return_no}>Return {r.return_no}: Rs. {n2(r.total)} ({SETTLED[r.settlement as keyof typeof SETTLED] ?? r.settlement}) <Link href={`/employee/pharmacy/returns/${r.id}`} className="text-pine hover:underline print:hidden">Print slip</Link></div>)}</div> : null}
         {b.status === "void" && b.void_reason ? <p className="mt-3 text-sm text-alert">Voided: {b.void_reason}</p> : null}
         <footer className="mt-4 text-center text-xs text-ink-faint">Issued by {b.by}.{b.profile.footer ? ` ${b.profile.footer}` : ""}</footer>
       </article>

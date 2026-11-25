@@ -1179,6 +1179,33 @@ patients is by phone (no SMS, D-136).
 
 ---
 
+## Pharmacy track, step 1 (2026-11-25)
+
+**D-142 The owner's order: finish the pharmacy completely, then the UI.** Pharmacy track:
+(1) counter and dispensing gaps, (2) purchasing gaps (vendor advance and credit notes applied
+to later bills, per-store reorder levels on screen, found stock on screen), (3) M-46
+purchase suggestions and supplier performance with a PO approval limit, (4) M-45
+reservations, (5) M-49 GS1 barcodes, camera scanning, shelf and price labels, (6) substitutes
+(same generic and strength). Not in it: the controlled-drug register (Future, D-137) and
+interaction checks (need a licensed drug database). Then the UI (Nepali and the rest).
+
+**D-141 Counter and dispensing gaps closed (migration 0060).**
+- **Partial dispensing:** a prescription line is done when what was sold against it (net of
+  returns, in the medicine's base unit: the prescribed quantity is read as base units)
+  reaches the prescribed quantity. A line with no quantity is done after any sale. The
+  queue shows "N given, M left" and Dispense and bill offers what is left. Giving more
+  than prescribed isn't blocked (pack sizes).
+- **Credit limit:** what a patient already owes is `invoice_outstanding` (net of returns
+  and collections) at check-in and at the counter. Before, returns were ignored, which was
+  stricter than meant.
+- **Return into the advance:** settlement `to_advance` (needs a patient on the bill; only
+  money already paid, like a refund): a negative payment with an advance leg, Dr AR /
+  Cr PATIENT_ADVANCES. The books check covers it.
+- **Return slip:** `/employee/pharmacy/returns/[id]` prints what came back, the value, how it
+  was settled and the refund receipt; the bill links each return's slip.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |

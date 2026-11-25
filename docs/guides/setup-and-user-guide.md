@@ -308,9 +308,9 @@ issued prescription appears in the pharmacy, within seconds.
 
 | Tab | What it's for |
 |---|---|
-| **Dispense** | Issued prescriptions waiting. Open one, the batches are suggested (earliest expiry first), adjust, take payment, print the bill. |
+| **Dispense** | Issued prescriptions waiting. Open one, the batches are suggested (earliest expiry first), adjust, take payment, print the bill. You can give part now: the line shows "8 given, 12 left" and the prescription stays until all is given. |
 | **Sale** | Counter sales: type or **scan** a medicine, choose the unit (tab/strip/box), quantity; link a patient or record a walk-in; payment (cash/online/mixed). A linked patient's **advance** pays first; take only the rest. Expired and blocked batches are never offered. Prescription-only items need a prescription. |
-| **Bills** | Today's and earlier bills: **print**, **return items** (batch by batch, refund or reduce what's owed), **void** (same day only). |
+| **Bills** | Today's and earlier bills: **print**, **return items** (batch by batch; refund in cash or online, reduce what's owed, or put it into the patient's advance), **print the return slip**, **void** (same day only). |
 | **Dues** | Patients who owe: collect. |
 | **Stock** | What's on hand, transfers between stores, stock counts (PIN level). |
 

@@ -97,7 +97,7 @@ export type BillDetail = {
   lines: { n: number; text: string; qty: number; unit: string; price: number; discount: number; tax: number; total: number; lots: string }[];
   external_rx: { prescriber_name: string; prescriber_reg_no: string | null; facility: string | null; rx_date: string } | null;
   patient_id: string | null; outstanding: number; same_day: boolean; void_reason: string | null;
-  returns: { return_no: string; total: number; settlement: string; created_at: string; reason: string }[];
+  returns: { id: string; return_no: string; total: number; settlement: string; created_at: string; reason: string }[];
 };
 export async function getBill(tenantId: string, id: string): Promise<BillDetail | null> {
   const db = serviceClient();
@@ -137,8 +137,8 @@ export async function getBill(tenantId: string, id: string): Promise<BillDetail 
     patient_id: h.patient_id, void_reason: h.void_reason,
     outstanding: Number((await db.rpc("invoice_outstanding", { p_invoice: id })).data ?? 0),
     same_day: await sameBusinessDay(tenantId, h.issued_at),
-    returns: rows<{ return_no: string; total: number; settlement: string; created_at: string; reason: string }>(
-      await db.from("sale_returns").select("return_no, total, settlement, created_at, reason").eq("tenant_id", tenantId).eq("invoice_id", id).order("created_at"), "returns")
+    returns: rows<{ id: string; return_no: string; total: number; settlement: string; created_at: string; reason: string }>(
+      await db.from("sale_returns").select("id, return_no, total, settlement, created_at, reason").eq("tenant_id", tenantId).eq("invoice_id", id).order("created_at"), "returns")
       .map((r) => ({ ...r, total: Number(r.total) })),
   };
 }
@@ -202,7 +202,7 @@ export type QueueRx = {
   prescription_id: string; rx_number: string; issued_at: string; notes: string | null; doctor: string | null;
   patient: { id: string; mrn: string; full_name: string; sex: string; age_years: number | null; date_of_birth: string | null; created_at: string };
   allergies: string[];
-  items: { id: string; medicine_text: string; strength: string | null; form: string | null; dose: string | null; frequency: string | null; duration_days: number | null; quantity: number | null; instructions: string | null; dispensed: boolean }[];
+  items: { id: string; medicine_text: string; strength: string | null; form: string | null; dose: string | null; frequency: string | null; duration_days: number | null; quantity: number | null; instructions: string | null; dispensed: boolean; dispensed_base: number; remaining: number | null }[];
 };
 /** The pharmacist's queue (C7): prescription items and allergies only. Every read is audited. */
 export async function dispensingQueue(tenantId: string, memberId: string, level: string): Promise<QueueRx[] | null> {

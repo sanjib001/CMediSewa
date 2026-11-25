@@ -253,3 +253,67 @@ test("dues: credit sales, then collected oldest bill first; never more than owed
     assert.equal(Math.round((ar.AR_PATIENTS ?? 0) * 100) / 100, 0, "nothing owed in the accounts either");
   });
 });
+
+// ── Pharmacy track step 1 (D-141): partial dispensing, credit net of returns, returns into the advance ──
+test("partial dispensing: a line stays in the queue until its quantity is dispensed; returns count back", async () => {
+  await withTx(async (c) => {
+    const x = await counter(c);
+    const doc = await member(c, x.t);
+    const { rows: [e] } = await c.query(`insert into encounters (tenant_id, patient_id, doctor_member_id, status, finalized_at, chief_complaint) values ($1, $2, $3, 'finalized', now(), 'Fever') returning id`, [x.t, x.patient, doc]);
+    const { rows: [rx] } = await c.query(`insert into prescriptions (tenant_id, patient_id, encounter_id, doctor_member_id, status) values ($1, $2, $3, $4, 'draft') returning id`, [x.t, x.patient, e.id, doc]);
+    const { rows: [ri] } = await c.query(`insert into prescription_items (tenant_id, prescription_id, line_no, item_id, medicine_text, frequency, quantity) values ($1, $2, 1, $3, 'Paracetamol 500', '1-1-1', 30) returning id`, [x.t, rx.id, x.para]);
+    await c.query(`update prescriptions set status = 'issued', rx_number = 'RX-P0001', issued_at = now() where id = $1`, [rx.id]);
+    await asApp(c);
+    const line = async () => (await c.query(`select dispensing_queue($1, $2, 'A1') j`, [x.t, x.pharmacist])).rows[0].j.queue.find((q) => q.rx_number === "RX-P0001")?.items[0];
+    const r1 = (await sell(c, x, [{ kind: "item", item_id: x.para, unit_id: x.u.strip, qty: 1, prescription_item_id: ri.id }], { patient: x.patient, cash: 20 })).rows[0].r;
+    let l = await line();
+    assert.deepEqual([l.dispensed, Number(l.dispensed_base), Number(l.remaining)], [false, 10, 20], "one strip of 10 out of 30: 20 left, still in the queue");
+    await sell(c, x, [{ kind: "item", item_id: x.para, unit_id: x.u.tab, qty: 20, prescription_item_id: ri.id }], { patient: x.patient, cash: 45 });
+    assert.equal(await line(), undefined, "all 30 dispensed: the prescription leaves the queue");
+    const alloc = (await c.query(`select a.id from invoice_line_allocations a join invoice_lines l on l.id = a.invoice_line_id where l.invoice_id = $1 limit 1`, [r1.invoice_id])).rows[0].id;
+    await ret(c, x, r1.invoice_id, [{ allocation_id: alloc, qty_base: 4, restock: "sellable" }]);
+    l = await line();
+    assert.deepEqual([l.dispensed, Number(l.remaining)], [false, 4], "4 came back: 4 left to dispense again");
+    await asOwner(c);
+  });
+});
+
+test("credit limit counts what is really owed: returns and collections lower it", async () => {
+  await withTx(async (c) => {
+    const x = await counter(c);
+    await c.query(`update tenant_settings set allow_credit = true, credit_limit_per_patient = 100 where tenant_id = $1`, [x.t]);
+    const { rows: [rl] } = await c.query(`insert into tenant_roles (tenant_id, name, permissions) values ($1, 'Credit', $2) returning id`, [x.t, ["allow_credit"]]);
+    await c.query(`insert into member_roles (tenant_id, member_id, role_id) values ($1, $2, $3)`, [x.t, x.pharmacist, rl.id]);
+    await asApp(c);
+    // 40 tabs at 2.5 (LATE lot after SOON's 20 at 2): 20×2 + 20×2.5 = 90, all on credit
+    const r = (await sell(c, x, [{ kind: "item", item_id: x.para, unit_id: x.u.tab, qty: 40 }], { patient: x.patient, cash: 0 })).rows[0].r;
+    assert.equal(Number(r.due), 90);
+    await expectError(c, `select issue_counter_sale($1, $2, $3, $4, null, null, $5, null, 0, 0, null, null, $6, 'A1', null)`,
+      [x.t, uuid(), x.store, x.patient, JSON.stringify([{ kind: "item", item_id: x.para, unit_id: x.u.tab, qty: 10 }]), x.pharmacist], /CREDIT_LIMIT/);
+    const soon = (await c.query(`select a.id from invoice_line_allocations a join invoice_lines l on l.id = a.invoice_line_id join item_batches b on b.id = a.batch_id where l.invoice_id = $1 and b.batch_no = 'SOON'`, [r.invoice_id])).rows[0].id;
+    await ret(c, x, r.invoice_id, [{ allocation_id: soon, qty_base: 20, restock: "sellable" }], { settlement: "reduce_due" });
+    const s2 = (await sell(c, x, [{ kind: "item", item_id: x.para, unit_id: x.u.tab, qty: 10 }], { patient: x.patient, cash: 0 })).rows[0].r;
+    assert.ok(Number(s2.due) > 0, "after a 40 return the patient owes 50, so another 20–25 on credit fits under 100");
+    await asOwner(c);
+  });
+});
+
+test("return into the advance: the money is held for the patient, not paid out; walk-ins can't", async () => {
+  await withTx(async (c) => {
+    const x = await counter(c);
+    await asApp(c);
+    const r = (await sell(c, x, [{ kind: "item", item_id: x.para, unit_id: x.u.tab, qty: 10 }], { patient: x.patient, cash: 20 })).rows[0].r;
+    const a = (await c.query(`select a.id from invoice_line_allocations a join invoice_lines l on l.id = a.invoice_line_id where l.invoice_id = $1 limit 1`, [r.invoice_id])).rows[0].id;
+    const back = (await ret(c, x, r.invoice_id, [{ allocation_id: a, qty_base: 5, restock: "sellable" }], { settlement: "to_advance" })).rows[0].r;
+    assert.equal(Number((await c.query(`select patient_advance_balance($1, $2) b`, [x.t, x.patient])).rows[0].b), Number(back.total));
+    const w = (await sell(c, x, [{ kind: "item", item_id: x.para, unit_id: x.u.tab, qty: 2 }], { name: "Walk-in", cash: 4 })).rows[0].r;
+    const wa = (await c.query(`select a.id from invoice_line_allocations a join invoice_lines l on l.id = a.invoice_line_id where l.invoice_id = $1 limit 1`, [w.invoice_id])).rows[0].id;
+    await expectError(c, `select post_sale_return($1, $2, $3, 'to_advance', null, 'Not needed', $4, $5, 'A2', now(), null)`,
+      [x.t, uuid(), w.invoice_id, JSON.stringify([{ allocation_id: wa, qty_base: 1, restock: "sellable" }]), x.admin], /PATIENT_REQUIRED_FOR_ADVANCE/);
+    await asOwner(c);
+    const chk = (await c.query(`select verify_finance_integrity($1) r`, [x.t])).rows[0].r;
+    assert.equal(chk.mismatches, 0, JSON.stringify(chk.checks));
+    const { rows: [cash] } = await c.query(`select coalesce(sum(debit - credit), 0)::numeric n from ledger_entries where tenant_id = $1 and account_code = 'CASH'`, [x.t]);
+    assert.equal(Number(cash.n), 24, "no cash went out for the return");
+  });
+});

@@ -140,7 +140,7 @@ test("undo: an appointment checked in under the kept record stays with its visit
   await withTx(async (c) => {
     const x = await clinic(c);
     const kept = await reg(c, x.t, "Gita Rai", "9800000003"), dup = await reg(c, x.t, "Gita Rai", "9800000003");
-    const appt = await slot(c, x, dup.id, 2), later = await slot(c, x, dup.id, 72);
+    const appt = await slot(c, x, dup.id, 0), later = await slot(c, x, dup.id, 72);   // "now" stays today at any hour
     await asApp(c);
     const m = await merge(c, x, kept.id, dup.id);
     const v = (await c.query(`select check_in_visit($1, $2, $3, $4, $5, $6, 0, 500, 0, null, null, $7, 'A1', null) r`, [x.t, uuid(), kept.id, x.doc, appt, x.svc, x.admin])).rows[0].r.visit_id;

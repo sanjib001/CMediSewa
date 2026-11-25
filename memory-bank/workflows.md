@@ -413,6 +413,10 @@ returned to a vendor (W-23) or disposed of (W-26).
 7. **[OPEN] P-22:** whether returns of prescription-only or cold-chain medicines may be
    restocked at all. The default is quarantine-only for cold-chain items.
 
+**Pharmacy track additions (D-141):** a prescription can be dispensed in parts (the queue
+shows what is left); a return can be settled into the patient's advance; every return has a
+printable slip.
+
 ## W-26 Expiry management & disposal (M-21)
 1. **Daily job:** near-expiry (≤ `near_expiry_days`) and critical (≤
    `critical_expiry_days`) lists per store, sent to inventory members as a digest plus a

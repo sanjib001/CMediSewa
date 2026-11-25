@@ -51,7 +51,7 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
               <li key={i.id} className={cn("grid gap-x-6 px-5 py-3 sm:grid-cols-[1.6fr_1fr_auto]", i.dispensed && "text-ink-faint")}>
                 <div><div className="font-medium">{i.medicine_text}{i.strength ? ` ${i.strength}` : ""}{i.form ? ` (${i.form})` : ""}</div>
                   <div className="text-sm text-ink-soft">{[i.dose, i.frequency, i.duration_days ? `${i.duration_days} days` : null, i.instructions].filter(Boolean).join(", ")}</div></div>
-                <div className="text-sm">{i.dispensed ? "Dispensed" : "To dispense"}</div>
+                <div className="text-sm">{i.dispensed ? "Dispensed" : Number(i.dispensed_base) > 0 ? `${Number(i.dispensed_base)} given, ${i.remaining ?? ""} left` : "To dispense"}</div>
                 <div className="font-semibold sm:text-right">{i.quantity ?? ""}</div>
               </li>))}</ul>
             {canSell && store ? <div className="flex justify-end border-t border-line px-5 py-3"><Link href={qs("sale", `&rx=${rx.prescription_id}`)} className="rounded-control bg-pine px-4 py-2 font-medium text-white">Dispense and bill</Link></div> : null}
@@ -134,7 +134,7 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
       if (rx) {
         const p = rx.patient;
         const lite: PatientLite = { id: p.id, mrn: p.mrn, full_name: p.full_name, sex: p.sex, age: ageText(p.date_of_birth, p.age_years, p.created_at), phone: null, possible_duplicate: false };
-        prefill = { patient: lite, rxNumber: rx.rx_number, lines: rx.items.filter((i) => !i.dispensed).map((i) => ({ prescription_item_id: i.id, text: [i.medicine_text, i.strength, i.dose, i.frequency].filter(Boolean).join(" "), qty: i.quantity })) };
+        prefill = { patient: lite, rxNumber: rx.rx_number, lines: rx.items.filter((i) => !i.dispensed).map((i) => ({ prescription_item_id: i.id, text: [i.medicine_text, i.strength, i.dose, i.frequency].filter(Boolean).join(" "), qty: i.remaining ?? i.quantity })) };
       }
     }
     body = <Panel title={prefill ? "Dispense" : "New sale"}><CounterSale key={`${store.id}:${sp.rx ?? ""}`} storeId={store.id} items={items} services={services} prefill={prefill}

@@ -12,6 +12,7 @@ import { toLite, type PatientLite } from "@/lib/desk/data";
 type Fail = { ok: false; error: string };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const ERRORS: [RegExp, string][] = [
+  [/PATIENT_REQUIRED_FOR_ADVANCE/, "Only a bill with a patient on it can go into an advance."],
   [/INSUFFICIENT_STOCK/, "There isn't enough sellable stock for that quantity."],
   [/CONTROLLED_BLOCKED/, "Controlled and narcotic medicines can't be sold here yet."],
   [/RX_REQUIRED/, "This medicine needs a prescription. Link the doctor's prescription or record the outside one."],
@@ -123,7 +124,7 @@ export async function voidBill(input: { id: string; reason: string }): Promise<{
 }
 
 export type ReturnInput = {
-  idempotencyKey: string; invoiceId: string; settlement: "refund_cash" | "refund_online" | "reduce_due"; channel?: string | null; reason: string;
+  idempotencyKey: string; invoiceId: string; settlement: "refund_cash" | "refund_online" | "reduce_due" | "to_advance"; channel?: string | null; reason: string;
   lines: { allocation_id: string; qty_base: number; restock: "sellable" | "quarantine" | "none" }[];
 };
 export async function postReturn(input: ReturnInput): Promise<{ ok: true; no: string; total: number } | Fail> {
