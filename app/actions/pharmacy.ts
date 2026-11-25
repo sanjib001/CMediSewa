@@ -70,7 +70,7 @@ export type SaleInput = {
   cash: number; online: number; channel?: string | null; reference?: string;
 };
 
-export async function issueSale(input: SaleInput): Promise<{ ok: true; id: string; no: string; total: number; due: number } | Fail> {
+export async function issueSale(input: SaleInput): Promise<{ ok: true; id: string; no: string; total: number; due: number; fromAdvance: number } | Fail> {
   const ctx = await counter();
   if (!UUID.test(input.idempotencyKey ?? "") || !UUID.test(input.storeId ?? "")) return { ok: false, error: "Choose the store." };
   if (input.patientId && !UUID.test(input.patientId)) return { ok: false, error: "That patient wasn't found." };
@@ -94,8 +94,8 @@ export async function issueSale(input: SaleInput): Promise<{ ok: true; id: strin
   });
   if (error) return { ok: false, error: friendly(error) };
   revalidatePath("/employee/pharmacy");
-  const r = data as { invoice_id: string; invoice_no: string; total: number; due: number };
-  return { ok: true, id: r.invoice_id, no: r.invoice_no, total: Number(r.total), due: Number(r.due ?? 0) };
+  const r = data as { invoice_id: string; invoice_no: string; total: number; due: number; from_advance?: number };
+  return { ok: true, id: r.invoice_id, no: r.invoice_no, total: Number(r.total), due: Number(r.due ?? 0), fromAdvance: Number(r.from_advance ?? 0) };
 }
 
 /** Find a patient to link to the sale (needed for dues and prescriptions). */

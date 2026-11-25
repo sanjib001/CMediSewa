@@ -62,7 +62,7 @@ export async function getFinanceOpening(tenantId: string) {
 
 type Bal = { opening: number; closing: number };
 export type FinanceReport = {
-  balances: Record<"CASH" | "BANK" | "AR_PATIENTS" | "INVENTORY" | "INVENTORY_IN_TRANSIT" | "VENDOR_ADVANCES" | "TAX_RECEIVABLE" | "AP_VENDORS" | "TAX_PAYABLE", Bal>;
+  balances: Record<"CASH" | "BANK" | "AR_PATIENTS" | "INVENTORY" | "INVENTORY_IN_TRANSIT" | "VENDOR_ADVANCES" | "TAX_RECEIVABLE" | "AP_VENDORS" | "TAX_PAYABLE" | "PATIENT_ADVANCES", Bal>;
   revenue_services: number; revenue_pharmacy: number; other_income: number; cogs: number; inventory_loss: number; inventory_gain: number; expenses: number;
   expenses_by_category: { code: string; name: string; amount: number }[];
   money: { kind: string; cash_in: number; cash_out: number; bank_in: number; bank_out: number }[];
@@ -77,7 +77,7 @@ export async function profitAndLoss(tenantId: string, storeId: string | null, fr
   return one<ProfitLoss>(await serviceClient().rpc("profit_and_loss", { p_tenant: tenantId, p_store: storeId, p_from: from, p_to: to }), "profit and loss");
 }
 
-export type DailySummary = { bills: number; voided: number; sales: number; returns: number; collected: number; refunded: number; dues_change: number; expenses: number; cash_close: number; bank_close: number };
+export type DailySummary = { bills: number; voided: number; sales: number; returns: number; collected: number; refunded: number; advances_in?: number; advances_refunded?: number; advances_used?: number; advances_held?: number; dues_change: number; expenses: number; cash_close: number; bank_close: number };
 export async function dailySummary(tenantId: string, day: string): Promise<DailySummary> {
   return one<DailySummary>(await serviceClient().rpc("daily_summary", { p_tenant: tenantId, p_day: day }), "daily summary");
 }

@@ -6,16 +6,18 @@ Read this section first in every new conversation, then `decisions.md` (latest D
 
 **Where we are**
 - Phase 0 (backend B0–B9) and Phase 1 (screens U1–U8) are **complete and committed**.
-- Phase 2: **M-37 patient merge done** (2026-11-25; the owner commits it). 57 migrations (last
-  `20261125100000_patient_merge.sql`, applied to dev), decisions D-01…D-138.
+- Phase 2: **M-37 patient merge** and **M-52 patient advances done** (2026-11-25; the owner
+  commits them). 58 migrations (last `20261125110000_patient_advances.sql`, applied to dev),
+  decisions D-01…D-139.
 - Owner-facing guide: `docs/guides/setup-and-user-guide.md` + `CMediSewa-Setup-and-User-Guide.pdf`
   (Super Admin setup, clinic setup in order, daily work, limits). Keep it in step with the app;
   rebuild the PDF with `.local-tools/ui/guide-pdf.mjs`.
 - Last fixes: idle lock covers the whole window, phone-width layouts, "Dr. Dr." names (D-135);
   medicine save accepts "500mg" / "1,000" and names the bad field (`app/actions/inventory.ts`).
 
-**Next step: M-52 patient advances** (deposits held for a patient, used against later bills).
-Phase 2 as trimmed by the owner: ~~M-37 patient merge~~ · M-52 patient advances · M-51 bulk recall ·
+**Next step: M-51 bulk recall** (block a batch number across all stores, notify, list affected
+sales by patient).
+Phase 2 as trimmed by the owner: ~~M-37 patient merge~~ · ~~M-52 patient advances~~ · M-51 bulk recall ·
 M-46 purchase suggestions · M-45 stock reservations · Nepali UI · later online payments, patient
 documents, subdomains. **Dropped to Future:** SMS M-32 (D-136), controlled-drug register M-48 and
 cashier shifts M-47 (D-137). Controlled/narcotic items stay blocked from sale.
@@ -56,6 +58,14 @@ cashier shifts M-47 (D-137). Controlled/narcotic items stay blocked from sale.
 
 **Phase:** Phase 0 and Phase 1 complete. **Pilot preparation:** work through `memory-bank/pilot-checklist.md` (decisions, production setup, email, clinic setup, real-device pass, dry run).
 **Last updated:** 2026-11-25
+
+## M-52 Patient advances: done (2026-11-25)
+| Item | Status |
+|---|---|
+| Migration 0058: patient_advances (AD- receipts), payments.advance_amount leg, record_patient_advance, use_patient_advance, apply_patient_advance (internal); check-in and counter sale use the advance first (0023/0044 bodies + checked substitutions); void returns the advance leg; finance report, daily summary and books check know advances; merges carry them (undo refused while the deposit is spent) | done |
+| Desk "Advance" tab (take, pay from advance, give back, history), check-in form "From the advance", counter sale the same, patient page Advance panel, printable advance receipt (/employee/advance-receipt/[id]), Finance labels; guide updated (E1, E3, E4) | done |
+| Checks | DB **120/120** (8 new) · fresh replay of all 58 migrations + posture ✓ · **E2E 251/251 on a production build** incl. desk and patient page in headless Chrome, phone width · typecheck/lint/build ✓ · posture ✓ · books check clean on both real dev clinics · test clinics purged |
+| Generator | 0058 was built by `gen-m52.cjs` (scratchpad, not kept): the copied functions are the current bodies with exact substitutions; edit the migration file itself from now on |
 
 ## M-37 Patient merge: done (2026-11-25)
 | Item | Status |

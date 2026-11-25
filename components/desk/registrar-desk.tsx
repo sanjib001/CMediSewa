@@ -7,6 +7,8 @@ import Link from "next/link";
 import type { DeskDoctor, DeskService, DeskSettings, PatientLite, QueueVisit, TodayAppointment } from "@/lib/desk/data";
 import { Button } from "@/components/ui/primitives";
 import { OpdTicket } from "@/components/ui/opd-ticket";
+import { AdvancePanel } from "@/components/billing/advance-panel";
+import { getAdvance } from "@/app/actions/advances";
 import { cn } from "@/lib/cn";
 
 const field = "w-full rounded-control border border-line-strong bg-surface px-3 py-2.5 text-ink placeholder:text-ink-faint";
@@ -34,14 +36,14 @@ function Alert({ text }: { text: string | null }) {
 export function RegistrarDesk(props: {
   today: string; doctors: DeskDoctor[]; services: DeskService[]; settings: DeskSettings;
   visits: QueueVisit[]; appointments: TodayAppointment[]; now: number;
-  can: { register: boolean; book: boolean; checkIn: boolean; cancel: boolean };
+  can: { register: boolean; book: boolean; checkIn: boolean; cancel: boolean; advance?: boolean };
   rxByVisit?: Record<string, { id: string; no: string }>; initialQuery?: string;
 }) {
   const router = useRouter();
   const [patient, setPatient] = useState<PatientLite | null>(null);
   const [appointmentId, setAppointmentId] = useState<string | null>(null);
   const [doctorId, setDoctorId] = useState(props.doctors[0]?.id ?? "");
-  const [tab, setTab] = useState<"checkin" | "book">("checkin");
+  const [tab, setTab] = useState<"checkin" | "book" | "advance">("checkin");
 
   const pick = (p: PatientLite, appt?: TodayAppointment) => {
     setPatient(p);
@@ -72,10 +74,10 @@ export function RegistrarDesk(props: {
         {patient ? (
           <section className="rounded-panel border border-line bg-surface">
             <div role="tablist" className="flex border-b border-line">
-              {(["checkin", "book"] as const).filter((t) => (t === "checkin" ? props.can.checkIn : props.can.book)).map((t) => (
+              {(["checkin", "book", "advance"] as const).filter((t) => (t === "checkin" ? props.can.checkIn : t === "book" ? props.can.book : props.can.advance)).map((t) => (
                 <button key={t} role="tab" aria-selected={tab === t} type="button" onClick={() => setTab(t)}
                   className={cn("flex-1 px-4 py-3 font-medium", tab === t ? "border-b-2 border-pine text-pine-deep" : "text-ink-soft")}>
-                  {t === "checkin" ? "Check in now" : "Book for later"}
+                  {t === "checkin" ? "Check in now" : t === "book" ? "Book for later" : "Advance"}
                 </button>
               ))}
             </div>
@@ -89,6 +91,7 @@ export function RegistrarDesk(props: {
               {tab === "book" && props.can.book ? (
                 <BookForm key={patient.id} patient={patient} doctors={props.doctors} services={props.services} today={props.today} onDone={() => router.refresh()} />
               ) : null}
+              {tab === "advance" && props.can.advance ? <AdvancePanel key={patient.id} patientId={patient.id} canTake canRefund /> : null}
             </div>
           </section>
         ) : null}
@@ -208,8 +211,17 @@ function CheckInForm({ patient, doctors, services, settings, doctorId, setDoctor
   const net = Math.max(0, price - discount);
   const tax = service?.taxCategory === "vat13" ? Math.round(net * 13) / 100 : 0;
   const total = net + tax;
-  const cashPart = method === "cash" ? total : method === "online" ? 0 : Math.min(total, cash ?? 0);
-  const onlinePart = method === "cash" ? 0 : total - cashPart;
+  // M-52: the patient's advance pays first; the desk takes only the rest.
+  const [held, setHeld] = useState(0);
+  useEffect(() => {
+    let live = true;
+    if (billing) void getAdvance(patient.id).then((r) => { if (live && r.ok) setHeld(r.summary.balance); });
+    return () => { live = false; };
+  }, [patient.id, billing]);
+  const fromAdvance = billing ? Math.max(0, Math.min(held, total)) : 0;
+  const toPay = Math.round((total - fromAdvance) * 100) / 100;
+  const cashPart = method === "cash" ? toPay : method === "online" ? 0 : Math.min(toPay, cash ?? 0);
+  const onlinePart = method === "cash" ? 0 : toPay - cashPart;
   const discountPct = price > 0 ? (discount * 100) / price : 0;
 
   if (result) {
@@ -217,7 +229,7 @@ function CheckInForm({ patient, doctors, services, settings, doctorId, setDoctor
       <div className="space-y-4 text-center">
         <OpdTicket token={result.token} doctor={doctor?.name ?? ""} room={doctor?.room ?? undefined} size="lg" />
         <p className="text-ink-soft">
-          {patient.full_name}{result.invoiceNo ? <>, bill {result.invoiceNo}{result.receiptNo ? `, receipt ${result.receiptNo}` : ""}: paid {npr(result.paid)}{result.due > 0 ? `, due ${npr(result.due)}` : ""}</> : null}
+          {patient.full_name}{result.invoiceNo ? <>, bill {result.invoiceNo}{result.receiptNo ? `, receipt ${result.receiptNo}` : ""}: paid {npr(result.paid)}{result.fromAdvance > 0 ? ` (${npr(result.fromAdvance)} from the advance)` : ""}{result.due > 0 ? `, due ${npr(result.due)}` : ""}</> : null}
           {result.replayed ? " (already recorded)" : ""}
         </p>
         <div className="flex justify-center gap-2">
@@ -255,7 +267,8 @@ function CheckInForm({ patient, doctors, services, settings, doctorId, setDoctor
             <dt>Fee</dt><dd className="text-right tabular-nums">{npr(price)}</dd>
             {discount > 0 ? <><dt>Discount</dt><dd className="text-right tabular-nums">− {npr(discount)}</dd></> : null}
             {tax > 0 ? <><dt>VAT 13%</dt><dd className="text-right tabular-nums">{npr(tax)}</dd></> : null}
-            <dt className="font-semibold">To pay</dt><dd className="text-right font-semibold tabular-nums">{npr(total)}</dd>
+            {fromAdvance > 0 ? <><dt>From the advance ({npr(held)} held)</dt><dd className="text-right tabular-nums">− {npr(fromAdvance)}</dd></> : null}
+            <dt className="font-semibold">To pay</dt><dd className="text-right font-semibold tabular-nums">{npr(toPay)}</dd>
           </dl>
           <details>
             <summary className="cursor-pointer text-sm text-pine">Discount</summary>
@@ -263,7 +276,7 @@ function CheckInForm({ patient, doctors, services, settings, doctorId, setDoctor
               <input type="number" min={0} max={price} step="1" value={discount || ""} onChange={(e) => setDiscount(Math.max(0, Number(e.target.value) || 0))} className={field} /></label>
             {discountPct > settings.maxDiscountPct ? <p className="mt-1 text-sm text-warn">Above the desk limit: an admin must approve it.</p> : null}
           </details>
-          {total > 0 ? (
+          {toPay > 0 ? (
             <fieldset>
               <legend className={lbl}>Payment</legend>
               <div className="grid grid-cols-3 gap-2">
@@ -273,7 +286,7 @@ function CheckInForm({ patient, doctors, services, settings, doctorId, setDoctor
               </div>
               {method === "mixed" ? (
                 <label className="mt-3 block"><span className={lbl}>Cash part (Rs.)</span>
-                  <input type="number" min={0} max={total} value={cash ?? ""} onChange={(e) => setCash(Number(e.target.value) || 0)} className={field} /></label>
+                  <input type="number" min={0} max={toPay} value={cash ?? ""} onChange={(e) => setCash(Number(e.target.value) || 0)} className={field} /></label>
               ) : null}
               {method !== "cash" ? (
                 <div className="mt-3 grid grid-cols-2 gap-3">
@@ -291,7 +304,7 @@ function CheckInForm({ patient, doctors, services, settings, doctorId, setDoctor
 
       <Alert text={error} />
       <Button type="submit" className="w-full" disabled={pending || !doctorId}>
-        {pending ? "Working…" : billing && total > 0 ? `Check in and take ${npr(total)}` : "Check in and give token"}
+        {pending ? "Working…" : billing && toPay > 0 ? `Check in and take ${npr(toPay)}` : billing && fromAdvance > 0 ? "Check in (paid from the advance)" : "Check in and give token"}
       </Button>
     </form>
   );

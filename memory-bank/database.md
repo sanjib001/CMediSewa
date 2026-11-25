@@ -192,6 +192,10 @@ CROSS      audit_log   notifications   push_subscriptions   notification_outbox 
   bool, deleted_at, merged_into, merged_at`. Per-tenant identity (D-20). Duplicate detection runs on phone + name +
   age. **patient_merges** + **patient_merge_rows** record each combination and exactly which
   rows moved, so it can be undone (M-37, D-138).
+- **patient_advances** (M-52, D-139): append-only deposits (+) and refunds (−) with cash /
+  online legs, AD- receipt per billing profile. **payments.advance_amount** is a third leg
+  (cash + online + advance = amount). Held = Σ advances − Σ payments.advance_amount
+  (`patient_advance_balance`); the books check compares it with `PATIENT_ADVANCES`.
 - **patient_allergies**, **patient_conditions**, **consents** (`kind, given_at, method,
   withdrawn_at`; consent text versioned, P-10).
 - **patient_accounts**: per tenant (D-31): `id, tenant_id, email, phone, display_name,

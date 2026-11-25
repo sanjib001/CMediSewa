@@ -161,6 +161,11 @@ other hides and its MRN still finds the person; `undo_patient_merge` reverses it
 4. Optional vitals by a nurse role [A1, C3].
 5. No-show: automatic by cron after OPD end + grace, or manual. A prepaid OPD fee on a
    cancelled visit is refunded through W-25 (A2 + re-auth).
+6. **Patient advance (M-52, D-139):** a deposit (`record_patient_advance`, AD- receipt) is
+   held for the patient. Check-in and counter sales take the unpaid part from it first
+   (a payment with an advance leg), so no credit is needed for what it covers;
+   `use_patient_advance` pays older open bills; a refund gives unused money back (reason,
+   `manage_billing`); a void returns the advance leg to the advance.
 
 ## W-11 Doctor consultation (M-18) [A2]
 1. My Queue → "Call next" → `in_consultation`.

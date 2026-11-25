@@ -138,7 +138,7 @@ export type CheckInInput = {
   idempotencyKey: string; patientId: string; doctorId: string; appointmentId?: string | null; serviceId?: string | null;
   discount?: number; cash?: number; online?: number; channel?: string | null; reference?: string | null;
 };
-export type CheckInResult = { ok: true; visitId: string; token: number; invoiceNo: string | null; receiptNo: string | null; total: number; paid: number; due: number; replayed: boolean } | Fail;
+export type CheckInResult = { ok: true; visitId: string; token: number; invoiceNo: string | null; receiptNo: string | null; total: number; paid: number; due: number; fromAdvance: number; replayed: boolean } | Fail;
 
 export async function checkIn(input: CheckInInput): Promise<CheckInResult> {
   const ctx = await desk("manage_queue");
@@ -153,9 +153,9 @@ export async function checkIn(input: CheckInInput): Promise<CheckInResult> {
     p_by: ctx.memberId, p_session_level: ctx.level, p_device: ctx.deviceId,
   });
   if (error) return { ok: false, error: friendly(error) };
-  const r = data as { visit_id: string; token_no: number; invoice_no: string | null; receipt_no?: string | null; total: number; paid: number; due?: number; replayed: boolean };
+  const r = data as { visit_id: string; token_no: number; invoice_no: string | null; receipt_no?: string | null; total: number; paid: number; due?: number; from_advance?: number; replayed: boolean };
   done();
-  return { ok: true, visitId: r.visit_id, token: r.token_no, invoiceNo: r.invoice_no, receiptNo: r.receipt_no ?? null, total: Number(r.total ?? 0), paid: Number(r.paid ?? 0), due: Number(r.due ?? 0), replayed: r.replayed };
+  return { ok: true, visitId: r.visit_id, token: r.token_no, invoiceNo: r.invoice_no, receiptNo: r.receipt_no ?? null, total: Number(r.total ?? 0), paid: Number(r.paid ?? 0), due: Number(r.due ?? 0), fromAdvance: Number(r.from_advance ?? 0), replayed: r.replayed };
 }
 
 /** Move a confirmed appointment to a new time (and optionally doctor): one step, one email. */

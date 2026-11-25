@@ -5,6 +5,7 @@ import { getPatient, mergedRecord, patientMerges } from "@/lib/patients/data";
 import { clearDuplicate, mergePatients, undoPatientMerge, updatePatient } from "@/app/actions/patients";
 import { ActionForm, field, label } from "@/components/platform/action-form";
 import { CollectDues } from "@/components/pharmacy/bill-corrections";
+import { AdvancePanel } from "@/components/billing/advance-panel";
 import { PageHeader, Panel } from "@/components/ui/primitives";
 import { cn } from "@/lib/cn";
 import { drName } from "@/lib/doctor-name";
@@ -84,7 +85,7 @@ export default async function Patient({ params, searchParams }: { params: Promis
           {edit ? (
             <section id="combine" aria-label="Combine with another record" className="scroll-mt-6">
               <Panel title="Combine with another record">
-                <p className="mb-3 text-sm text-ink-soft">For the same person registered twice. Visits, appointments, bills, payments, allergies, vitals, consultations and prescriptions all move to the record you keep; the other record&apos;s MRN still finds them. It can be undone.</p>
+                <p className="mb-3 text-sm text-ink-soft">For the same person registered twice. Visits, appointments, bills, payments, advances, allergies, vitals, consultations and prescriptions all move to the record you keep; the other record&apos;s MRN still finds them. It can be undone.</p>
                 <ActionForm key={otherMrn} action={mergePatients} submitLabel="Combine records" tone="danger" confirm="Combine these two records into one? Everything moves to the record you keep.">
                   <input type="hidden" name="id" value={p.id} />
                   <label className="block"><span className={label}>MRN of the other record</span><input name="other_mrn" required inputMode="numeric" pattern="[0-9]{1,6}" maxLength={6} defaultValue={otherMrn} className={field} placeholder="e.g. 000123" /></label>
@@ -116,6 +117,11 @@ export default async function Patient({ params, searchParams }: { params: Promis
             <Panel title={`Owes ${npr(p.owed)}`}>
               <p className="mb-3 text-sm text-ink-soft">Payments clear the oldest bill first.</p>
               {can(ctx, "manage_billing") || can(ctx, "pharmacy_sell") ? <CollectDues key={p.owed} patientId={p.id} owed={p.owed} /> : null}
+            </Panel>
+          ) : null}
+          {can(ctx, "manage_billing") || can(ctx, "pharmacy_sell") ? (
+            <Panel title="Advance">
+              <AdvancePanel patientId={p.id} canTake canRefund={can(ctx, "manage_billing")} />
             </Panel>
           ) : null}
         </div>

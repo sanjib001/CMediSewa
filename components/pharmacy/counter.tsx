@@ -1,8 +1,9 @@
 "use client";
 
-import { useMemo, useRef, useState, useTransition } from "react";
+import { useEffect, useMemo, useRef, useState, useTransition } from "react";
 import Link from "next/link";
 import { findPatient, issueSale, type SaleLine } from "@/app/actions/pharmacy";
+import { getAdvance } from "@/app/actions/advances";
 import type { CounterItem, CounterService } from "@/lib/pharmacy/data";
 import type { PatientLite } from "@/lib/desk/data";
 import { Button } from "@/components/ui/primitives";
@@ -30,7 +31,8 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
   const [ext, setExt] = useState({ prescriber_name: "", prescriber_reg_no: "", facility: "", rx_date: "" });
   const [cash, setCash] = useState(""); const [online, setOnline] = useState(""); const [channel, setChannel] = useState("");
   const [err, setErr] = useState<string | null>(null);
-  const [done, setDone] = useState<{ id: string; no: string; total: number; due: number } | null>(null);
+  const [done, setDone] = useState<{ id: string; no: string; total: number; due: number; fromAdvance: number } | null>(null);
+  const [heldFor, setHeldFor] = useState<{ id: string; balance: number } | null>(null);
   const [pending, start] = useTransition();
 
   const item = (id: string) => items.find((i) => i.id === id);
@@ -78,6 +80,15 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
     });
   }, [rows, items, services]); // eslint-disable-line react-hooks/exhaustive-deps
   const total = Math.round(preview.reduce((s, p) => s + p.net + p.tax, 0) * 100) / 100;
+  // M-52: a linked patient's advance pays first; take only the rest.
+  useEffect(() => {
+    let live = true;
+    if (patient) void getAdvance(patient.id).then((r) => { if (live) setHeldFor({ id: patient.id, balance: r.ok ? r.summary.balance : 0 }); });
+    return () => { live = false; };
+  }, [patient]);
+  const held = patient && heldFor?.id === patient.id ? heldFor.balance : 0;
+  const fromAdvance = patient ? Math.max(0, Math.min(held, total)) : 0;
+  const toTake = Math.round((total - fromAdvance) * 100) / 100;
   const paid = (Number(cash) || 0) + (Number(online) || 0);
   const needsExt = rows.some((r) => r.kind === "item" && !r.rxItemId && item(r.itemId)?.rx_only);
 
@@ -104,7 +115,7 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
 
   if (done) return (
     <div className="rounded-panel border border-ok/40 bg-ok/5 p-5" role="status">
-      <p className="text-lg font-medium">Bill {done.no} issued: {npr(done.total)}{done.due > 0 ? `, ${npr(done.due)} left as due` : ", paid"}.</p>
+      <p className="text-lg font-medium">Bill {done.no} issued: {npr(done.total)}{done.fromAdvance > 0 ? `, ${npr(done.fromAdvance)} from the advance` : ""}{done.due > 0 ? `, ${npr(done.due)} left as due` : ", paid"}.</p>
       <div className="mt-4 flex flex-wrap gap-2">
         <Link href={`/employee/pharmacy/bills/${done.id}`} className="rounded-control bg-pine px-4 py-2 font-medium text-white">Print bill</Link>
         <Button type="button" tone="secondary" onClick={fresh}>New sale</Button>
@@ -213,15 +224,16 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
         <fieldset className="space-y-3">
           <legend className="mb-1 text-sm font-medium">Payment</legend>
           <div className="flex items-baseline justify-between"><span className="text-ink-soft">Total (estimate)</span><span className="text-2xl font-semibold tabular-nums">{npr(total)}</span></div>
+          {fromAdvance > 0 ? <div className="flex items-baseline justify-between text-sm"><span className="text-ink-soft">From the advance ({npr(held)} held)</span><span className="tabular-nums">− {npr(fromAdvance)}; take {npr(toTake)}</span></div> : null}
           <div className="grid gap-3 sm:grid-cols-3">
             <label><span className="block text-xs text-ink-faint">Cash</span><input type="number" min={0} step="0.01" value={cash} onChange={(e) => setCash(e.target.value)} className={field} /></label>
             <label><span className="block text-xs text-ink-faint">Online</span><input type="number" min={0} step="0.01" value={online} onChange={(e) => setOnline(e.target.value)} className={field} /></label>
             <label><span className="block text-xs text-ink-faint">Paid by</span><select value={channel} onChange={(e) => setChannel(e.target.value)} disabled={!Number(online)} className={field}><option value="">—</option>{CHANNELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
           </div>
           <div className="flex flex-wrap gap-2 text-sm">
-            <button type="button" onClick={() => { setCash(String(total)); setOnline(""); }} className="rounded-control border border-line px-2 py-1">All cash</button>
-            <button type="button" onClick={() => { setOnline(String(total)); setCash(""); }} className="rounded-control border border-line px-2 py-1">All online</button>
-            <span className="self-center text-ink-faint">{paid < total ? (allowCredit && patient ? `${npr(total - paid)} will be left as due` : `${npr(total - paid)} still to take`) : paid > total ? `Change ${npr(paid - total)}: enter only the bill amount` : "Paid in full"}</span>
+            <button type="button" onClick={() => { setCash(String(toTake)); setOnline(""); }} className="rounded-control border border-line px-2 py-1">All cash</button>
+            <button type="button" onClick={() => { setOnline(String(toTake)); setCash(""); }} className="rounded-control border border-line px-2 py-1">All online</button>
+            <span className="self-center text-ink-faint">{paid < toTake ? (allowCredit && patient ? `${npr(toTake - paid)} will be left as due` : `${npr(toTake - paid)} still to take`) : paid > toTake ? `Change ${npr(paid - toTake)}: enter only the amount to take` : "Paid in full"}</span>
           </div>
         </fieldset>
       </div>

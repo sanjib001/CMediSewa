@@ -288,6 +288,12 @@ issued prescription appears in the pharmacy, within seconds.
 - **Booking requests** from the website: confirm or decline (with a reason).
 - **Reschedule** or cancel appointments; **Appointments to move** when a doctor is on leave.
 - **Patients who owe:** collect dues.
+- **Advance** (a tab next to Check in and Book, for staff who take payments): take a deposit
+  before an operation or stay (cash or online), and print its **advance receipt** (`AD-…`).
+  The advance pays the patient's next bills by itself: at check-in the form shows **From
+  the advance** and takes only the rest, even if your clinic doesn't allow dues. Bills
+  from before the deposit are paid with **Pay … from the advance**. Unused money can be
+  **given back** (with a reason) by staff with billing permission.
 
 ### E2. Doctor OPD (`/employee/opd`)
 - Your **queue** for today. **Call next**, see the patient's **chart and allergies**.
@@ -303,7 +309,7 @@ issued prescription appears in the pharmacy, within seconds.
 | Tab | What it's for |
 |---|---|
 | **Dispense** | Issued prescriptions waiting. Open one, the batches are suggested (earliest expiry first), adjust, take payment, print the bill. |
-| **Sale** | Counter sales: type or **scan** a medicine, choose the unit (tab/strip/box), quantity; link a patient or record a walk-in; payment (cash/online/mixed). Expired and blocked batches are never offered. Prescription-only items need a prescription. |
+| **Sale** | Counter sales: type or **scan** a medicine, choose the unit (tab/strip/box), quantity; link a patient or record a walk-in; payment (cash/online/mixed). A linked patient's **advance** pays first; take only the rest. Expired and blocked batches are never offered. Prescription-only items need a prescription. |
 | **Bills** | Today's and earlier bills: **print**, **return items** (batch by batch, refund or reduce what's owed), **void** (same day only). |
 | **Dues** | Patients who owe: collect. |
 | **Stock** | What's on hand, transfers between stores, stock counts (PIN level). |
@@ -313,7 +319,7 @@ issued prescription appears in the pharmacy, within seconds.
 | Menu | Use it to |
 |---|---|
 | **Dashboard** | Today: patients booked/registered/waiting/seen, cash and online received, owed by patients, owed to vendors, alerts. |
-| **Patients** | Search, open a patient (visits, appointments, bills), edit details, resolve duplicate flags, **combine two records of the same person** (and undo it). |
+| **Patients** | Search, open a patient (visits, appointments, bills), edit details, resolve duplicate flags, **combine two records of the same person** (and undo it), the patient's **advance** (take, use, give back). |
 | **Appointments** | All bookings by day and doctor. |
 | **Purchases** | **New purchase**: enter the supplier's bill (batches, expiry, cost, MRP, free qty, discount, VAT); pay now or on credit. **Orders** (purchase orders), **Returns** to the vendor, void a purchase. |
 | **Vendors** | Supplier list, what you owe each, **record payments** against bills, payables check. |

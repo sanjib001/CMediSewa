@@ -1121,6 +1121,42 @@ says where everything went.
 
 ---
 
+## M-52 Patient advances (2026-11-25, Phase 2)
+
+**D-139 A patient advance is money held for the patient (a liability) and is spent as a third
+payment leg.** Migration 0058. A deposit or refund is a `patient_advances` row (append-only,
+`AD-` receipt per billing profile, cash/online legs): Dr CASH/BANK / Cr PATIENT_ADVANCES, or the
+reverse for a refund. Using it is an ordinary payment whose `advance_amount` leg funds it
+(cash + online + advance = amount), so dues, bill pages, voids and returns work as before:
+Dr PATIENT_ADVANCES / Cr AR_PATIENTS. Held = deposits − refunds − advance legs
+(`patient_advance_balance`); it can't go below zero (an advisory lock per patient,
+`patient_advance_locked`, so two bills can't spend one deposit).
+- **Automatic use:** `check_in_visit` and `issue_counter_sale` take the unpaid part of a new bill
+  from the advance before the credit rules apply, so a clinic that allows no dues can still
+  bill against a deposit. The desk and counter forms show "From the advance" and ask only for
+  the rest. Both functions are the 0023/0044 bodies with only those lines changed (made by
+  checked text substitution, so nothing else drifted).
+- **Older bills:** `use_patient_advance` pays open bills oldest first (one payment per billing
+  profile). A deposit made after a credit bill doesn't pay it by itself; staff press "Pay …
+  from the advance".
+- **Who:** taking and using need `manage_billing` or `pharmacy_sell`. Giving back needs
+  `manage_billing` and a reason, can't exceed what is held, and doesn't ask for re-auth (the
+  amount is capped by the deposit; it is audited). Both are in the posture allow-list.
+- **Void:** each payment is refunded in its legs, and an advance leg goes back to the advance
+  (Cr PATIENT_ADVANCES), never out as cash. Rounding goes to the advance leg if there is one.
+  A sale return still refunds in cash/online or reduces the due.
+- **Reports:** the finance report shows "Advances held for patients". Money in/out has
+  "Patient advances". The day's "Collected" is now cash + online only (money really
+  received), with advances taken, used and given back listed separately. The nightly books
+  check adds the deposits to cash/bank and an `advances` line (documents vs the
+  PATIENT_ADVANCES balance).
+- **Merge (D-138):** advances move with the patient. Undo is refused
+  (`MERGE_UNDO_ADVANCE_SPENT`) while the kept record has spent the merged record's deposit;
+  void those bills first.
+- **Not done:** returning sale-return money into the advance; advances on the Billing list.
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |

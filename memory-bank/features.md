@@ -90,7 +90,7 @@ the same MVP.
 | M-48 | Controlled-drug register | **F (dropped from P2, D-137)**; still **required before controlled/narcotic items can be sold** (P-22) | register of receipt, dispensing, balance, prescriber; stricter disposal |
 | M-49 | Advanced barcode | P2 | GS1 DataMatrix parsing (GTIN + batch + expiry), camera scanning on phones, shelf and price label printing |
 | M-50 | Accounting export & e-billing integration | F | export journal (CSV/Tally-style); IRD/CBMS real-time invoice reporting if required (P-08) |
-| M-52 | Patient advances / deposits | P2 | deposits before procedures, applied to invoices (`PATIENT_ADVANCES` liability; HRestroSewa room-advance pattern) |
+| M-52 | Patient advances / deposits | P2 | deposits before procedures, applied to invoices (`PATIENT_ADVANCES` liability; HRestroSewa room-advance pattern): **done** (D-139) |
 | M-51 | Bulk recall | P2 | block a batch number across all stores, notify, list affected sales by patient |
 
 ## 2. Feature inventory by area

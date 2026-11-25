@@ -12,6 +12,7 @@ export const EXPOSED_POSTING_FUNCTIONS = new Set([
   "create_purchase_order", "end_purchase_order", "post_purchase_return", "reconcile_vendor_payables",
   "issue_counter_sale", "post_sale_return", "void_invoice", "collect_patient_dues",
   "record_expense", "record_other_income", "reverse_finance_entry", "post_finance_opening", "verify_finance_integrity",
+  "record_patient_advance", "use_patient_advance",
 ]);
 
 const LEDGER_TABLES = ["postings", "ledger_entries", "document_sequences", "ledger_accounts"];

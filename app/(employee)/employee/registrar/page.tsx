@@ -52,7 +52,7 @@ export default async function RegistrarDeskPage({ searchParams }: { searchParams
           can={{
             register: can(ctx, "manage_patients"), book: can(ctx, "manage_appointments"),
             checkIn: can(ctx, "manage_queue") && (setup.settings.billingPoint !== "check_in" || can(ctx, "manage_billing")),
-            cancel: can(ctx, "manage_queue"),
+            cancel: can(ctx, "manage_queue"), advance: can(ctx, "manage_billing"),
           }}
         />
       )}

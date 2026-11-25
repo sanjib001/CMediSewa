@@ -16,12 +16,12 @@ const npr = (n: number) => `${n < 0 ? "−" : ""}Rs. ${Math.abs(n).toLocaleStrin
 const DATE = /^\d{4}-\d{2}-\d{2}$/;
 const shift = (iso: string, days: number) => new Date(Date.parse(`${iso}T00:00:00Z`) + days * 86_400_000).toISOString().slice(0, 10);
 const BALANCES: [string, string][] = [["CASH", "Cash in hand"], ["BANK", "Bank and online"], ["AR_PATIENTS", "Owed by patients"], ["INVENTORY", "Stock at cost"],
-  ["INVENTORY_IN_TRANSIT", "Stock in transit"], ["VENDOR_ADVANCES", "Paid ahead to vendors"], ["TAX_RECEIVABLE", "VAT to recover"], ["AP_VENDORS", "Owed to vendors"], ["TAX_PAYABLE", "VAT to pay"]];
+  ["INVENTORY_IN_TRANSIT", "Stock in transit"], ["VENDOR_ADVANCES", "Paid ahead to vendors"], ["TAX_RECEIVABLE", "VAT to recover"], ["AP_VENDORS", "Owed to vendors"], ["PATIENT_ADVANCES", "Advances held for patients"], ["TAX_PAYABLE", "VAT to pay"]];
 const MONEY: Record<string, string> = {
   payment: "Patients and customers (bills, dues, refunds)", purchase_invoice: "Purchase bills paid at entry", vendor_payment: "Vendor payments",
-  purchase_return: "Refunds from vendors", expense: "Expenses", other_income: "Other income", finance_opening: "Opening balance",
+  purchase_return: "Refunds from vendors", patient_advance: "Patient advances (taken, given back)", expense: "Expenses", other_income: "Other income", finance_opening: "Opening balance",
 };
-const CHECKS: Record<string, string> = { receivables: "Owed by patients", inventory: "Stock value", cash: "Cash", bank: "Bank and online" };
+const CHECKS: Record<string, string> = { receivables: "Owed by patients", inventory: "Stock value", cash: "Cash", bank: "Bank and online", advances: "Advances held for patients" };
 
 function Row({ label: l, value, strong, sub }: { label: string; value: number; strong?: boolean; sub?: boolean }) {
   return <div className={cn("flex justify-between gap-4 py-1.5", strong && "border-t border-line pt-2 font-semibold", sub && "pl-4 text-sm text-ink-soft")}><span>{l}</span><span className="tabular-nums">{npr(value)}</span></div>;
@@ -61,7 +61,7 @@ export default async function Finance({ searchParams }: { searchParams: Promise<
 
       {day ? (
         <section aria-label="Day at a glance" className="mb-6 grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {[["Bills", `${day.bills}${day.voided ? ` (${day.voided} void)` : ""}`, npr(Number(day.sales))], ["Collected", npr(Number(day.collected)), Number(day.refunded) ? `${npr(Number(day.refunded))} refunded` : "no refunds"],
+          {[["Bills", `${day.bills}${day.voided ? ` (${day.voided} void)` : ""}`, npr(Number(day.sales))], ["Collected", npr(Number(day.collected)), [Number(day.refunded) ? `${npr(Number(day.refunded))} refunded` : "no refunds", Number(day.advances_in) || Number(day.advances_used) ? `advances: ${npr(Number(day.advances_in ?? 0))} taken, ${npr(Number(day.advances_used ?? 0))} used${Number(day.advances_refunded) ? `, ${npr(Number(day.advances_refunded))} given back` : ""}` : ""].filter(Boolean).join("; ")],
             ["Expenses", npr(Number(day.expenses)), Number(day.returns) ? `returns ${npr(Number(day.returns))}` : "no returns"], ["Cash at close", npr(Number(day.cash_close)), `bank ${npr(Number(day.bank_close))}`]].map(([t, v, s]) => (
             <div key={t} className="rounded-panel border border-line bg-surface px-4 py-3"><div className="text-sm text-ink-soft">{t}</div><div className="text-xl font-semibold tabular-nums">{v}</div><div className="text-sm text-ink-faint">{s}</div></div>
           ))}
