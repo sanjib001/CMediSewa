@@ -1352,6 +1352,36 @@ forms, and delete what isn't wanted.
   settings, holds, batch choice, the pharmacy Stock tab, purchase orders, counts and recalls.
 - Admin menu "Stock & stores" is now "Stock".
 
+**D-150 The vendor bill form shows each item's cost and starts each line at the batch (owner).**
+- Under each line: "Item cost: Rs X per <unit> = Rs Y per <base unit>", computed exactly as the
+  lot is valued (line after its discount and its share of the bill discount, over paid + free
+  quantity, VAT left out because it is reclaimed), and the MRP margin when an MRP is entered
+  (red when the cost is above the MRP). Each line also shows its Amount, and the total sits
+  under the items.
+- Line order: Item · Batch · Expiry · Unit · Qty · Free · Rate · Disc % · VAT · MRP · Amount, and
+  a newly added item puts the cursor in Batch: the batch is the first thing read off the bill.
+
+**D-151 One batch, one expiry: the bill form fills it in (owner).** GMP: a batch number is one
+production run of one product by one maker, so its packs share the manufacturing and expiry
+dates (labelled under the Drug Act / DDA rules). On the vendor bill, leaving the batch box looks up
+that batch for that medicine (batchOnFile); if it is on file the expiry is filled in, and the MRP
+too when blank. A different expiry shows a red note ("one batch has one expiry: check the label");
+a different MRP shows a warning ("MRP changed"), since MRP can legitimately change. Neither blocks
+posting (owner chose fill + warn). The same batch number on another medicine is unrelated.
+
+**D-152 One batch, one lot (owner; migration 0066).** Buying a batch already on file again adds
+to that lot instead of making a second one, when it is the same medicine, batch number, vendor,
+expiry, cost per base unit (after the line discount, its share of the bill discount and free
+goods), MRP and sale price. Anything different stays a separate lot: a different cost would
+misvalue the stock, and a different vendor would break returns to the vendor.
+- post_purchase_invoice works out each line's final cost before choosing the lot (the bill's
+  pre-discount net is summed first with the same rounding); a reused lot keeps its first bill line.
+- void_purchase_invoice: allowed while what this bill brought is still free on the shelf of the
+  receiving store (on hand minus held), lot by lot; this replaces "no other movement on the lot".
+- post_purchase_return against a bill: the lot must be on that bill, and returns against that bill
+  are limited to what it brought; returnableLots matches the bill's lines by lot.
+- Existing duplicate lots are not merged after the fact (none on the real clinics).
+
 ---
 
 ## Pending decisions

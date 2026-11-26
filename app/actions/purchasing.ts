@@ -147,6 +147,18 @@ const friendlier = (e: { message?: string; code?: string } | null) => {
   return friendly(e);
 };
 
+// D-151: a batch number already on file for this medicine (one production run = one expiry):
+// the bill form fills the expiry from it and warns when the MRP differs.
+export async function batchOnFile(itemId: string, batchNo: string): Promise<{ expiry_date: string | null; mrp_base: number | null } | null> {
+  const ctx = await requireTenant({ operation: "admin.area", permission: "manage_purchases", allowPendingTenant: true, next: "/admin/purchases/new" });
+  const b = String(batchNo ?? "").trim().toUpperCase().slice(0, 30);
+  if (!UUID.test(String(itemId ?? "")) || !b) return null;
+  const { data } = await serviceClient().from("item_batches").select("expiry_date, mrp_base").eq("tenant_id", ctx.tenantId).eq("item_id", itemId).eq("batch_no", b)
+    .order("created_at", { ascending: false }).limit(1).maybeSingle();
+  const d = data as { expiry_date: string | null; mrp_base: number | null } | null;
+  return d ? { expiry_date: d.expiry_date, mrp_base: d.mrp_base === null ? null : Number(d.mrp_base) } : null;
+}
+
 export async function createPurchaseOrder(input: { vendorId: string; storeId: string; expected?: string; note?: string; lines: { item_id: string; unit_id: string; qty: number | string; expected_unit_cost?: number | string | null }[] }):
   Promise<{ ok: true; id: string } | Fail> {
   const ctx = await requireTenant({ operation: "stock.operate", permission: "manage_purchases", allowPendingTenant: true, next: "/admin/purchases/orders" });

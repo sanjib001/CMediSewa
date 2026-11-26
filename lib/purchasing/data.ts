@@ -125,9 +125,10 @@ export async function returnableLots(tenantId: string, vendorId: string, storeId
   if (!lots.length) return [];
   let keep = lots;
   if (invoiceId) {
-    const { data: pl } = await db.from("purchase_invoice_lines").select("id").eq("purchase_id", invoiceId);
-    const set = new Set(((pl ?? []) as { id: string }[]).map((x) => x.id));
-    keep = lots.filter((l) => l.purchase_invoice_line_id && set.has(l.purchase_invoice_line_id));
+    // D-152: a lot can hold several bills of the same batch, so match the bill's lines by lot.
+    const { data: pl } = await db.from("purchase_invoice_lines").select("batch_id").eq("purchase_id", invoiceId);
+    const set = new Set(((pl ?? []) as { batch_id: string }[]).map((x) => x.batch_id));
+    keep = lots.filter((l) => set.has(l.id));
   }
   const [bal, it, un] = await Promise.all([
     db.from("stock_balances").select("batch_id, qty_on_hand").eq("tenant_id", tenantId).eq("store_id", storeId).in("batch_id", keep.map((l) => l.id)),

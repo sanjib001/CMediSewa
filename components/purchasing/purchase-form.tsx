@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { postPurchase } from "@/app/actions/purchasing";
+import { batchOnFile, postPurchase } from "@/app/actions/purchasing";
 import { findItems } from "@/app/actions/inventory";
 import type { ItemRow } from "@/lib/inventory/data";
 import { Button } from "@/components/ui/primitives";
@@ -12,7 +12,9 @@ const f = "w-full rounded-control border border-line-strong bg-surface px-2 py-1
 const lbl = "mb-1 block text-sm font-medium";
 const npr = (n: number) => `Rs. ${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 export type PoPrefill = { poId: string; poNo: string; vendorId: string; storeId: string; lines: { po_line_id: string; item: ItemRow; unit_id: string; qty: number; unit_cost: number | null }[] };
-type Row = { po_line_id?: string; item: ItemRow; unit_id: string; qty: string; free_qty: string; unit_cost: string; discount_pct: string; tax_rate: number; batch_no: string; expiry_date: string; mrp: string; short_expiry_reason: string };
+type Row = { po_line_id?: string; item: ItemRow; unit_id: string; qty: string; free_qty: string; unit_cost: string; discount_pct: string; tax_rate: number; batch_no: string; expiry_date: string; mrp: string; short_expiry_reason: string;
+  /** D-151: the same batch of this medicine already on file (looked up for knownFor = "item:batch"). */
+  known?: { expiry_date: string | null; mrp_base: number | null } | null; knownFor?: string };
 
 function Picker({ onPick }: { onPick: (i: ItemRow) => void }) {
   const [q, setQ] = useState("");
@@ -58,9 +60,29 @@ export function PurchaseForm({ vendors, stores, defaultVendor, today, po }: { ve
   const [channel, setChannel] = useState("bank_transfer");
   const [error, setError] = useState<string | null>(null);
   const [badLine, setBadLine] = useState<number | null>(null);
+  const [focusRow, setFocusRow] = useState<number | null>(null);   // a newly added line starts at its batch number
+  // D-151: leaving the batch box looks the batch up for this medicine; if it is on file, its expiry
+  // (one production run = one expiry) and, when blank, its MRP are filled in.
+  const lookBatch = async (i: number) => {
+    const r = rows[i];
+    const b = r?.batch_no.trim();
+    if (!r || !b || r.knownFor === `${r.item.id}:${b}`) return;
+    const res = await batchOnFile(r.item.id, b);
+    setRows((rs) => rs.map((x, j) => {
+      if (j !== i || x.batch_no.trim() !== b || x.item.id !== r.item.id) return x;
+      if (!res) return { ...x, known: null, knownFor: `${x.item.id}:${b}` };
+      const factor = Number(x.item.units.find((u) => u.id === x.unit_id)?.factor_to_base ?? 1);
+      return { ...x, known: res, knownFor: `${x.item.id}:${b}`, expiry_date: res.expiry_date ?? x.expiry_date,
+        mrp: x.mrp || (res.mrp_base !== null ? String(Math.round(res.mrp_base * factor * 100) / 100) : "") };
+    }));
+  };
   const [pending, start] = useTransition();
   const key = useRef(crypto.randomUUID());
-  const set = (i: number, p: Partial<Row>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...p } : r)));
+  // Editing the line an error points at clears that error (not while typing the short-expiry reason it asked for).
+  const set = (i: number, p: Partial<Row>) => {
+    setRows(rows.map((r, j) => (j === i ? { ...r, ...p } : r)));
+    if (badLine === i + 1 && !("short_expiry_reason" in p)) { setError(null); setBadLine(null); }
+  };
 
   // The same arithmetic and rounding as post_purchase_invoice, so "Pay all" matches the bill to the paisa.
   const r2 = (n: number) => Math.round(n * 100) / 100;
@@ -74,6 +96,22 @@ export function PurchaseForm({ vendors, stores, defaultVendor, today, po }: { ve
   const taxLines = r2(calc.reduce((s, c) => s + c.tax, 0));
   const tax = bd > 0 && net > 0 ? r2(taxLines * (net - bd) / net) : taxLines;
   const total = r2(net - bd + tax);
+  // Item cost (D-150): what one unit really costs the clinic, the way the stock is valued
+  // (post_purchase_invoice): the line after its discount and its share of the bill discount,
+  // spread over the paid and free quantity. VAT is left out (it is reclaimed, not stock cost).
+  const unitCost = rows.map((r, i) => {
+    const unit = r.item.units.find((u) => u.id === r.unit_id);
+    const base = r.item.units.find((u) => u.is_base);
+    const qtyBase = ((Number(r.qty) || 0) + (Number(r.free_qty) || 0)) * Number(unit?.factor_to_base ?? 1);
+    if (!unit || !base || qtyBase <= 0 || !(Number(r.unit_cost) > 0)) return null;
+    const share = net > 0 ? r2(bd * calc[i]!.net / net) : 0;
+    const perBase = (calc[i]!.net - share) / qtyBase;
+    const perUnit = perBase * Number(unit.factor_to_base);
+    const mrp = Number(r.mrp) || 0;
+    return { perBase, perUnit, base: base.name, unit: unit.name, isBase: unit.is_base, free: Number(r.free_qty) > 0,
+      margin: mrp > 0 ? Math.round(((mrp - perUnit) / mrp) * 1000) / 10 : null };
+  });
+  const money4 = (n: number) => `Rs. ${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: n < 10 ? 4 : 2 })}`;
   const paidNow = Math.round(((Number(cash) || 0) + (Number(online) || 0)) * 100) / 100;
   const credit = Math.max(0, Math.round((total - paidNow) * 100) / 100);
   const over = paidNow > total + 0.004;
@@ -93,32 +131,74 @@ export function PurchaseForm({ vendors, stores, defaultVendor, today, po }: { ve
       <section className="space-y-3 rounded-panel border border-line bg-surface p-5">
         <h2 className="font-semibold">Items on the bill</h2>
         {rows.length ? (
-          <div className="hidden grid-cols-[1.8fr_0.9fr_0.6fr_0.6fr_0.8fr_0.6fr_0.6fr_0.9fr_1fr_0.8fr_auto] gap-2 px-1 text-xs text-ink-faint xl:grid">
-            <span>Item</span><span>Unit</span><span>Qty</span><span>Free</span><span>Rate</span><span>Disc %</span><span>VAT</span><span>Batch</span><span>Expiry</span><span>MRP</span><span />
+          <div className="hidden grid-cols-[1.5fr_0.9fr_1fr_0.8fr_0.55fr_0.55fr_0.75fr_0.55fr_0.8fr_0.7fr_0.95fr_auto] gap-2 px-1 text-xs text-ink-faint xl:grid">
+            <span>Item</span><span>Batch</span><span>Expiry</span><span>Unit</span><span>Qty</span><span>Free</span><span>Rate</span><span>Disc %</span><span>VAT</span><span>MRP</span><span className="text-right">Amount</span><span />
           </div>
         ) : null}
         {rows.map((r, i) => (
-          <div key={i} className={cn("grid grid-cols-2 gap-2 rounded-control border p-2 xl:grid-cols-[1.8fr_0.9fr_0.6fr_0.6fr_0.8fr_0.6fr_0.6fr_0.9fr_1fr_0.8fr_auto] xl:border-0 xl:p-0", badLine === i + 1 ? "border-alert" : "border-line")}>
+          <div key={i} className={cn("grid grid-cols-2 gap-2 rounded-control border p-2 xl:grid-cols-[1.5fr_0.9fr_1fr_0.8fr_0.55fr_0.55fr_0.75fr_0.55fr_0.8fr_0.7fr_0.95fr_auto] xl:border-0 xl:p-0", badLine === i + 1 ? "border-alert" : "border-line")}>
             <span className="col-span-2 self-center truncate text-sm font-medium xl:col-span-1">{r.item.name}</span>
+            {/* Batch number first: it is the first thing read off the vendor's bill (owner) */}
+            <input value={r.batch_no} onChange={(e) => set(i, { batch_no: e.target.value.toUpperCase() })} onBlur={() => void lookBatch(i)} placeholder="Batch" aria-label="Batch number" className={f}
+              autoFocus={focusRow === i} />
+            <input value={r.expiry_date} onChange={(e) => set(i, { expiry_date: e.target.value })} type="date" aria-label="Expiry date" className={f} />
             <select value={r.unit_id} onChange={(e) => set(i, { unit_id: e.target.value })} aria-label="Unit" className={f}>{r.item.units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select>
             <input value={r.qty} onChange={(e) => set(i, { qty: e.target.value })} inputMode="decimal" placeholder="Qty" aria-label="Quantity" className={f} />
             <input value={r.free_qty} onChange={(e) => set(i, { free_qty: e.target.value })} inputMode="decimal" placeholder="0" aria-label="Free quantity" className={f} />
             <input value={r.unit_cost} onChange={(e) => set(i, { unit_cost: e.target.value })} inputMode="decimal" placeholder="Rate" aria-label="Rate per unit" className={f} />
             <input value={r.discount_pct} onChange={(e) => set(i, { discount_pct: e.target.value })} inputMode="decimal" placeholder="0" aria-label="Discount percent" className={f} />
             <select value={r.tax_rate} onChange={(e) => set(i, { tax_rate: Number(e.target.value) })} aria-label="VAT" className={f}><option value={0}>0%</option><option value={13}>13%</option></select>
-            <input value={r.batch_no} onChange={(e) => set(i, { batch_no: e.target.value.toUpperCase() })} placeholder="Batch" aria-label="Batch number" className={f} />
-            <input value={r.expiry_date} onChange={(e) => set(i, { expiry_date: e.target.value })} type="date" aria-label="Expiry date" className={f} />
             <input value={r.mrp} onChange={(e) => set(i, { mrp: e.target.value })} inputMode="decimal" placeholder="MRP" aria-label="MRP per unit" className={f} />
+            {/* What this line costs: qty × rate, less its discount, plus its VAT */}
+            <span className="col-span-2 flex items-baseline justify-between gap-2 self-center text-sm xl:col-span-1 xl:block xl:text-right" data-testid="line-amount">
+              <span className="text-ink-faint xl:hidden">Amount</span>
+              <span className="font-medium tabular-nums">{npr(calc[i]!.net + calc[i]!.tax)}</span>
+              {calc[i]!.tax || Number(r.discount_pct) ? <span className="block text-xs text-ink-faint">{Number(r.discount_pct) ? `−${Number(r.discount_pct)}%` : ""}{calc[i]!.tax ? ` +VAT ${npr(calc[i]!.tax)}` : ""}</span> : null}
+            </span>
             <button type="button" aria-label="Remove line" className="px-2 text-ink-faint hover:text-alert" onClick={() => setRows(rows.filter((_, j) => j !== i))}>×</button>
+            {r.known && r.knownFor === `${r.item.id}:${r.batch_no.trim()}` ? (() => {
+              const k = r.known;
+              const unit = r.item.units.find((u) => u.id === r.unit_id);
+              const mrpUnit = k.mrp_base === null ? null : Math.round(k.mrp_base * Number(unit?.factor_to_base ?? 1) * 100) / 100;
+              const expiryOff = Boolean(k.expiry_date && r.expiry_date && r.expiry_date !== k.expiry_date);
+              const mrpOff = mrpUnit !== null && Number(r.mrp) > 0 && Math.abs(Number(r.mrp) - mrpUnit) > 0.005;
+              return (
+                <p className="col-span-2 flex flex-wrap gap-x-4 gap-y-0.5 px-1 text-sm xl:col-span-12" data-testid="batch-known">
+                  <span className="text-ink-soft">Batch {r.batch_no.trim()} is on file{k.expiry_date ? `: expiry ${k.expiry_date}` : ""}{mrpUnit !== null ? `, MRP Rs. ${mrpUnit} per ${unit?.name ?? "unit"}` : ""}.</span>
+                  {expiryOff ? <span className="font-medium text-alert">The expiry differs from this batch on file ({k.expiry_date}). One batch has one expiry: check the label.</span> : null}
+                  {mrpOff ? <span className="font-medium text-warn">MRP changed: this batch was Rs. {mrpUnit} per {unit?.name ?? "unit"}. Check the price on the pack.</span> : null}
+                </p>
+              );
+            })() : null}
+            {unitCost[i] ? (
+              <p className="col-span-2 flex flex-wrap gap-x-4 gap-y-0.5 px-1 text-sm xl:col-span-12" data-testid="item-cost">
+                <span><span className="text-ink-soft">Item cost:</span> <strong className="tabular-nums">{money4(unitCost[i]!.perUnit)}</strong> per {unitCost[i]!.unit}
+                  {!unitCost[i]!.isBase ? <span className="text-ink-soft"> = <span className="tabular-nums">{money4(unitCost[i]!.perBase)}</span> per {unitCost[i]!.base}</span> : null}</span>
+                {unitCost[i]!.free ? <span className="text-ink-soft">free units included</span> : null}
+                {bd ? <span className="text-ink-soft">after its share of the bill discount</span> : null}
+                {unitCost[i]!.margin !== null ? (
+                  <span className={unitCost[i]!.margin! < 0 ? "font-medium text-alert" : "text-ink-soft"}>
+                    MRP margin <span className="tabular-nums">{unitCost[i]!.margin}%</span>{unitCost[i]!.margin! < 0 ? " (costs more than the MRP)" : ""}</span>
+                ) : null}
+              </p>
+            ) : null}
             {badLine === i + 1 && error?.includes("shelf life") ? (
-              <input value={r.short_expiry_reason} onChange={(e) => set(i, { short_expiry_reason: e.target.value })} placeholder="Why accept a short expiry?" className={cn(f, "col-span-2 xl:col-span-11")} />
+              <input value={r.short_expiry_reason} onChange={(e) => set(i, { short_expiry_reason: e.target.value })} placeholder="Why accept a short expiry?" className={cn(f, "col-span-2 xl:col-span-12")} />
             ) : null}
           </div>
         ))}
-        <Picker onPick={(it) => setRows([...rows, {
+        {rows.length ? (
+          <div className="flex flex-wrap items-baseline justify-end gap-x-6 gap-y-1 border-t border-line pt-3 text-[0.95rem]" data-testid="items-total">
+            <span className="text-ink-soft">{rows.length} item{rows.length === 1 ? "" : "s"}</span>
+            {tax ? <span className="text-ink-soft">VAT {npr(taxLines)}</span> : null}
+            <span className="font-semibold">Total <span className="tabular-nums">{npr(r2(net + taxLines))}</span></span>
+            {bd ? <span className="text-ink-soft">after the bill discount <span className="font-semibold tabular-nums text-ink">{npr(total)}</span></span> : null}
+          </div>
+        ) : null}
+        <Picker onPick={(it) => { setFocusRow(rows.length); setRows([...rows, {
           item: it, unit_id: (it.units.find((u) => u.can_purchase && !u.is_base) ?? it.units[0])!.id, qty: "", free_qty: "", unit_cost: "", discount_pct: "", tax_rate: 0,
           batch_no: "", expiry_date: "", mrp: "", short_expiry_reason: "",
-        }])} />
+        }]); }} />
       </section>
 
       <section className="grid gap-6 rounded-panel border border-line bg-surface p-5 md:grid-cols-2">
