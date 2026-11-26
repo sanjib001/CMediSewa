@@ -2,7 +2,7 @@
 
 import { useState, useTransition } from "react";
 import { useRouter } from "next/navigation";
-import { createPurchaseOrder, endPurchaseOrder } from "@/app/actions/purchasing";
+import { createPurchaseOrder, decidePurchaseOrder, endPurchaseOrder } from "@/app/actions/purchasing";
 import { findItems } from "@/app/actions/inventory";
 import type { ItemRow } from "@/lib/inventory/data";
 import { Button } from "@/components/ui/primitives";
@@ -54,44 +54,85 @@ export function NewOrder({ vendors, stores }: { vendors: { id: string; name: str
   );
 }
 
-/** Reorder page: tick suggestions and order them from one vendor (one order per store). */
-export function OrderSuggestions({ vendors, suggestions }: {
-  vendors: { id: string; name: string }[];
-  suggestions: { key: string; store_id: string; store: string; item_id: string; item: string; units: number; unit: string; purchase_unit_id: string | null; unit_cost: number | null }[];
+export type DraftLine = {
+  key: string; store_id: string; store: string; item_id: string; item: string; units: number; unit: string;
+  purchase_unit_id: string | null; unit_cost: number | null; detail: string; urgent: boolean;
+};
+
+/** Reorder page (M-46): one vendor's suggestions, all ticked, quantities editable; one click
+ *  creates a draft order per store, expected after the vendor's delivery time. */
+export function VendorDraft({ vendorId, expected, vendors, lines, canOrder }: {
+  vendorId: string | null; expected: string | null; vendors: { id: string; name: string }[]; lines: DraftLine[]; canOrder: boolean;
 }) {
   const router = useRouter();
-  const [picked, setPicked] = useState<Record<string, boolean>>({});
-  const [vendorId, setVendorId] = useState(vendors[0]?.id ?? "");
+  const [picked, setPicked] = useState<Record<string, boolean>>(() => Object.fromEntries(lines.map((l) => [l.key, Boolean(l.purchase_unit_id)])));
+  const [qty, setQty] = useState<Record<string, string>>(() => Object.fromEntries(lines.map((l) => [l.key, String(l.units)])));
+  const [vendor, setVendor] = useState(vendorId ?? "");
   const [error, setError] = useState<string | null>(null);
   const [pending, start] = useTransition();
-  const chosen = suggestions.filter((s) => picked[s.key] && s.purchase_unit_id);
+  const chosen = lines.filter((l) => picked[l.key] && l.purchase_unit_id && Number(qty[l.key]) > 0);
+  const cost = chosen.reduce((s, l) => s + (l.unit_cost ?? 0) * Number(qty[l.key]), 0);
   return (
     <div className="space-y-3">
       <ul className="divide-y divide-line">
-        {suggestions.map((s) => (
-          <li key={s.key} className="flex items-center gap-3 py-2">
-            <input type="checkbox" checked={Boolean(picked[s.key])} disabled={!s.purchase_unit_id} onChange={(e) => setPicked({ ...picked, [s.key]: e.target.checked })} aria-label={`Order ${s.item}`} />
-            <span className="flex-1"><span className="font-medium">{s.item}</span> <span className="text-sm text-ink-faint">{s.store}</span></span>
-            <span className="text-sm">{s.units} {s.unit}</span>
+        {lines.map((l) => (
+          <li key={l.key} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2">
+            {canOrder ? <input type="checkbox" checked={Boolean(picked[l.key])} disabled={!l.purchase_unit_id} onChange={(e) => setPicked({ ...picked, [l.key]: e.target.checked })} aria-label={`Order ${l.item}`} /> : null}
+            <span className="min-w-48 flex-1">
+              <span className="font-medium">{l.item}</span> <span className="text-sm text-ink-faint">{l.store}</span>
+              <span className={cn("block text-sm", l.urgent ? "text-alert" : "text-ink-soft")}>{l.detail}{l.urgent ? " (runs out before a delivery)" : ""}</span>
+            </span>
+            {canOrder ? (
+              <span className="flex items-center gap-1 text-sm">
+                <input value={qty[l.key]} onChange={(e) => setQty({ ...qty, [l.key]: e.target.value })} inputMode="decimal" aria-label={`Quantity of ${l.item}`} className={cn(f, "w-16 text-right")} />{l.unit}
+              </span>
+            ) : <span className="text-sm font-medium">{l.units} {l.unit}</span>}
+            <span className="w-24 text-right text-sm tabular-nums text-ink-soft">{l.unit_cost === null ? "no cost yet" : `Rs. ${(l.unit_cost * Number(qty[l.key] || 0)).toLocaleString("en-IN", { maximumFractionDigits: 0 })}`}</span>
           </li>
         ))}
       </ul>
-      {vendors.length ? (
+      {canOrder ? (vendors.length ? (
         <div className="flex flex-wrap items-center gap-2">
-          <select value={vendorId} onChange={(e) => setVendorId(e.target.value)} aria-label="Vendor" className={cn(f, "w-auto py-2")}>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select>
-          <Button type="button" disabled={pending || !chosen.length} onClick={() => start(async () => {
+          {vendorId ? null : <select value={vendor} onChange={(e) => setVendor(e.target.value)} aria-label="Vendor" className={cn(f, "w-auto py-2")}>
+            <option value="">Choose a vendor</option>{vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}</select>}
+          <Button type="button" disabled={pending || !chosen.length || !vendor} onClick={() => start(async () => {
             setError(null);
             const stores = [...new Set(chosen.map((c) => c.store_id))];
             let first: string | null = null;
             for (const st of stores) {
-              const r = await createPurchaseOrder({ vendorId, storeId: st, lines: chosen.filter((c) => c.store_id === st).map((c) => ({ item_id: c.item_id, unit_id: c.purchase_unit_id!, qty: c.units, expected_unit_cost: c.unit_cost })) });
+              const r = await createPurchaseOrder({ vendorId: vendor, storeId: st, expected: vendorId && expected ? expected : undefined, note: "From Reorder suggestions",
+                lines: chosen.filter((c) => c.store_id === st).map((c) => ({ item_id: c.item_id, unit_id: c.purchase_unit_id!, qty: qty[c.key] ?? "", expected_unit_cost: c.unit_cost })) });
               if (!r.ok) { setError(r.error); return; }
               first ??= r.id;
             }
-            if (first) router.push(`/admin/purchases/orders/${first}`);
-          })}>{chosen.length ? `Order ${chosen.length} item${chosen.length > 1 ? "s" : ""} from this vendor` : "Tick items to order"}</Button>
+            router.push(stores.length > 1 ? "/admin/purchases/orders" : `/admin/purchases/orders/${first}`);
+          })}>{chosen.length ? `Create order for ${chosen.length} item${chosen.length > 1 ? "s" : ""}${cost ? ` (about Rs. ${cost.toLocaleString("en-IN", { maximumFractionDigits: 0 })})` : ""}` : "Tick items to order"}</Button>
         </div>
-      ) : <p className="text-sm text-ink-soft">Add a vendor to order from.</p>}
+      ) : <p className="text-sm text-ink-soft">Add a vendor to order from.</p>) : null}
+      {error ? <p role="alert" className="text-sm text-alert">{error}</p> : null}
+    </div>
+  );
+}
+
+/** Approve or reject an order waiting above the clinic's approval limit. */
+export function DecideOrder({ id }: { id: string }) {
+  const router = useRouter();
+  const [reason, setReason] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [pending, start] = useTransition();
+  const run = (approve: boolean) => start(async () => {
+    setError(null);
+    const r = await decidePurchaseOrder({ id, approve, reason });
+    if (r.ok) router.refresh(); else setError(r.error);
+  });
+  return (
+    <div className="space-y-3">
+      <label className="block max-w-md"><span className={lbl}>Reason (needed to reject)</span>
+        <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} className={cn(f, "py-2")} placeholder="e.g. buy from the cheaper vendor" /></label>
+      <div className="flex flex-wrap gap-2">
+        <Button type="button" disabled={pending} onClick={() => run(true)}>Approve order</Button>
+        <Button type="button" tone="secondary" disabled={pending} onClick={() => run(false)}>Reject</Button>
+      </div>
       {error ? <p role="alert" className="text-sm text-alert">{error}</p> : null}
     </div>
   );

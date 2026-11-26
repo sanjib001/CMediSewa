@@ -11,12 +11,12 @@ function rows<T>(r: { data: unknown; error: { message: string } | null }, what: 
 
 export type Vendor = {
   id: string; vendor_code: string; name: string; pan_vat_no: string | null; contact_person: string | null; phone: string | null; email: string | null;
-  address: string | null; payment_terms_days: number | null; is_active: boolean; notes: string | null; payable: number; advance: number;
+  address: string | null; payment_terms_days: number | null; lead_time_days: number | null; is_active: boolean; notes: string | null; payable: number; advance: number;
 };
 export async function listVendors(tenantId: string): Promise<Vendor[]> {
   const db = serviceClient();
   const [v, b] = await Promise.all([
-    db.from("vendors").select("id, vendor_code, name, pan_vat_no, contact_person, phone, email, address, payment_terms_days, is_active, notes").eq("tenant_id", tenantId).order("name"),
+    db.from("vendors").select("id, vendor_code, name, pan_vat_no, contact_person, phone, email, address, payment_terms_days, lead_time_days, is_active, notes").eq("tenant_id", tenantId).order("name"),
     db.rpc("vendor_balances", { p_tenant: tenantId }),
   ]);
   const bal = rows<{ vendor_id: string; payable: number; advance: number }>(b, "vendor balances");
@@ -94,9 +94,9 @@ export async function listVendorPayments(tenantId: string, vendorId: string): Pr
 }
 
 // ── B6b: orders, returns, payable check ──────────────────────────────────────
-export type OrderRow = { id: string; po_no: string; vendor_id: string; deliver_to_store_id: string; status: string; expected_date: string | null; created_at: string; note: string | null };
+export type OrderRow = { id: string; po_no: string; vendor_id: string; deliver_to_store_id: string; status: string; expected_date: string | null; created_at: string; note: string | null; created_by: string; approved_at: string | null };
 export async function listOrders(tenantId: string): Promise<OrderRow[]> {
-  return rows<OrderRow>(await serviceClient().from("purchase_orders").select("id, po_no, vendor_id, deliver_to_store_id, status, expected_date, created_at, note")
+  return rows<OrderRow>(await serviceClient().from("purchase_orders").select("id, po_no, vendor_id, deliver_to_store_id, status, expected_date, created_at, note, created_by, approved_at")
     .eq("tenant_id", tenantId).order("created_at", { ascending: false }).limit(100), "orders");
 }
 export async function getOrder(tenantId: string, id: string) {
@@ -159,4 +159,39 @@ export async function returnableLots(tenantId: string, vendorId: string, storeId
 export async function lastPayableCheck(tenantId: string) {
   const { data } = await serviceClient().from("payable_reconciliations").select("ran_at, vendors, mismatches").eq("tenant_id", tenantId).order("ran_at", { ascending: false }).limit(1).maybeSingle();
   return data as { ran_at: string; vendors: number; mismatches: number } | null;
+}
+
+// ── M-46 (D-144): purchase plan and supplier performance ─────────────────────
+export type PlanRow = {
+  store_id: string; store_name: string; item_id: string; item_name: string; vendor_id: string | null; vendor_name: string | null;
+  on_hand: number; on_order: number; used: number; per_day: number; days_left: number | null; lead_days: number; reorder_level: number | null;
+  suggested_base: number; purchase_unit_id: string | null; purchase_unit: string; unit_factor: number; suggested_units: number;
+  last_unit_cost_base: number | null; est_cost: number; reason: "level" | "sales";
+};
+/** What each receiving store should order, from its use over the last `days` and each vendor's delivery time. */
+export async function purchasePlan(tenantId: string, days = 30): Promise<PlanRow[]> {
+  const r = await serviceClient().rpc("purchase_plan", { p_tenant: tenantId, p_store: null, p_days: days });
+  const NUM = ["on_hand", "on_order", "used", "per_day", "days_left", "lead_days", "reorder_level", "suggested_base", "unit_factor", "suggested_units", "last_unit_cost_base", "est_cost"] as const;
+  return rows<Record<string, unknown>>(r, "purchase plan").map((x) => {
+    const o = { ...x } as Record<string, unknown>;
+    for (const k of NUM) o[k] = o[k] === null || o[k] === undefined ? null : Number(o[k]);
+    return o as unknown as PlanRow;
+  });
+}
+
+export type VendorPerformance = {
+  orders: number; fill_rate: number | null; on_time_rate: number | null; delivery_days: number | null; bills: number; purchased: number; returned: number;
+  return_rate: number | null; shelf_life_days: number | null; short_dated_lots: number; price_changes: { item: string; last: number; previous: number; change_pct: number }[];
+};
+export async function vendorPerformance(tenantId: string, vendorId: string, days = 365): Promise<VendorPerformance> {
+  const { data, error } = await serviceClient().rpc("vendor_performance", { p_tenant: tenantId, p_vendor: vendorId, p_days: days });
+  if (error) throw new Error(`vendor performance: ${error.message}`);
+  const p = data as Record<string, unknown>;
+  const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
+  return {
+    orders: Number(p.orders ?? 0), fill_rate: n(p.fill_rate), on_time_rate: n(p.on_time_rate), delivery_days: n(p.delivery_days), bills: Number(p.bills ?? 0),
+    purchased: Number(p.purchased ?? 0), returned: Number(p.returned ?? 0), return_rate: n(p.return_rate), shelf_life_days: n(p.shelf_life_days),
+    short_dated_lots: Number(p.short_dated_lots ?? 0),
+    price_changes: ((p.price_changes ?? []) as { item: string; last: unknown; previous: unknown; change_pct: unknown }[]).map((c) => ({ item: c.item, last: Number(c.last), previous: Number(c.previous), change_pct: Number(c.change_pct) })),
+  };
 }

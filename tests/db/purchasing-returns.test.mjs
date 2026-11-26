@@ -219,3 +219,83 @@ test("found stock: a proper lot (capital batch, expiry needed for medicines, MRP
     assert.deepEqual([lot.batch_no, Number(lot.c), Number(lot.m), Number(lot.s)], ["FD22", 8, 15, 15], "per tablet: cost 8, MRP and price 15 (not the cost)");
   });
 });
+
+// ── M-46 (D-144): purchase plan from real use, vendor performance, the PO approval limit ──
+const sellTabs = async (c, x, item, unit, qty) => {
+  const { rows: [p] } = await c.query(`select sale_price_base::numeric p from item_batches where item_id = $1 order by created_at limit 1`, [item]);
+  return c.query(`select issue_counter_sale($1, $2, $3, null, 'Walk-in', null, $4, null, $5, 0, null, null, $6, 'A1', null) r`,
+    [x.t, uuid(), x.store, JSON.stringify([{ kind: "item", item_id: item, unit_id: unit, qty }]), Math.round(qty * Number(p.p) * 100) / 100, x.admin]);
+};
+
+test("purchase plan: what to order from how fast it sells and the vendor's delivery time; orders already placed count", async () => {
+  await withTx(async (c) => {
+    const x = await setup(c);
+    await asApp(c);
+    const { rows: [{ id: velo }] } = await save(c, x, PARA({ name: "Velocid 500", reorder_level: null, min_stock_level: null, barcodes: [] }));
+    const uv = await units(c, velo);
+    await bill(c, x, { no: "PL-1", lines: [{ item_id: velo, unit_id: uv.strip, qty: 10, free_qty: 1, unit_cost: 100, tax_rate: 0, batch_no: "VL1", expiry_date: d(400), mrp: 150 }], billDiscount: 0, cash: 0 });
+    const row = async () => (await c.query(`select * from purchase_plan($1, $2, 30) where item_id = $3`, [x.t, x.store, velo])).rows[0];
+    assert.equal(await row(), undefined, "110 on hand and nothing sold: nothing to order");
+    await sellTabs(c, x, velo, uv.tab, 90);
+    let r = await row();
+    assert.deepEqual([r.reason, Number(r.on_hand), Number(r.per_day), Number(r.days_left), Number(r.lead_days), r.vendor_id],
+      ["sales", 20, 3, 6.7, 7, x.vendor], "3 a day, 20 left: under a week's delivery plus a week");
+    assert.deepEqual([Number(r.suggested_base), r.purchase_unit, Number(r.suggested_units)], [91, "box", 1], "3 × (7 + 30) − 20 = 91 tabs → 1 box");
+    await c.query(`select save_vendor($1, $2, $3, $4)`, [x.t, x.vendor, JSON.stringify({ name: "Himalayan Pharma Distributors", lead_time_days: 14 }), x.admin]);
+    r = await row();
+    assert.deepEqual([Number(r.lead_days), Number(r.suggested_base)], [14, 112], "a slower vendor: 3 × (14 + 30) − 20");
+    await po(c, x, [{ item_id: velo, unit_id: uv.box, qty: 1, expected_unit_cost: 900 }]);
+    assert.equal(await row(), undefined, "a box already on order covers it");
+  });
+});
+
+test("vendor performance: fill rate, on time, delivery days, returns, price changes, shelf life at receipt", async () => {
+  await withTx(async (c) => {
+    const x = await setup(c);
+    await asApp(c);
+    const P = (await c.query(`select create_purchase_order($1, $2, $3, $4, $5, null, $6) id`, [x.t, x.admin, x.vendor, x.store, d(5),
+      JSON.stringify([{ item_id: x.item, unit_id: x.u.strip, qty: 20, expected_unit_cost: 100 }])])).rows[0].id;
+    const { rows: [pl] } = await c.query(`select id from purchase_order_lines where po_id = $1`, [P]);
+    await bill(c, x, { no: "VP-1", lines: [{ item_id: x.item, unit_id: x.u.strip, qty: 10, unit_cost: 100, tax_rate: 0, batch_no: "VP1", expiry_date: d(400), mrp: 150, po_line_id: pl.id }], billDiscount: 0, cash: 1000 });
+    const b2 = (await bill(c, x, { no: "VP-2", lines: [{ item_id: x.item, unit_id: x.u.strip, qty: 10, unit_cost: 120, tax_rate: 0, batch_no: "VP2", expiry_date: d(100), mrp: 150 }], billDiscount: 0, cash: 1200 })).rows[0].id;
+    const { rows: [l2] } = await c.query(`select batch_id from purchase_invoice_lines where purchase_id = $1`, [b2]);
+    await c.query(`select post_purchase_return($1, $2, $3, $4, $5, 'cash_refund', null, null, $6, $7, 'A2', null)`,
+      [x.t, uuid(), x.vendor, x.store, b2, JSON.stringify([{ batch_id: l2.batch_id, qty_base: 20, reason: "near_expiry" }]), x.admin]);
+    const p = (await c.query(`select vendor_performance($1, $2, 365) p`, [x.t, x.vendor])).rows[0].p;
+    assert.equal(Number(p.fill_rate), 50, "10 of 20 strips ordered came");
+    assert.equal(Number(p.on_time_rate), 100);
+    assert.equal(Number(p.delivery_days), 0);
+    assert.equal(Number(p.return_rate), 10.9, "240 back of 2,200 bought");
+    assert.equal(p.short_dated_lots, 1, "the lot with 100 days left");
+    assert.equal(p.price_changes[0].change_pct, 20, "100 → 120 per strip");
+  });
+});
+
+test("approval limit: a big order waits for the owner; it can't be received until approved; rejected needs a reason", async () => {
+  await withTx(async (c) => {
+    const x = await setup(c);
+    const { rows: [r] } = await c.query(`insert into tenant_roles (tenant_id, name, permissions) values ($1, 'Buyer', $2) returning id`, [x.t, ["manage_purchases"]]);
+    await c.query(`insert into member_roles (tenant_id, member_id, role_id) values ($1, $2, $3)`, [x.t, x.pharmacist, r.id]);
+    await c.query(`update tenant_settings set po_approval_limit = 1000 where tenant_id = $1`, [x.t]);
+    await asApp(c);
+    const order = (by, qty, cost = 100) => c.query(`select create_purchase_order($1, $2, $3, $4, null, null, $5) id`, [x.t, by, x.vendor, x.store,
+      JSON.stringify([{ item_id: x.item, unit_id: x.u.strip, qty, expected_unit_cost: cost }])]).then((q) => q.rows[0].id);
+    const status = async (id) => (await c.query(`select status from purchase_orders where id = $1`, [id])).rows[0].status;
+    const small = await order(x.pharmacist, 5), big = await order(x.pharmacist, 20), noCost = await order(x.pharmacist, 1, null), own = await order(x.admin, 50);
+    assert.deepEqual([await status(small), await status(big), await status(noCost), await status(own)], ["open", "pending_approval", "pending_approval", "open"]);
+    const { rows: [pl] } = await c.query(`select id from purchase_order_lines where po_id = $1`, [big]);
+    await expectError(c, `select post_purchase_invoice($1, $2, $3, 'PA-1', $4, $5, $6, 0, 0, 0, 0, null, null, $7, 'A2', null)`,
+      [x.t, uuid(), x.vendor, d(-1), x.store, JSON.stringify([{ item_id: x.item, unit_id: x.u.strip, qty: 5, unit_cost: 100, batch_no: "PA1", expiry_date: d(300), po_line_id: pl.id }]), x.admin], /PO_LINE_NOT_FOUND/);
+    await expectError(c, `select decide_purchase_order($1, $2, $3, true, null)`, [x.t, x.pharmacist, big], /NO_PERMISSION/);
+    await expectError(c, `select decide_purchase_order($1, $2, $3, false, '')`, [x.t, x.admin, noCost], /REASON_REQUIRED/);
+    await c.query(`select decide_purchase_order($1, $2, $3, true, null)`, [x.t, x.admin, big]);
+    await c.query(`select decide_purchase_order($1, $2, $3, false, 'Buy from the cheaper vendor')`, [x.t, x.admin, noCost]);
+    assert.deepEqual([await status(big), await status(noCost)], ["open", "cancelled"]);
+    await expectError(c, `select decide_purchase_order($1, $2, $3, true, null)`, [x.t, x.admin, big], /PO_NOT_PENDING/);
+    await asOwner(c);
+    const { rows: [n] } = await c.query(`select count(*)::int n from notifications where tenant_id = $1 and kind = 'po_approval' and member_id = $2`, [x.t, x.admin]);
+    assert.equal(n.n, 2, "the owner was told about both waiting orders");
+    const { rows: [po2] } = await c.query(`select approved_by, closed_reason from purchase_orders where id = $1`, [noCost]);
+    assert.equal(po2.closed_reason, "Not approved: Buy from the cheaper vendor");
+  });
+});

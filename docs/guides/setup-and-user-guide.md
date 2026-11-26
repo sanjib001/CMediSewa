@@ -160,6 +160,8 @@ province, district, municipality, ward, street/tole.
 | Email a reminder (hours before) | Appointment reminder by email; 0 = off |
 | Warn about expiry / Urgent expiry (days before) | When medicines show as "expiring" and "urgent" |
 | **Receipt paper** | 80 mm thermal · 58 mm thermal · A5 · A4 |
+| Order enough for (days) | Reorder suggestions cover the vendor's delivery time plus this many days of sales (default 30) |
+| Orders above this need approval (Rs.) | Blank = no approval. A purchase order worth more (or with a line without an expected rate) waits for someone who manages the settings, and can't be received until approved |
 
 Saving asks for your password if you haven't entered it recently.
 
@@ -230,8 +232,9 @@ Enter what is on the shelf **on the day you start**, one line per batch: item, u
 stock entries can be corrected, never deleted.
 
 ### C9. Vendors (Pharmacy & stock → Vendors)
-Add each supplier (name, PAN/VAT, phone, contact person, payment terms in days) and their
-**opening balance**: what the clinic already owed them on the start date.
+Add each supplier (name, PAN/VAT, phone, contact person, payment terms in days, **delivery
+time in days**) and their **opening balance**: what the clinic already owed them on the start
+date. Leave the delivery time blank to have it worked out from past orders (else 7 days).
 
 ### C10. Opening cash and bank (Money → Finance)
 Under **Opening cash and bank**, enter the cash in the drawer and the bank balance on the
@@ -321,9 +324,9 @@ issued prescription appears in the pharmacy, within seconds.
 | **Dashboard** | Today: patients booked/registered/waiting/seen, cash and online received, owed by patients, owed to vendors, alerts. |
 | **Patients** | Search, open a patient (visits, appointments, bills), edit details, resolve duplicate flags, **combine two records of the same person** (and undo it), the patient's **advance** (take, use, give back). |
 | **Appointments** | All bookings by day and doctor. |
-| **Purchases** | **New purchase**: enter the supplier's bill (batches, expiry, cost, MRP, free qty, discount, VAT); pay now or on credit. **Orders** (purchase orders), **Returns** to the vendor, void a purchase. |
-| **Vendors** | Supplier list, what you owe each, **record payments** against bills, payables check. If you paid ahead or have unused credit notes, the vendor page shows **Credit with this vendor** and **Use … of credit** on the bills you owe, oldest first. |
-| **Stock & stores** | Needs attention (low, expiring, expired), on the shelf, **transfers**, **counts**, **reorder** list, **dispose** expired or damaged stock, opening stock, **found stock** (a batch on the shelf with no lot on file: batch, expiry, cost, MRP), **Recalls**. Each medicine can have its own **levels per store** (Medicines → the item). |
+| **Purchases** | **New purchase**: enter the supplier's bill (batches, expiry, cost, MRP, free qty, discount, VAT); pay now or on credit. **Orders** (purchase orders), **Returns** to the vendor, void a purchase. An order above the approval limit (Settings) shows **Needs approval**: the owner opens it and approves or rejects it (with a reason); someone else must approve an order they raised. |
+| **Vendors** | Supplier list, what you owe each, **record payments** against bills, payables check. If you paid ahead or have unused credit notes, the vendor page shows **Credit with this vendor** and **Use … of credit** on the bills you owe, oldest first. **How this vendor has done** (last 12 months): fill rate, on time, delivery time, returns, shelf life at receipt, price changes. |
+| **Stock & stores** | Needs attention (low, expiring, expired), on the shelf, **transfers**, **counts**, **Reorder** (what each store should order, from how fast it sold in the last 30/60/90 days and the vendor's delivery time, or because it is at its reorder level; grouped by the vendor last bought from, one click makes a draft order), **dispose** expired or damaged stock, opening stock, **found stock** (a batch on the shelf with no lot on file: batch, expiry, cost, MRP), **Recalls**. Each medicine can have its own **levels per store** (Medicines → the item). |
 | **Billing** | Every bill; open, print, see returns and payments. |
 | **Expenses** | Record expenses (electricity, rent, salaries, transport…) paid in cash or online; reverse a mistake. |
 | **Finance** | Profit and loss for any period, money in and out, cash and bank balances, expenses by category, the nightly **books check**, opening cash and bank. |

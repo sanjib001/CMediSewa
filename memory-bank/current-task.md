@@ -1,28 +1,26 @@
 # Current Task
 
-## ▶ Resume here (handoff, 2026-11-25)
+## ▶ Resume here (handoff, 2026-11-26)
 Read this section first in every new conversation, then `decisions.md` (latest D-numbers) and
 `pilot-checklist.md`.
 
 **Where we are**
 - Phase 0 (backend B0–B9) and Phase 1 (screens U1–U8) are **complete and committed**.
 - Phase 2: M-37 patient merge, M-52 patient advances, M-51 bulk recall committed.
-- **Pharmacy track (owner, D-142): finish the pharmacy completely, then the UI.** Step 1
-  (counter and dispensing gaps, D-141) committed; step 2 (purchasing gaps, D-143) done
-  2026-11-25, the owner commits it. 61 migrations (last `20261125140000_purchasing_gaps.sql`,
-  applied to dev), decisions D-01…D-143.
+- **Pharmacy track (owner, D-142): finish the pharmacy completely, then the UI.** Steps 1 (D-141)
+  and 2 (D-143) committed; step 3 (M-46 purchase suggestions and supplier performance, D-144)
+  done 2026-11-26, the owner commits it. 62 migrations (last `20261125150000_purchase_planning.sql`,
+  applied to dev), decisions D-01…D-144.
 - Owner-facing guide: `docs/guides/setup-and-user-guide.md` + `CMediSewa-Setup-and-User-Guide.pdf`
   (Super Admin setup, clinic setup in order, daily work, limits). Keep it in step with the app;
   rebuild the PDF with `.local-tools/ui/guide-pdf.mjs`.
 - Last fixes: idle lock covers the whole window, phone-width layouts, "Dr. Dr." names (D-135);
   medicine save accepts "500mg" / "1,000" and names the bad field (`app/actions/inventory.ts`).
 
-**Next step: pharmacy track step 3, M-46 purchase suggestions and supplier performance**
-(sales speed × the vendor's delivery time per store, one-click draft orders per vendor,
-supplier fill rate, on-time rate, returns, price trend, shelf life at receipt, a PO approval
-limit). Then step 4 M-45, step 5 M-49, step 6 substitutes (D-142), then the UI.
+**Next step: pharmacy track step 4, M-45 stock reservations.** Then step 5 M-49, step 6
+substitutes (D-142), then the UI.
 Phase 2 as trimmed by the owner: ~~M-37 patient merge~~ · ~~M-52 patient advances~~ · ~~M-51 bulk recall~~ ·
-M-46 purchase suggestions · M-45 stock reservations · Nepali UI · later online payments, patient
+~~M-46 purchase suggestions~~ · M-45 stock reservations · Nepali UI · later online payments, patient
 documents, subdomains. **Dropped to Future:** SMS M-32 (D-136), controlled-drug register M-48 and
 cashier shifts M-47 (D-137). Controlled/narcotic items stay blocked from sale.
 
@@ -61,7 +59,14 @@ cashier shifts M-47 (D-137). Controlled/narcotic items stay blocked from sale.
 ---
 
 **Phase:** Phase 0 and Phase 1 complete. **Pilot preparation:** work through `memory-bank/pilot-checklist.md` (decisions, production setup, email, clinic setup, real-device pass, dry run).
-**Last updated:** 2026-11-25
+**Last updated:** 2026-11-26
+
+## Pharmacy step 3, M-46 purchase suggestions and supplier performance: done (2026-11-26)
+| Item | Status |
+|---|---|
+| Migration 0062: purchase_plan (use per day × delivery time + cover days, levels, on order), vendor_lead_days, vendor_performance, PO approval limit (pending_approval, decide_purchase_order, notifications), vendors.lead_time_days, tenant_settings.reorder_cover_days / po_approval_limit | done |
+| Reorder page grouped by vendor with 30/60/90-day speed and one-click draft orders; orders "Needs approval" banner, approve/reject on the order; vendor page "How this vendor has done" and delivery time; Settings fields; guide updated (C2, C9, E4) | done |
+| Checks | DB **132/132** (3 new) · fresh replay of all 62 migrations + posture ✓ · **E2E 299/299 on a production build** incl. the one-click draft in headless Chrome, phone width · typecheck/lint/build ✓ · posture ✓ · test clinics purged |
 
 ## Pharmacy step 2, purchasing gaps: done (2026-11-25)
 | Item | Status |

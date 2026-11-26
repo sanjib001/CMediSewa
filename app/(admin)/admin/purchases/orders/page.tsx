@@ -9,7 +9,7 @@ export const metadata = { title: "Purchase orders" };
 export const dynamic = "force-dynamic";
 
 const ORDER_STATUS: Record<string, [string, string]> = {
-  open: ["Waiting", "text-warn"], partially_received: ["Part received", "text-marigold-ink"], received: ["Received", "text-ok"],
+  pending_approval: ["Needs approval", "text-alert"], open: ["Waiting", "text-warn"], partially_received: ["Part received", "text-marigold-ink"], received: ["Received", "text-ok"],
   closed: ["Closed", "text-ink-faint"], cancelled: ["Cancelled", "text-ink-faint"],
 };
 
@@ -17,9 +17,16 @@ export default async function Orders() {
   const ctx = await requireTenant({ operation: "admin.area", permission: "manage_purchases", allowPendingTenant: true, next: "/admin/purchases/orders" });
   const [orders, vendors, { stores }] = await Promise.all([listOrders(ctx.tenantId), listVendors(ctx.tenantId), listStores(ctx.tenantId)]);
   const vname = (id: string) => vendors.find((v) => v.id === id)?.name ?? "";
+  const waiting = can(ctx, "manage_settings") ? orders.filter((o) => o.status === "pending_approval") : [];
   return (
     <>
       <PageHeader title="Purchase orders" subtitle={<><Link href="/admin/purchases" className="text-pine hover:underline">Purchases</Link> / what you&apos;ve asked vendors for. Receiving a bill against an order fills it in. Tip: start from <Link href="/admin/stock/reorder" className="text-pine underline">Reorder</Link>.</>} />
+      {waiting.length ? (
+        <div role="status" className="mb-6 rounded-panel border border-alert/40 bg-surface px-5 py-3">
+          <span className="font-medium">{waiting.length} order{waiting.length === 1 ? " is" : "s are"} above the approval limit and waiting for you:</span>{" "}
+          {waiting.map((o, i) => <span key={o.id}>{i ? ", " : ""}<Link href={`/admin/purchases/orders/${o.id}`} className="text-pine underline">{o.po_no}</Link> ({vname(o.vendor_id)})</span>)}
+        </div>
+      ) : null}
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_1fr]">
         <Panel title="Orders" flush>
           {orders.length === 0 ? <p className="px-5 py-4 text-ink-soft">No orders yet.</p> : (

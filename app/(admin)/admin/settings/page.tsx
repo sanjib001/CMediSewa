@@ -98,6 +98,8 @@ export default async function Settings() {
                 <Text name="near_expiry_days" title="Warn about expiry (days before)" value={s.near_expiry_days} type="number" min={1} max={730} />
                 <Text name="critical_expiry_days" title="Urgent expiry (days before)" value={s.critical_expiry_days} type="number" min={0} max={365} />
                 <Choice name="print_paper_width" title="Receipt paper" value={s.print_paper_width} options={[["80mm", "80 mm thermal"], ["58mm", "58 mm thermal"], ["a5", "A5"], ["a4", "A4"]]} />
+                <Text name="reorder_cover_days" title="Order enough for (days)" value={s.reorder_cover_days} type="number" min={7} max={120} hint="Purchase suggestions cover the vendor's delivery time plus this many days of sales." />
+                <Text name="po_approval_limit" title="Orders above this need approval (Rs.)" value={s.po_approval_limit} type="number" min={1} step="0.01" hint="Blank = no approval. Orders above it wait for someone who manages the settings." />
               </fieldset>
             </ActionForm>
           </Panel>

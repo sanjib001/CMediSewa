@@ -1230,6 +1230,36 @@ interaction checks (need a licensed drug database). Then the UI (Nepali and the 
 
 ---
 
+## Pharmacy track, step 3 (2026-11-26)
+
+**D-144 Purchase suggestions and supplier performance (M-46, migration 0062).**
+- **What to order** (`purchase_plan`): per receiving store × item, use per day = sales − sale
+  returns + transfers out, over 30, 60 or 90 days (Reorder page). Suggested when at its
+  reorder level, or when on hand + on order won't last the delivery time + 7 days. Quantity =
+  per day × (delivery time + `reorder_cover_days`, default 30, 7–120 in Settings), at least
+  the levels (max, 2 × reorder, reorder qty), less on hand and on order (open, part-received
+  and waiting orders), rounded up to the purchase unit. It replaces the old level-only list
+  on Reorder (`purchase_suggestions` stays in the database, no longer used by the app).
+- **Vendor and delivery time:** the vendor it was last bought from (not opening stock). The
+  delivery time is `vendors.lead_time_days` if set, else the average order → first bill over
+  the last year, else 7. Vendors are not ranked against each other: one vendor per item is
+  enough for a pilot clinic.
+- **One-click drafts:** Reorder groups suggestions by vendor; one button makes an order per
+  store, ticked lines and editable quantities, expected date = today + delivery time (Nepal
+  date), expected rate = the last cost, note "From Reorder suggestions".
+- **Supplier performance** (`vendor_performance`, vendor page, last 12 months): fill rate
+  (received ÷ ordered, approved orders only), on time (first bill by the expected date),
+  delivery days, bought, return rate (returns ÷ bills by value), shelf life at receipt and
+  lots under 6 months, the 10 biggest price changes between the last two bills of an item.
+- **Approval limit:** `tenant_settings.po_approval_limit` (blank = off). An order above it, or
+  with a line without an expected rate, raised by someone without `manage_settings`, is
+  `pending_approval`: those with `manage_settings` are notified (`po_approval`), and
+  `decide_purchase_order` approves (→ open, approver recorded) or rejects with a reason
+  (→ cancelled, "Not approved: …"). Never the person who raised it. A waiting order can be
+  cancelled by the buyer but not received against. Audited (`po.approve` / `po.reject`).
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |

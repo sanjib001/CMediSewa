@@ -28,13 +28,14 @@ export type Settings = {
   scheduling_mode: string; consultation_billing_point: string; pin_policy: string; idle_lock_minutes: number;
   shift_window_hours: number; print_paper_width: string; near_expiry_days: number; critical_expiry_days: number;
   allow_credit: boolean; credit_limit_per_patient: number; max_discount_pct_without_reauth: number; reminder_hours_before: number;
+  reorder_cover_days: number; po_approval_limit: number | null;
 };
 
 export async function getClinicSettings(tenantId: string) {
   const db = serviceClient();
   const [t, s, b] = await Promise.all([
     db.from("tenants").select("id, slug, name, legal_name, pan_number, registration_no, phone, email, address_province, address_district, address_municipality, address_ward, address_street, status").eq("id", tenantId).single(),
-    db.from("tenant_settings").select("booking_window_days, min_notice_minutes, cancellation_cutoff_hours, auto_confirm_online, scheduling_mode, consultation_billing_point, pin_policy, idle_lock_minutes, shift_window_hours, print_paper_width, near_expiry_days, critical_expiry_days, allow_credit, credit_limit_per_patient, max_discount_pct_without_reauth, reminder_hours_before").eq("tenant_id", tenantId).maybeSingle(),
+    db.from("tenant_settings").select("booking_window_days, min_notice_minutes, cancellation_cutoff_hours, auto_confirm_online, scheduling_mode, consultation_billing_point, pin_policy, idle_lock_minutes, shift_window_hours, print_paper_width, near_expiry_days, critical_expiry_days, allow_credit, credit_limit_per_patient, max_discount_pct_without_reauth, reminder_hours_before, reorder_cover_days, po_approval_limit").eq("tenant_id", tenantId).maybeSingle(),
     db.from("billing_profiles").select("id, name, legal_name, pan_vat_no, registration_no, address, phone, invoice_prefix, receipt_footer").eq("tenant_id", tenantId).eq("is_default", true).maybeSingle(),
   ]);
   return { clinic: one<Clinic>(t, "tenant")!, settings: one<Settings>(s, "settings"), billing: one<BillingProfile>(b, "billing profile") };

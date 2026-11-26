@@ -61,7 +61,7 @@ export async function saveVendor(fd: FormData): Promise<{ ok: true; message: str
   const ctx = await requireTenant({ operation: "admin.area", permission: "manage_vendors", allowPendingTenant: true, next: "/admin/vendors" });
   const id = String(fd.get("id") ?? "") || null;
   if (id && !UUID.test(id)) return { ok: false, error: "Vendor not found." };
-  const d = Object.fromEntries(["name", "pan_vat_no", "contact_person", "phone", "email", "address", "payment_terms_days", "notes"].map((k) => [k, String(fd.get(k) ?? "").trim()]));
+  const d = Object.fromEntries(["name", "pan_vat_no", "contact_person", "phone", "email", "address", "payment_terms_days", "lead_time_days", "notes"].map((k) => [k, String(fd.get(k) ?? "").trim()]));
   const { error } = await serviceClient().rpc("save_vendor", { p_tenant: ctx.tenantId, p_vendor: id, p_d: { ...d, is_active: id ? fd.get("is_active") === "on" : true }, p_by: ctx.memberId });
   if (error) return { ok: false, error: friendly(error) };
   refresh(id ?? undefined);
@@ -137,6 +137,8 @@ const MORE: [RegExp, string][] = [
   [/INSUFFICIENT_STOCK/, "Not enough of that batch in this store."],
   [/HAS_RETURNS/, "Items from this bill were returned, so it can't be voided."],
   [/REASON_REQUIRED/, "Choose a reason for each line."],
+  [/PO_NOT_PENDING/, "This order isn't waiting for approval any more."],
+  [/OWN_ORDER/, "Someone else must approve an order you raised."],
 ];
 const friendlier = (e: { message?: string; code?: string } | null) => {
   const text = `${e?.code ?? ""} ${e?.message ?? ""}`;
@@ -154,6 +156,20 @@ export async function createPurchaseOrder(input: { vendorId: string; storeId: st
   if (error) return { ok: false, error: friendlier(error) };
   revalidatePath("/admin/purchases/orders");
   return { ok: true, id: data as string };
+}
+
+// M-46 (D-144): approve or reject an order above the clinic's approval limit. Needs
+// manage_settings, and never the person who raised it (the database checks both).
+export async function decidePurchaseOrder(input: { id: string; approve: boolean; reason?: string }): Promise<{ ok: true } | Fail> {
+  const ctx = await requireTenant({ operation: "admin.area", permission: "manage_settings", allowPendingTenant: true, next: `/admin/purchases/orders/${input.id}` });
+  if (!UUID.test(input.id)) return { ok: false, error: "That order wasn't found." };
+  const reason = String(input.reason ?? "").trim().slice(0, 300);
+  if (!input.approve && reason.length < 3) return { ok: false, error: "Say why the order isn't approved." };
+  const { error } = await serviceClient().rpc("decide_purchase_order", { p_tenant: ctx.tenantId, p_by: ctx.memberId, p_po: input.id, p_approve: input.approve, p_reason: reason || null });
+  if (error) return { ok: false, error: /REASON_REQUIRED/.test(error.message) ? "Say why the order isn't approved." : friendlier(error) };
+  revalidatePath("/admin/purchases/orders");
+  revalidatePath(`/admin/purchases/orders/${input.id}`);
+  return { ok: true };
 }
 
 export async function endPurchaseOrder(input: { id: string; action: "cancel" | "close"; reason?: string }): Promise<{ ok: true } | Fail> {

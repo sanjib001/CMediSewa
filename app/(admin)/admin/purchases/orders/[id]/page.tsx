@@ -3,13 +3,13 @@ import { notFound } from "next/navigation";
 import { requireTenant, can } from "@/lib/auth/context";
 import { getOrder, listVendors } from "@/lib/purchasing/data";
 import { listStores } from "@/lib/inventory/data";
-import { EndOrder } from "@/components/purchasing/orders";
+import { DecideOrder, EndOrder } from "@/components/purchasing/orders";
 import { ButtonLink, PageHeader, Panel } from "@/components/ui/primitives";
 
 export const metadata = { title: "Purchase order" };
 export const dynamic = "force-dynamic";
 
-const STATUS: Record<string, string> = { open: "Waiting for delivery", partially_received: "Part received", received: "Fully received", closed: "Closed", cancelled: "Cancelled" };
+const STATUS: Record<string, string> = { pending_approval: "Waiting for approval (above the clinic's limit), so it can't be received yet", open: "Waiting for delivery", partially_received: "Part received", received: "Fully received", closed: "Closed", cancelled: "Cancelled" };
 
 export default async function Order({ params }: { params: Promise<{ id: string }> }) {
   const { id } = await params;
@@ -19,6 +19,9 @@ export default async function Order({ params }: { params: Promise<{ id: string }
   if (!o) notFound();
   const [vendors, { stores }] = await Promise.all([listVendors(ctx.tenantId), listStores(ctx.tenantId)]);
   const live = ["open", "partially_received"].includes(o.head.status);
+  const waiting = o.head.status === "pending_approval";
+  const total = o.lines.reduce((s, l) => s + (l.expected_unit_cost === null ? 0 : Number(l.expected_unit_cost) * l.qty), 0);
+  const unpriced = o.lines.some((l) => l.expected_unit_cost === null);
   return (
     <>
       <PageHeader title={o.head.po_no}
@@ -37,7 +40,14 @@ export default async function Order({ params }: { params: Promise<{ id: string }
               </tr>))}</tbody>
           </table>
         </Panel>
-        {live && can(ctx, "manage_purchases") ? <EndOrder id={o.head.id} canCancel={o.head.status === "open"} /> : null}
+        <p className="text-sm text-ink-soft">Expected value: <strong>Rs. {total.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</strong>{unpriced ? " (some lines have no expected rate)" : ""}.
+          {o.head.approved_at ? ` Approved ${new Date(o.head.approved_at).toLocaleString("en-GB", { timeZone: "Asia/Kathmandu" })}.` : ""}</p>
+        {waiting && can(ctx, "manage_settings") ? (
+          o.head.created_by === ctx.memberId
+            ? <Panel title="Approval"><p className="text-ink-soft">You raised this order, so someone else who manages the settings must approve it.</p></Panel>
+            : <Panel title="Approve this order"><DecideOrder id={o.head.id} /></Panel>
+        ) : null}
+        {(live || waiting) && can(ctx, "manage_purchases") ? <EndOrder id={o.head.id} canCancel={o.head.status !== "partially_received"} /> : null}
       </div>
     </>
   );

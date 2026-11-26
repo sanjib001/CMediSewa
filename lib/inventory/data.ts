@@ -212,22 +212,7 @@ export async function getAlerts(tenantId: string, storeId: string | null = null)
   }).sort((x, y) => (x.severity === y.severity ? 0 : x.severity === "critical" ? -1 : 1) || ALERT_ORDER[x.kind] - ALERT_ORDER[y.kind] || x.item.localeCompare(y.item));
 }
 
-export type Suggestion = { store_id: string; purchase_unit_id: string | null; unit_cost: number | null; store: string; item: string; item_id: string; on_hand: string; reorder_at: string | null; units: number; unit: string; est_cost: number };
-export async function getSuggestions(tenantId: string): Promise<Suggestion[]> {
-  const { data, error } = await serviceClient().rpc("purchase_suggestions", { p_tenant: tenantId, p_store: null });
-  if (error) throw new Error(`suggestions: ${error.message}`);
-  const raw = (data ?? []) as { store_id: string; item_id: string; on_hand: number; reorder_level: number | null; suggested_units: number; purchase_unit: string; purchase_unit_id: string | null; last_unit_cost_base: number | null; est_cost: number }[];
-  if (!raw.length) return [];
-  const [items, { stores }] = await Promise.all([listItems(tenantId), listStores(tenantId)]);
-  return raw.map((s) => {
-    const it = items.find((i) => i.id === s.item_id);
-    const factor = it?.units.find((u) => u.id === s.purchase_unit_id)?.factor_to_base ?? 1;
-    return { store_id: s.store_id, purchase_unit_id: s.purchase_unit_id, unit_cost: s.last_unit_cost_base === null ? null : Math.round(Number(s.last_unit_cost_base) * factor * 100) / 100,
-      store: stores.find((x) => x.id === s.store_id)?.name ?? "", item: it?.name ?? "", item_id: s.item_id, on_hand: packText(Number(s.on_hand), it?.units ?? []),
-      reorder_at: s.reorder_level === null ? null : packText(Number(s.reorder_level), it?.units ?? []), units: Number(s.suggested_units), unit: s.purchase_unit, est_cost: Number(s.est_cost) };
-  }).sort((a, b) => a.item.localeCompare(b.item));
-}
-
+// Purchase suggestions moved to purchasePlan() in lib/purchasing/data.ts (M-46, D-144).
 export async function lastReconciliation(tenantId: string) {
   const { data } = await serviceClient().from("stock_reconciliations").select("ran_at, checked, mismatches").eq("tenant_id", tenantId).order("ran_at", { ascending: false }).limit(1).maybeSingle();
   return data as { ran_at: string; checked: number; mismatches: number } | null;

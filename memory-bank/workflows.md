@@ -373,8 +373,12 @@ returned to a vendor (W-23) or disposed of (W-26).
 3. Receiving happens in W-15 with the PO linked. Each purchase invoice line can reference a
    PO line, so the received quantity is derived and the PO moves to `partially_received` or
    `received`. Close or cancel the remainder manually.
-4. Advanced (P2): PO approval thresholds, vendor emailing, expected-date tracking for
-   supplier performance.
+4. **Approval limit (M-46, D-144):** with `po_approval_limit` set, an order above it (or with
+   a line of unknown cost) raised by someone without `manage_settings` is `pending_approval`;
+   `manage_settings` holders are notified and approve (→ `open`) or reject with a reason
+   (→ `cancelled`), never their own order. It can't be received until approved.
+5. Expected date: draft orders from Reorder get today + the vendor's delivery time, which the
+   on-time rate measures. Later: vendor emailing.
 
 ## W-23 Purchase return to vendor (M-22) [A2, `return_to_vendor`]
 1. Choose the vendor, then the store, then lots. Lots from a linked purchase invoice are
@@ -464,10 +468,13 @@ printable slip.
 3. For the pharmacy counter, the suggestion may be "transfer from main store" when the main
    store has stock (the suggestion type picks transfer before purchase).
 4. Select suggestions → create a PO (W-22) or a transfer request (W-16).
-5. **P2 (M-46):** suggested qty = average daily sales (last N days) × (lead time + review
-   period) + safety stock − (available + on order). Supplier performance: fill rate
-   (received/ordered), on-time rate, return rate, price trend, average shelf life at receipt.
-   It is shown on the vendor page and used to rank vendors for a suggestion.
+5. **M-46 (done, D-144):** `purchase_plan`: use per day = (sales − sale returns + transfers
+   out) over 30/60/90 days. A store × item is suggested at its reorder level, or when on hand
+   + on order won't last the vendor's delivery time + 7 days. Qty = per day × (delivery time +
+   cover days, default 30), at least the levels, − on hand − on order, rounded up to the
+   purchase unit. Vendor = the one it was last bought from. `vendor_performance`: fill rate,
+   on-time rate, delivery days, return rate, price changes, shelf life at receipt, on the
+   vendor page. Vendors are not ranked against each other (yet).
 
 ## W-29 Daily close & sales summary (M-24, M-27)
 1. At the tenant day boundary (`day_closing_hour`), or on demand, the **daily sales

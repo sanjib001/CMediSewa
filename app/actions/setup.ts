@@ -131,6 +131,15 @@ export async function saveOperatingSettings(fd: FormData): Promise<FormResult> {
   row.allow_credit = on(fd, "allow_credit");
   row.credit_limit_per_patient = Math.round(limit * 100) / 100;
   row.max_discount_pct_without_reauth = Math.round(pct * 100) / 100;
+  // M-46: purchase orders above this (expected value) wait for someone who manages the settings. Blank = no limit.
+  const poLimit = num(fd, "po_approval_limit");
+  if (poLimit !== null && !(poLimit > 0 && poLimit <= 100_000_000)) return { ok: false, error: "The order approval limit must be more than 0, or left blank for no limit." };
+  row.po_approval_limit = poLimit === null ? null : Math.round(poLimit * 100) / 100;
+  const cover = num(fd, "reorder_cover_days");   // blank keeps the current value (default 30)
+  if (cover !== null) {
+    if (!Number.isInteger(cover) || cover < 7 || cover > 120) return { ok: false, error: "Order enough for: between 7 and 120 days." };
+    row.reorder_cover_days = cover;
+  }
   const { error } = await serviceClient().from("tenant_settings").update(row).eq("tenant_id", ctx.tenantId);
   if (error) return { ok: false, error: friendly(error) };
   await audit({ tenantId: ctx.tenantId, actorKind: "member", actorId: ctx.memberId, sessionLevel: ctx.level, action: "settings.update", targetType: "tenant_settings", targetId: ctx.tenantId, detail: row });
