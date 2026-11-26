@@ -299,3 +299,35 @@ test("approval limit: a big order waits for the owner; it can't be received unti
     assert.equal(po2.closed_reason, "Not approved: Buy from the cheaper vendor");
   });
 });
+
+// ── D-152: one batch, one lot ──
+test("the same batch bought again at the same cost joins its lot; a different cost stays separate; void and returns per bill", async () => {
+  await withTx(async (c) => {
+    const x = await setup(c);
+    await asApp(c);
+    const line = (o = {}) => ({ item_id: x.item, unit_id: x.u.strip, qty: 10, free_qty: 0, unit_cost: 100, discount_pct: 0, tax_rate: 0, batch_no: "3333h", expiry_date: d(400), mrp: 150, ...o });
+    const b1 = (await bill(c, x, { no: "OB-1", lines: [line()], billDiscount: 0, cash: 0 })).rows[0].id;
+    const b2 = (await bill(c, x, { no: "OB-2", lines: [line({ qty: 5 })], billDiscount: 0, cash: 0 })).rows[0].id;
+    const lots = async () => (await c.query(`select ib.id, ib.unit_cost_base::numeric cost, coalesce(sum(b.qty_on_hand), 0)::numeric q from item_batches ib
+      left join stock_balances b on b.batch_id = ib.id where ib.tenant_id = $1 and ib.batch_no = '3333H' group by ib.id order by ib.unit_cost_base desc`, [x.t])).rows;
+    let l = await lots();
+    assert.deepEqual(l.map((y) => [Number(y.cost), Number(y.q)]), [[10, 150]], "one lot of 150 tabs (100 + 50) at Rs. 10 a tab");
+    const { rows: lines } = await c.query(`select batch_id from purchase_invoice_lines where purchase_id in ($1, $2)`, [b1, b2]);
+    assert.ok(lines.every((y) => y.batch_id === l[0].id), "both bills point at the same lot");
+    // a different cost (a 10% discount this time) makes its own lot
+    await bill(c, x, { no: "OB-3", lines: [line({ discount_pct: 10 })], billDiscount: 0, cash: 0 });
+    l = await lots();
+    assert.deepEqual(l.map((y) => [Number(y.cost), Number(y.q)]), [[10, 150], [9, 100]], "Rs. 9 a tab stays separate");
+    // returning against bill 2 is limited to what bill 2 brought (50 tabs)
+    await expectError(c, `select post_purchase_return($1, $2, $3, $4, $5, 'credit_note', null, null, $6, $7, 'A2', null)`,
+      [x.t, uuid(), x.vendor, x.store, b2, JSON.stringify([{ batch_id: l[0].id, qty_base: 60, reason: "excess" }]), x.admin], /MORE_THAN_RECEIVED/);
+    await c.query(`select post_purchase_return($1, $2, $3, $4, $5, 'credit_note', null, null, $6, $7, 'A2', null)`,
+      [x.t, uuid(), x.vendor, x.store, b2, JSON.stringify([{ batch_id: l[0].id, qty_base: 20, reason: "excess" }]), x.admin]);
+    // bill 1 can be voided while its 100 tabs are still on the shelf (130 left after the return)
+    await c.query(`select void_purchase_invoice($1, $2, $3, 'Entered twice', $4, 'A2', now(), null)`, [x.t, uuid(), b1, x.admin]);
+    assert.equal(Number((await lots())[0].q), 30, "150 − 20 returned − 100 voided");
+    // books still agree
+    const { rows: [{ r: rec }] } = await c.query(`select reconcile_stock_balances($1) r`, [x.t]);
+    assert.equal(rec.mismatches, 0);
+  });
+});

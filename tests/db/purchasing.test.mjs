@@ -145,7 +145,8 @@ test("void: only with a fresh password, never once lots moved or the bill was pa
     assert.equal(Number((await c.query(`select coalesce(sum(qty_on_hand), 0) q from stock_balances where item_id = $1`, [x.item])).rows[0].q), 0);
     await asApp(c);
     await bill(c, x, { no: "OOPS-1" });                                       // re-entering a voided bill number is allowed
-    const used = (await bill(c, x, { no: "USED-1" })).rows[0].id;
+    // its own batch: the same batch at the same cost would join the lot above (D-152) and stay voidable
+    const used = (await bill(c, x, { no: "USED-1", lines: [{ item_id: x.item, unit_id: x.u.strip, qty: 10, free_qty: 1, unit_cost: 100, discount_pct: 10, tax_rate: 13, batch_no: "used1", expiry_date: d(400), mrp: 150 }] })).rows[0].id;
     const { rows: [lot] } = await c.query(`select batch_id from purchase_invoice_lines where purchase_id = $1`, [used]);
     await c.query(`select post_stock_adjustment($1, $2, $3, 'damaged', null, $4, $5, 'A2', null)`, [x.t, uuid(), x.store, JSON.stringify([{ batch_id: lot.batch_id, qty_base: -1 }]), x.admin]);
     await expectError(c, `select void_purchase_invoice($1, $2, $3, 'x', $4, 'A2', now(), null)`, [x.t, uuid(), used, x.admin], /LOTS_ALREADY_USED/);
