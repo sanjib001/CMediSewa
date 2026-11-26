@@ -40,6 +40,7 @@ const ERRORS: [RegExp, string][] = [
   [/NO_LINES/, "Add at least one line."],
   [/PO_LINE_NOT_FOUND/, "That order line isn't open for this vendor any more."],
   [/batch_no_check/, "Batch numbers use letters, numbers, / . _ - only."],
+  [/null value in column "batch_no"/, "Enter the batch number for each medicine (it is printed on the strip or box)."],
   [/pan_vat_no_check/, "PAN/VAT is 9 digits."],
   [/phone_check/, "Enter a valid phone number."],
   [/email_check/, "Enter a valid email."],
@@ -134,7 +135,7 @@ const MORE: [RegExp, string][] = [
   [/LOT_FROM_ANOTHER_VENDOR/, "That batch was bought from a different vendor."],
   [/LOT_NOT_ON_THIS_BILL/, "That batch isn't on this bill."],
   [/MORE_THAN_RECEIVED/, "That's more than this bill brought in (minus earlier returns)."],
-  [/INSUFFICIENT_STOCK/, "Not enough of that batch in this store."],
+  [/INSUFFICIENT_STOCK|stock_balances_check/, "Not enough of that batch in this store. Stock on hold for customers (Pharmacy → Holds) can't be returned until the hold ends."],
   [/HAS_RETURNS/, "Items from this bill were returned, so it can't be voided."],
   [/REASON_REQUIRED/, "Choose a reason for each line."],
   [/PO_NOT_PENDING/, "This order isn't waiting for approval any more."],
@@ -195,15 +196,6 @@ export async function postPurchaseReturn(input: {
   refresh(input.vendorId);
   revalidatePath("/admin/purchases/returns");
   return { ok: true, id: data as string };
-}
-
-export async function runPayableCheck(): Promise<{ ok: true; message: string } | Fail> {
-  const ctx = await requireTenant({ operation: "admin.area", permission: "pay_vendors", allowPendingTenant: true, next: "/admin/vendors" });
-  const { data, error } = await serviceClient().rpc("reconcile_vendor_payables", { p_tenant: ctx.tenantId });
-  if (error) return { ok: false, error: friendly(error) };
-  const r = data as { vendors: number; mismatches: number };
-  revalidatePath("/admin/vendors");
-  return { ok: true, message: r.mismatches ? `${r.mismatches} vendor(s) don't match their documents. Logged for review.` : `All ${r.vendors} vendors match their bills, payments and returns.` };
 }
 
 // ── Pharmacy track step 2 (D-143): use a vendor's credit on their open bills ──

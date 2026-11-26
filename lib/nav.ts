@@ -34,7 +34,7 @@ export const ADMIN_NAV: NavGroup[] = [
     label: "Pharmacy & stock",
     items: [
       { href: "/admin/medicines", label: "Medicines", icon: "Pill", module: "inventory", permission: "manage_items" },
-      { href: "/admin/stock", label: "Stock & stores", icon: "Boxes", module: "inventory", permission: "view_stock" },
+      { href: "/admin/stock", label: "Stock", icon: "Boxes", module: "inventory", permission: "view_stock" },
       { href: "/admin/purchases", label: "Purchases", icon: "Package", module: "purchasing", permission: "manage_purchases" },
       { href: "/admin/vendors", label: "Vendors", icon: "Truck", module: "purchasing", permission: "manage_vendors" },
     ],

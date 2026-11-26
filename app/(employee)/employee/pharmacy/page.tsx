@@ -1,15 +1,14 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { requireTenant } from "@/lib/auth/context";
-import { counterServices, counterStock, counterStores, dispensingQueue, patientsWithDues, stockStores, todaysBills } from "@/lib/pharmacy/data";
-import { getOpenCount, listItems, listTransfers, packText, stockInStore } from "@/lib/inventory/data";
-import { NewTransfer, TransferList } from "@/components/inventory/transfers";
+import { counterServices, counterStock, counterStores, dispensingQueue, heldRxItems, holdForCollection, listHolds, stockStores, todaysBills } from "@/lib/pharmacy/data";
+import { getOpenCount, listItems, packText, stockInStore } from "@/lib/inventory/data";
 import { CountSheet, StartCount } from "@/components/inventory/count-sheet";
-import { CollectDues } from "@/components/pharmacy/bill-corrections";
 import { getAlerts } from "@/lib/inventory/data";
 import { ageText, type PatientLite } from "@/lib/desk/data";
 import { serviceClient } from "@/lib/supabase/service";
-import { CounterSale, type RxPrefill } from "@/components/pharmacy/counter";
+import { CounterSale, type HoldStart, type RxPrefill } from "@/components/pharmacy/counter";
+import { ReleaseHold } from "@/components/pharmacy/holds";
 import { AllergyBanner, PageHeader, Panel } from "@/components/ui/primitives";
 import { cn } from "@/lib/cn";
 import { LiveRefresh } from "@/components/notify/live-refresh";
@@ -21,20 +20,22 @@ export const metadata = { title: "Pharmacy" };
 const npr = (n: number) => `Rs. ${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 const UUID = /^[0-9a-f-]{36}$/;
 const ALERT_TEXT = { expired: "Expired", blocked: "Blocked", near_expiry: "Near expiry", critical_stock: "Very low", low_stock: "Low stock" } as const;
-type Tab = "dispense" | "sale" | "bills" | "dues" | "stock";
+type Tab = "dispense" | "sale" | "holds" | "bills" | "stock";
+const HOLD_STATUS = { held: "Held", collected: "Collected", released: "Released", expired: "Ran out of time" } as const;
+const when = (s: string) => new Date(s).toLocaleString("en-GB", { timeZone: "Asia/Kathmandu", dateStyle: "medium", timeStyle: "short" });
 
 // The pharmacy counter (W-14): the dispensing queue for pharmacists (C7: Rx items and
 // allergies only), the sale screen, and recent bills. Tabs follow the keys held (D-57).
-export default async function PharmacyDesk({ searchParams }: { searchParams: Promise<{ tab?: string; store?: string; rx?: string; q?: string }> }) {
+export default async function PharmacyDesk({ searchParams }: { searchParams: Promise<{ tab?: string; store?: string; rx?: string; q?: string; hold?: string }> }) {
   const ctx = await requireTenant({ operation: "pharmacy.counter", next: "/employee/pharmacy" });
   if (!["pharmacy_sell", "dispense_prescription", "view_stock"].some((k) => ctx.permissions.has(k))) redirect("/employee");
   const sp = await searchParams;
   const canSell = ctx.permissions.has("pharmacy_sell"), canDispense = ctx.permissions.has("dispense_prescription");
   const tabs: [Tab, string][] = [];
   if (canDispense) tabs.push(["dispense", "Dispense"]);
-  if (canSell) tabs.push(["sale", "Sale"], ["bills", "Bills"], ["dues", "Dues"]);
+  if (canSell) tabs.push(["sale", "Sale"], ["holds", "Holds"], ["bills", "Bills"]);
   if (ctx.permissions.has("view_stock")) tabs.push(["stock", "Stock"]);
-  const tab: Tab = sp.rx && canSell ? "sale" : tabs.find(([t]) => t === sp.tab)?.[0] ?? tabs[0]?.[0] ?? "bills";
+  const tab: Tab = (sp.rx || sp.hold) && canSell ? "sale" : tabs.find(([t]) => t === sp.tab)?.[0] ?? tabs[0]?.[0] ?? "bills";
   const stores = await counterStores(ctx.tenantId, ctx.memberId);
   const store = stores.find((s) => s.id === sp.store) ?? stores[0];
   const qs = (t: Tab, extra = "") => `/employee/pharmacy?tab=${t}${store ? `&store=${store.id}` : ""}${extra}`;
@@ -42,6 +43,7 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
   let body: React.ReactNode;
   if (tab === "dispense") {
     const queue = await dispensingQueue(ctx.tenantId, ctx.memberId, ctx.level);
+    const held = await heldRxItems(ctx.tenantId, (queue ?? []).flatMap((rx) => rx.items.map((i) => i.id)));
     body = !queue ? <p className="text-ink-soft">Only a verified pharmacist sees the dispensing queue.</p> : queue.length === 0
       ? <p className="rounded-panel border border-line bg-surface p-5 text-ink-soft">No prescriptions waiting. Issued prescriptions from the last 14 days appear here until everything on them is dispensed.</p>
       : <div className="space-y-5">{queue.map((rx) => (
@@ -51,7 +53,8 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
               <li key={i.id} className={cn("grid gap-x-6 px-5 py-3 sm:grid-cols-[1.6fr_1fr_auto]", i.dispensed && "text-ink-faint")}>
                 <div><div className="font-medium">{i.medicine_text}{i.strength ? ` ${i.strength}` : ""}{i.form ? ` (${i.form})` : ""}</div>
                   <div className="text-sm text-ink-soft">{[i.dose, i.frequency, i.duration_days ? `${i.duration_days} days` : null, i.instructions].filter(Boolean).join(", ")}</div></div>
-                <div className="text-sm">{i.dispensed ? "Dispensed" : Number(i.dispensed_base) > 0 ? `${Number(i.dispensed_base)} given, ${i.remaining ?? ""} left` : "To dispense"}</div>
+                <div className="text-sm">{i.dispensed ? "Dispensed" : Number(i.dispensed_base) > 0 ? `${Number(i.dispensed_base)} given, ${i.remaining ?? ""} left` : "To dispense"}
+                  {held.get(i.id) ? <span className="block text-warn">On hold {held.get(i.id)!.hold_no} until {when(held.get(i.id)!.expires_at)}</span> : null}</div>
                 <div className="font-semibold sm:text-right">{i.quantity ?? ""}</div>
               </li>))}</ul>
             {canSell && store ? <div className="flex justify-end border-t border-line px-5 py-3"><Link href={qs("sale", `&rx=${rx.prescription_id}`)} className="rounded-control bg-pine px-4 py-2 font-medium text-white">Dispense and bill</Link></div> : null}
@@ -64,13 +67,11 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
     if (!here) {
       body = <p className="rounded-panel border border-line bg-surface p-5 text-ink-soft">You aren&apos;t assigned to a store. Ask the admin to add you to one.</p>;
     } else {
-      const [lots, items, transfers, open] = await Promise.all([stockInStore(ctx.tenantId, here.id), listItems(ctx.tenantId), listTransfers(ctx.tenantId), getOpenCount(ctx.tenantId, here.id)]);
+      const [lots, items, open] = await Promise.all([stockInStore(ctx.tenantId, here.id), listItems(ctx.tenantId), getOpenCount(ctx.tenantId, here.id)]);
       const term = String(sp.q ?? "").trim().toLowerCase().slice(0, 60);
       const rows = lots.map((l) => ({ l, it: items.find((i) => i.id === l.item_id) }))
         .filter(({ it }) => !term || `${it?.name ?? ""} ${it?.generic ?? ""} ${it?.item_code ?? ""}`.toLowerCase().includes(term))
         .sort((a, b) => (a.it?.name ?? "").localeCompare(b.it?.name ?? "") || (a.l.expiry_date ?? "9").localeCompare(b.l.expiry_date ?? "9"));
-      const mine = transfers.filter((t) => t.from_store_id === here.id || t.to_store_id === here.id);
-      const storesAll = ss.map((x) => ({ id: x.id, name: x.name }));
       const exp = (d: string | null) => (d ? new Intl.DateTimeFormat("en-GB", { month: "short", year: "numeric", timeZone: "UTC" }).format(new Date(`${d}T00:00:00Z`)) : "none");
       const sheet = lots.map((l) => { const it = items.find((i) => i.id === l.item_id); return { batch_id: l.batch_id, item: it?.name ?? "", batch_no: l.batch_no, expiry: exp(l.expiry_date), unit: it?.units.find((u) => u.is_base)?.name ?? "", system: l.qty_on_hand }; })
         .sort((a, b) => a.item.localeCompare(b.item));
@@ -98,8 +99,6 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
               </div>
             )}
           </Panel>
-          {ctx.permissions.has("transfer_stock") && ss.length > 1 ? <Panel title="Ask for stock or send it"><NewTransfer stores={storesAll} /></Panel> : null}
-          <Panel title="Transfers in and out">{mine.length ? <TransferList transfers={mine} stores={storesAll} /> : <p className="text-ink-soft">No transfers for this store.</p>}</Panel>
           <Panel title={open ? `Stock count ${open.count_no}${open.blind ? " (blind)" : ""}` : "Stock count"}>
             {open ? <CountSheet countId={open.id} blind={open.blind} lots={sheet} lines={open.lines} canPost={ctx.permissions.has("manage_stock") && ctx.level !== "A1"} />
               : here.access !== "view" ? <StartCount storeId={here.id} /> : <p className="text-ink-soft">You can view this store only.</p>}
@@ -110,17 +109,39 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
     }
   } else if (!store) {
     body = <p className="rounded-panel border border-line bg-surface p-5 text-ink-soft">You aren&apos;t assigned to a store that sells. Ask the admin to add you to the pharmacy store.</p>;
-  } else if (tab === "dues") {
-    const dues = await patientsWithDues(ctx.tenantId);
-    body = dues.length === 0 ? <p className="rounded-panel border border-line bg-surface p-5 text-ink-soft">Nobody owes anything.</p> : (
-      <Panel title="Patients who owe" aside={<span className="text-sm text-ink-faint">{npr(dues.reduce((s, d) => s + d.owed, 0))} in total</span>} flush>
-        <ul className="divide-y divide-line">{dues.map((d) => (
-          <li key={d.patient_id} className="grid gap-3 px-5 py-3 lg:grid-cols-[1fr_auto]">
-            <div><div className="font-medium">{d.name} <span className="text-sm text-ink-faint">{d.mrn}{d.phone ? `, ${d.phone}` : ""}</span></div>
-              <div className="text-sm text-ink-soft">Owes {npr(d.owed)} on {d.bills} bill{d.bills > 1 ? "s" : ""}, oldest {new Date(d.oldest).toLocaleDateString("en-GB", { timeZone: "Asia/Kathmandu", dateStyle: "medium" })}</div></div>
-            <CollectDues key={`${d.patient_id}:${d.owed}`} patientId={d.patient_id} owed={d.owed} />
-          </li>))}</ul>
-      </Panel>
+  } else if (tab === "holds") {
+    // M-45: stock kept aside for customers who collect later.
+    const holds = await listHolds(ctx.tenantId, store.id);
+    const open = holds.filter((h) => h.status === "held"), ended = holds.filter((h) => h.status !== "held");
+    body = (
+      <div className="space-y-6">
+        <Panel title="On hold" aside={<span className="text-sm text-ink-faint">{open.length ? `${open.length} waiting` : "Use Hold for later on the Sale tab"}</span>} flush>
+          {open.length === 0 ? <p className="px-5 py-4 text-ink-soft">Nothing on hold. To keep medicines aside for someone, add them on the Sale tab and choose Hold for later.</p> : (
+            <ul className="divide-y divide-line">{open.map((h) => (
+              <li key={h.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[1fr_auto]">
+                <div>
+                  <div className="font-medium">{h.hold_no} · {h.customer}{h.phone ? <a href={`tel:${h.phone}`} className="ml-2 text-sm font-normal text-pine underline">{h.phone}</a> : null}</div>
+                  <ul className="mt-1 text-sm">{h.lines.map((l, i) => <li key={i}>{l.item} <span className="text-ink-faint">batch {l.batch_no}</span> · {l.qty}{l.rx ? <span className="ml-1 text-xs text-ink-faint">(prescription)</span> : null}</li>)}</ul>
+                  <div className={cn("mt-1 text-sm", h.overdue ? "text-alert" : "text-ink-soft")}>{h.overdue ? "Time ran out; it goes back to the shelf with the next sale." : `Held until ${when(h.expires_at)}`} · by {h.by}</div>
+                </div>
+                <div className="flex flex-wrap items-start gap-2">
+                  {!h.overdue ? <Link href={qs("sale", `&hold=${h.id}`)} className="rounded-control bg-pine px-4 py-2 font-medium text-white">Collect and bill</Link> : null}
+                  <ReleaseHold id={h.id} />
+                </div>
+              </li>))}</ul>
+          )}
+        </Panel>
+        {ended.length ? (
+          <Panel title="Ended in the last 3 days" flush>
+            <ul className="divide-y divide-line text-sm">{ended.map((h) => (
+              <li key={h.id} className="flex flex-wrap justify-between gap-x-4 px-5 py-2.5">
+                <span><span className="font-medium">{h.hold_no}</span> · {h.customer} · {h.lines.map((l) => l.item).join(", ")}</span>
+                <span className="text-ink-soft">{HOLD_STATUS[h.status]}{h.ended_at ? ` ${when(h.ended_at)}` : ""}{h.end_reason ? `: ${h.end_reason}` : ""}
+                  {h.invoice_id ? <> · <Link href={`/employee/pharmacy/bills/${h.invoice_id}`} className="text-pine underline">bill</Link></> : null}</span>
+              </li>))}</ul>
+          </Panel>
+        ) : null}
+      </div>
     );
   } else if (tab === "sale") {
     const db = serviceClient();
@@ -129,15 +150,23 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
       db.from("tenant_settings").select("allow_credit").eq("tenant_id", ctx.tenantId).single(),
     ]);
     let prefill: RxPrefill | null = null;
-    if (sp.rx && UUID.test(sp.rx) && canDispense) {
+    let hold: HoldStart | null = null;
+    if (sp.hold && UUID.test(sp.hold)) {
+      const h = await holdForCollection(ctx.tenantId, store.id, sp.hold);
+      if (h) hold = { ...h, patient: h.patient ? { id: h.patient.id, mrn: h.patient.mrn, full_name: h.patient.full_name, sex: h.patient.sex,
+        age: ageText(h.patient.date_of_birth, h.patient.age_years, h.patient.created_at), phone: h.patient.phone, possible_duplicate: false } : null };
+    }
+    if (!hold && sp.rx && UUID.test(sp.rx) && canDispense) {
       const rx = (await dispensingQueue(ctx.tenantId, ctx.memberId, ctx.level))?.find((x) => x.prescription_id === sp.rx);
       if (rx) {
         const p = rx.patient;
         const lite: PatientLite = { id: p.id, mrn: p.mrn, full_name: p.full_name, sex: p.sex, age: ageText(p.date_of_birth, p.age_years, p.created_at), phone: null, possible_duplicate: false };
-        prefill = { patient: lite, rxNumber: rx.rx_number, lines: rx.items.filter((i) => !i.dispensed).map((i) => ({ prescription_item_id: i.id, text: [i.medicine_text, i.strength, i.dose, i.frequency].filter(Boolean).join(" "), qty: i.remaining ?? i.quantity })) };
+        prefill = { patient: lite, rxNumber: rx.rx_number, lines: rx.items.filter((i) => !i.dispensed).map((i) => ({ prescription_item_id: i.id, text: [i.medicine_text, i.strength, i.dose, i.frequency].filter(Boolean).join(" "),
+          qty: i.remaining ?? i.quantity, item_id: i.item_id ?? null })) };
       }
     }
-    body = <Panel title={prefill ? "Dispense" : "New sale"}><CounterSale key={`${store.id}:${sp.rx ?? ""}`} storeId={store.id} items={items} services={services} prefill={prefill}
+    body = <Panel title={hold ? `Collect ${hold.holdNo}` : prefill ? "Dispense" : "New sale"}>{sp.hold && !hold ? <p role="alert" className="mb-4 text-sm text-alert">That hold has ended or isn&apos;t in this store. Check the Holds tab.</p> : null}
+      <CounterSale key={`${store.id}:${sp.rx ?? ""}:${sp.hold ?? ""}`} storeId={store.id} items={items} services={services} prefill={prefill} hold={hold}
       canOverride={ctx.permissions.has("override_batch")} canSellRx={ctx.permissions.has("sell_prescription_only")}
       allowCredit={Boolean((set.data as { allow_credit: boolean } | null)?.allow_credit) && ctx.permissions.has("allow_credit")} /></Panel>;
   } else {

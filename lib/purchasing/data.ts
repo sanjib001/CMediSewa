@@ -71,21 +71,7 @@ export async function getPurchase(tenantId: string, id: string) {
   };
 }
 
-export type StatementLine = { at: string; doc: string; kind: string; debit: number; credit: number; balance: number; memo: string | null };
 /** A vendor's account straight from the journal (AP_VENDORS + VENDOR_ADVANCES), oldest first. */
-export async function vendorStatement(tenantId: string, vendorId: string): Promise<StatementLine[]> {
-  const { data, error } = await serviceClient().from("ledger_entries").select("occurred_at, doc_type, account_code, debit, credit, memo, posting_id")
-    .eq("tenant_id", tenantId).eq("vendor_id", vendorId).in("account_code", ["AP_VENDORS", "VENDOR_ADVANCES"]).order("occurred_at").order("id").limit(1000);
-  if (error) throw new Error(`statement: ${error.message}`);
-  let bal = 0;
-  return ((data ?? []) as { occurred_at: string; doc_type: string; account_code: string; debit: number; credit: number; memo: string | null }[]).map((e) => {
-    // owed to the vendor goes UP with an AP credit and DOWN with an AP debit or an advance.
-    const owed = Number(e.credit) - Number(e.debit);
-    bal = Math.round((bal + owed) * 100) / 100;
-    return { at: e.occurred_at, doc: e.memo ?? "", kind: e.doc_type, debit: Number(e.debit), credit: Number(e.credit), balance: bal, memo: e.account_code === "VENDOR_ADVANCES" ? "advance" : null };
-  });
-}
-
 export type PaymentRow = { id: string; payment_no: string; amount: number; cash_amount: number; online_amount: number; online_channel: string | null; reference: string | null; paid_at: string };
 export async function listVendorPayments(tenantId: string, vendorId: string): Promise<PaymentRow[]> {
   const { data } = await serviceClient().from("vendor_payments").select("id, payment_no, amount, cash_amount, online_amount, online_channel, reference, paid_at")
@@ -156,11 +142,6 @@ export async function returnableLots(tenantId: string, vendorId: string, storeId
   })).sort((a, b) => a.item.localeCompare(b.item) || (a.expiry_date ?? "9").localeCompare(b.expiry_date ?? "9"));
 }
 
-export async function lastPayableCheck(tenantId: string) {
-  const { data } = await serviceClient().from("payable_reconciliations").select("ran_at, vendors, mismatches").eq("tenant_id", tenantId).order("ran_at", { ascending: false }).limit(1).maybeSingle();
-  return data as { ran_at: string; vendors: number; mismatches: number } | null;
-}
-
 // ── M-46 (D-144): purchase plan and supplier performance ─────────────────────
 export type PlanRow = {
   store_id: string; store_name: string; item_id: string; item_name: string; vendor_id: string | null; vendor_name: string | null;
@@ -179,19 +160,3 @@ export async function purchasePlan(tenantId: string, days = 30): Promise<PlanRow
   });
 }
 
-export type VendorPerformance = {
-  orders: number; fill_rate: number | null; on_time_rate: number | null; delivery_days: number | null; bills: number; purchased: number; returned: number;
-  return_rate: number | null; shelf_life_days: number | null; short_dated_lots: number; price_changes: { item: string; last: number; previous: number; change_pct: number }[];
-};
-export async function vendorPerformance(tenantId: string, vendorId: string, days = 365): Promise<VendorPerformance> {
-  const { data, error } = await serviceClient().rpc("vendor_performance", { p_tenant: tenantId, p_vendor: vendorId, p_days: days });
-  if (error) throw new Error(`vendor performance: ${error.message}`);
-  const p = data as Record<string, unknown>;
-  const n = (v: unknown) => (v === null || v === undefined ? null : Number(v));
-  return {
-    orders: Number(p.orders ?? 0), fill_rate: n(p.fill_rate), on_time_rate: n(p.on_time_rate), delivery_days: n(p.delivery_days), bills: Number(p.bills ?? 0),
-    purchased: Number(p.purchased ?? 0), returned: Number(p.returned ?? 0), return_rate: n(p.return_rate), shelf_life_days: n(p.shelf_life_days),
-    short_dated_lots: Number(p.short_dated_lots ?? 0),
-    price_changes: ((p.price_changes ?? []) as { item: string; last: unknown; previous: unknown; change_pct: unknown }[]).map((c) => ({ item: c.item, last: Number(c.last), previous: Number(c.previous), change_pct: Number(c.change_pct) })),
-  };
-}

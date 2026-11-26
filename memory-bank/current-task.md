@@ -7,22 +7,24 @@ Read this section first in every new conversation, then `decisions.md` (latest D
 **Where we are**
 - Phase 0 (backend B0–B9) and Phase 1 (screens U1–U8) are **complete and committed**.
 - Phase 2: M-37 patient merge, M-52 patient advances, M-51 bulk recall committed.
-- **Pharmacy track (owner, D-142): finish the pharmacy completely, then the UI.** Steps 1 (D-141)
-  and 2 (D-143) committed; step 3 (M-46 purchase suggestions and supplier performance, D-144)
-  done 2026-11-26, the owner commits it. 62 migrations (last `20261125150000_purchase_planning.sql`,
-  applied to dev), decisions D-01…D-144.
+- **Pharmacy track (owner, D-142): complete.** Steps 1–4 committed (D-141, D-143, D-144, D-145);
+  step 5 moved to Future (D-146); step 6 substitutes (D-147) done 2026-11-26, the owner commits
+  it. 65 migrations (last `20261126120000_store_access_by_role.sql`, applied to dev), decisions D-01…D-149.
 - Owner-facing guide: `docs/guides/setup-and-user-guide.md` + `CMediSewa-Setup-and-User-Guide.pdf`
   (Super Admin setup, clinic setup in order, daily work, limits). Keep it in step with the app;
   rebuild the PDF with `.local-tools/ui/guide-pdf.mjs`.
 - Last fixes: idle lock covers the whole window, phone-width layouts, "Dr. Dr." names (D-135);
   medicine save accepts "500mg" / "1,000" and names the bad field (`app/actions/inventory.ts`).
 
-**Next step: pharmacy track step 4, M-45 stock reservations.** Then step 5 M-49, step 6
-substitutes (D-142), then the UI.
+**Next step: simpler screens, step 2** (owner, D-148/D-149: no Nepali; make screens simpler, hide
+or delete what isn't essential). Step 1 done 2026-11-26 (removals + the medicine form). Step 2:
+the other detailed forms in the same way: the purchase bill (Purchases → New), opening stock,
+Settings ("How the clinic runs" folded into essentials + More), then an overall look pass
+(dashboard, menus, the pharmacy counter). Ask the owner before deleting anything else.
 Phase 2 as trimmed by the owner: ~~M-37 patient merge~~ · ~~M-52 patient advances~~ · ~~M-51 bulk recall~~ ·
-~~M-46 purchase suggestions~~ · M-45 stock reservations · Nepali UI · later online payments, patient
+~~M-46 purchase suggestions~~ · ~~M-45 stock reservations~~ · Nepali UI · later online payments, patient
 documents, subdomains. **Dropped to Future:** SMS M-32 (D-136), controlled-drug register M-48 and
-cashier shifts M-47 (D-137). Controlled/narcotic items stay blocked from sale.
+cashier shifts M-47 (D-137), advanced barcodes M-49 (D-146). Controlled/narcotic items stay blocked from sale.
 
 **Database and data**
 - Only a **development** database exists (`.env.local`); no production DB yet (pilot checklist §2).
@@ -60,6 +62,32 @@ cashier shifts M-47 (D-137). Controlled/narcotic items stay blocked from sale.
 
 **Phase:** Phase 0 and Phase 1 complete. **Pilot preparation:** work through `memory-bank/pilot-checklist.md` (decisions, production setup, email, clinic setup, real-device pass, dry run).
 **Last updated:** 2026-11-26
+
+## Simpler screens, step 1: done (2026-11-26)
+| Item | Status |
+|---|---|
+| Removed (screens and app code): vendor performance, account statement, payables check panel; Transfers page and forms, Add a store, Who works in this store, Levels per store; pharmacy Dues tab | done |
+| Migration 0065: store access follows the role when there is no store_members row | done |
+| Medicine form: essentials first (name, generic, strength, form, sold, pack preset with summary, reorder level), the rest under More details; menu "Stock"; guide updated (C6, C7, C8, E3, E4) | done |
+| Checks | DB **139/139** · posture ✓ · **E2E 319/319 on a production build** (one run hit a one-off DB statement timeout in the advance step; the rerun passed) · typecheck/lint/build ✓ · test clinics purged |
+| Fixed (owner: "unable to add a purchase", sanjib) | the DB posts a bill for that clinic fine (checked in a rolled-back transaction); the bill form was the problem: item search matched only the brand name and showed nothing when there was no match, the Post button was greyed out without saying why, and a medicine line without a batch failed with "Something went wrong". Now: search by name, generic or code, a "No item matches… Add it in Medicines" hint, Post explains what is missing (bill no., items, qty, rate, batch, expiry per line), and the batch error is worded. New browser check of the whole form: **E2E 326/326** |
+| Fixed (owner: "pay in cash and online don't seem to work") | the DB recorded them correctly; the form only changed one small "On credit" figure. Now: "Paying the vendor now?" with Cash now / Online now / Online via, Pay all in cash / Pay all online / All on credit, "Paid now" lines in the summary, a warning (and a block) when more is paid than the bill, and the form total uses the same per-line rounding as post_purchase_invoice so Pay all matches to the paisa. Browser check: full cash with VAT + bill discount, and part cash + part online + credit: **E2E 331/331** |
+
+## Pharmacy step 6, substitutes: done (2026-11-26)
+| Item | Status |
+|---|---|
+| Migration 0064: medicine_equivalent, medicine_substitutes, substitute rule + reason in issue_counter_sale and create_stock_hold (stock_hold_lines.substitution_reason), dispensing_queue returns item_id | done |
+| Counter: prescription line starts with the prescribed item or the same medicine in stock, list limited to the same medicine, reason with quick choices; search offers the same medicine for an out-of-stock brand; bill prints "in place of the prescribed brand: reason"; guide updated (E3) | done |
+| Checks | DB **139/139** (3 new) · fresh replay of all 64 migrations + posture ✓ · **E2E 318/318 on a production build** incl. the same-medicine suggestion and the prescribed item chosen in headless Chrome · typecheck/lint/build ✓ · posture ✓ · test clinics purged |
+| Generator | 0064 copies create_stock_hold and issue_counter_sale from 0063 and dispensing_queue from 0060 with exact insertions; edit the migration file itself from now on |
+
+## Pharmacy step 4, M-45 stock holds: done (2026-11-26)
+| Item | Status |
+|---|---|
+| Migration 0063: stock_holds / stock_hold_lines, sync_reserved, create_stock_hold, release_stock_hold, release_expired_holds (allocate_stock, counter sale and nightly job), lot-status trigger, collection in issue_counter_sale (hold_line_id) | done |
+| Sale tab "Hold for later" (1/2/3/7 days); Holds tab (collect and bill, release with reason, ended in the last 3 days); collection prefill pinned to the held lots; counter shows only unheld stock; Dispense tab "On hold"; guide updated (E3) | done |
+| Checks | DB **136/136** (4 new) · fresh replay of all 63 migrations + posture ✓ · **E2E 309/309 on a production build** incl. hold and collect in headless Chrome, phone width · typecheck/lint/build ✓ · posture ✓ · test clinics purged |
+| Generator | the issue_counter_sale body in 0063 was taken from the live database (pg_get_functiondef) with exact insertions for hold collection; edit the migration file itself from now on |
 
 ## Pharmacy step 3, M-46 purchase suggestions and supplier performance: done (2026-11-26)
 | Item | Status |

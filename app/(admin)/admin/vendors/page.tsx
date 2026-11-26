@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { requireTenant, can } from "@/lib/auth/context";
-import { lastPayableCheck, listVendors } from "@/lib/purchasing/data";
-import { runPayableCheck, saveVendor } from "@/app/actions/purchasing";
+import { listVendors } from "@/lib/purchasing/data";
+import { saveVendor } from "@/app/actions/purchasing";
 import { ActionForm, field, label } from "@/components/platform/action-form";
 import { PageHeader, Panel } from "@/components/ui/primitives";
 
@@ -12,7 +12,7 @@ const npr = (n: number) => `Rs. ${n.toLocaleString("en-IN", { maximumFractionDig
 
 export default async function Vendors() {
   const ctx = await requireTenant({ operation: "admin.area", permission: "manage_vendors", allowPendingTenant: true, next: "/admin/vendors" });
-  const [vendors, check] = await Promise.all([listVendors(ctx.tenantId), lastPayableCheck(ctx.tenantId)]);
+  const vendors = await listVendors(ctx.tenantId);
   const owed = vendors.reduce((s, v) => s + v.payable, 0);
   return (
     <>
@@ -47,11 +47,6 @@ export default async function Vendors() {
             </ActionForm>
           </Panel>
         ) : null}
-        <Panel title="Payables check" aside={<span className="text-sm text-ink-faint">Runs every night</span>}>
-          <p className="mb-3 text-sm text-ink-soft">What the accounts say you owe each vendor must equal their unpaid bills, payments and returns.
-            {check ? <> Last checked {new Date(check.ran_at).toLocaleString("en-GB", { timeZone: "Asia/Kathmandu" })}: {check.mismatches ? <span className="font-medium text-alert">{check.mismatches} vendor(s) differ</span> : `all ${check.vendors} match`}.</> : " Not checked yet."}</p>
-          {can(ctx, "pay_vendors") ? <ActionForm action={runPayableCheck} submitLabel="Check now" tone="secondary"><></></ActionForm> : null}
-        </Panel>
         </div>
       </div>
     </>

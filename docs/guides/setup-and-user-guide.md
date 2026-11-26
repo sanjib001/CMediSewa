@@ -209,24 +209,25 @@ is renewed.
    "Appointments to move".
 4. **Profile:** qualifications and a short bio for the website.
 
-### C6. Stores (Pharmacy & stock → Stock & stores)
-Every clinic starts with a **Pharmacy** store (sellable) and a **Quarantine** store
-(not sellable, for damaged, recalled or returned stock). Add more if needed (e.g. a
-second counter or a main store). Give each pharmacist **access** to their store(s).
+### C6. Stores (Pharmacy & stock → Stock)
+Every clinic has one **Pharmacy** store (it sells) and a **Quarantine** store (it doesn't:
+damaged, recalled or returned stock waits there to be disposed of). Nothing to set up: staff
+can work in the pharmacy as soon as their role lets them sell, dispense or manage stock.
 
 ### C7. Medicines (Pharmacy & stock → Medicines)
-For each item:
-- **Name on the shelf (brand)**, generic name, strength, form/route, manufacturer, category,
-  DDA registration number
-- **Units:** the smallest unit (tab, cap, ml, sachet) and packs (strip = 10, box = 100…).
-  Use **Start from a common pack** to fill these quickly. Set **Usually bought in** and **Usually sold in**.
-- **Sale rule:** Over the counter · Prescription only · Controlled / Narcotic (**blocked from sale for now**)
-- **Storage:** room temperature, cold chain, frozen, protect from light
-- **Stock levels:** reorder at, reorder quantity, critical below, maximum
-- **Barcodes:** optional. Add them only if you use a scanner.
-- **Returnable to vendor**, **Can be sold loose**
+**Add medicine** asks only for what every medicine needs:
+- **Name on the shelf** (the brand), **generic name**, **strength** and **form**
+- **Sold:** only with a prescription, or over the counter (controlled and narcotic medicines are
+  blocked from sale for now)
+- **Pack:** pick the common pack (e.g. tablets: strip of 10, box of 10 strips); choose **Other pack
+  sizes** only if it's different
+- **Reorder when stock falls to** (optional): it then appears on the Reorder list
 
-### C8. Opening stock (Stock & stores → Opening stock)
+Everything else is under **More details** and can be left alone: category, maker, code, VAT,
+storage, DDA number, the units it is usually bought and sold in, critical and maximum levels,
+loose sale, returnable to vendor, barcodes (only if you use a scanner).
+
+### C8. Opening stock (Stock → Opening stock)
 Enter what is on the shelf **on the day you start**, one line per batch: item, unit, quantity,
 **batch number, expiry date, cost per unit, MRP per unit**. Check the totals before saving:
 stock entries can be corrected, never deleted.
@@ -311,11 +312,11 @@ issued prescription appears in the pharmacy, within seconds.
 
 | Tab | What it's for |
 |---|---|
-| **Dispense** | Issued prescriptions waiting. Open one, the batches are suggested (earliest expiry first), adjust, take payment, print the bill. You can give part now: the line shows "8 given, 12 left" and the prescription stays until all is given. |
-| **Sale** | Counter sales: type or **scan** a medicine, choose the unit (tab/strip/box), quantity; link a patient or record a walk-in; payment (cash/online/mixed). A linked patient's **advance** pays first; take only the rest. Expired and blocked batches are never offered. Prescription-only items need a prescription. |
+| **Dispense** | Issued prescriptions waiting. Open one, the batches are suggested (earliest expiry first), adjust, take payment, print the bill. You can give part now: the line shows "8 given, 12 left" and the prescription stays until all is given. The prescribed medicine is chosen for you; if it's out of stock, another brand of the **same medicine** (same generic, strength and form) is offered, and you give the reason. A different medicine can't be given against the prescription: ask the doctor. |
+| **Sale** | Counter sales: type or **scan** a medicine, choose the unit (tab/strip/box), quantity; link a patient or record a walk-in; payment (cash/online/mixed). A linked patient's **advance** pays first; take only the rest. Expired and blocked batches are never offered. Prescription-only items need a prescription. A medicine with none in stock shows the **same medicine** from other brands that are in stock, to add instead. **Hold for later** (1, 2, 3 or 7 days) keeps the medicines on the list aside for a linked patient or a named customer instead of billing now. |
+| **Holds** | Medicines kept aside for someone who collects later (the rest of a prescription, a phone order). Nobody else can sell, move or dispose of held stock. **Collect and bill** opens the sale with the held batches (take less if they want less; the rest goes back). **Release** puts it back on the shelf, with a reason. A hold that isn't collected in time goes back by itself, and so does a hold on a batch that gets recalled or blocked. The Dispense tab shows "On hold" against the prescription. |
 | **Bills** | Today's and earlier bills: **print**, **return items** (batch by batch; refund in cash or online, reduce what's owed, or put it into the patient's advance), **print the return slip**, **void** (same day only). |
-| **Dues** | Patients who owe: collect. |
-| **Stock** | What's on hand, transfers between stores, stock counts (PIN level). |
+| **Stock** | What's on hand and stock counts (PIN level). Dues are collected at the Registrar desk or in Billing. |
 
 ### E4. Admin: the rest of the menu
 
@@ -325,8 +326,8 @@ issued prescription appears in the pharmacy, within seconds.
 | **Patients** | Search, open a patient (visits, appointments, bills), edit details, resolve duplicate flags, **combine two records of the same person** (and undo it), the patient's **advance** (take, use, give back). |
 | **Appointments** | All bookings by day and doctor. |
 | **Purchases** | **New purchase**: enter the supplier's bill (batches, expiry, cost, MRP, free qty, discount, VAT); pay now or on credit. **Orders** (purchase orders), **Returns** to the vendor, void a purchase. An order above the approval limit (Settings) shows **Needs approval**: the owner opens it and approves or rejects it (with a reason); someone else must approve an order they raised. |
-| **Vendors** | Supplier list, what you owe each, **record payments** against bills, payables check. If you paid ahead or have unused credit notes, the vendor page shows **Credit with this vendor** and **Use … of credit** on the bills you owe, oldest first. **How this vendor has done** (last 12 months): fill rate, on time, delivery time, returns, shelf life at receipt, price changes. |
-| **Stock & stores** | Needs attention (low, expiring, expired), on the shelf, **transfers**, **counts**, **Reorder** (what each store should order, from how fast it sold in the last 30/60/90 days and the vendor's delivery time, or because it is at its reorder level; grouped by the vendor last bought from, one click makes a draft order), **dispose** expired or damaged stock, opening stock, **found stock** (a batch on the shelf with no lot on file: batch, expiry, cost, MRP), **Recalls**. Each medicine can have its own **levels per store** (Medicines → the item). |
+| **Vendors** | Supplier list, what you owe each, **record payments** against bills. If you paid ahead or have unused credit notes, the vendor page shows **Credit with this vendor** and **Use … of credit** on the bills you owe, oldest first. |
+| **Stock** | Needs attention (low, expiring, expired), on the shelf (move a lot to **quarantine** in one click), **counts**, **Reorder** (what each store should order, from how fast it sold in the last 30/60/90 days and the vendor's delivery time, or because it is at its reorder level; grouped by the vendor last bought from, one click makes a draft order), **dispose** expired or damaged stock, opening stock, **found stock** (a batch on the shelf with no lot on file: batch, expiry, cost, MRP), **Recalls**. |
 | **Billing** | Every bill; open, print, see returns and payments. |
 | **Expenses** | Record expenses (electricity, rent, salaries, transport…) paid in cash or online; reverse a mistake. |
 | **Finance** | Profit and loss for any period, money in and out, cash and bank balances, expenses by category, the nightly **books check**, opening cash and bank. |
@@ -334,7 +335,7 @@ issued prescription appears in the pharmacy, within seconds.
 | **Audit log** | Who did what and when, including who opened patient records. |
 | **Notifications** | Prescriptions to dispense, stock needing attention, booking requests, leave notices. Turn on push for this device to get them when the app is closed. |
 
-**A batch is recalled** (by the maker or the DDA). Go to **Stock & stores → Recalls**, type
+**A batch is recalled** (by the maker or the DDA). Go to **Stock → Recalls**, type
 the medicine, the batch number on the notice, the reason and the notice number, and press
 **Recall in every store** (you need your password session and the *block batches*
 permission). Every lot of that medicine with that batch number stops being sold at once,
@@ -403,7 +404,7 @@ are recorded in the audit log, and you need the **manage patients** permission f
 - [ ] Services: at least one consultation with its fee
 - [ ] Staff invited, roles set, registrations **verified by someone else**
 - [ ] Doctors: fee, departments, **weekly OPD**
-- [ ] Stores and staff store access
+- [ ] Staff roles (store access follows the role)
 - [ ] Medicines with units and reorder levels
 - [ ] **Opening stock** by batch (batch, expiry, cost, MRP)
 - [ ] Vendors and **opening balances**

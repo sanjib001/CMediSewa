@@ -5,15 +5,12 @@ import { AlertList } from "@/components/inventory/alert-list";
 import { serviceClient } from "@/lib/supabase/service";
 import { OpeningStockForm } from "@/components/inventory/opening-stock-form";
 import { FoundStockForm } from "@/components/inventory/found-stock-form";
-import { StoreAccess } from "@/components/inventory/store-access";
 import { LotActions } from "@/components/inventory/lot-actions";
 import { DisposalForm } from "@/components/inventory/disposal-form";
-import { ActionForm, field, label } from "@/components/platform/action-form";
-import { createStore } from "@/app/actions/inventory";
 import { PageHeader, Panel } from "@/components/ui/primitives";
 import { cn } from "@/lib/cn";
 
-export const metadata = { title: "Stock & stores" };
+export const metadata = { title: "Stock" };
 export const dynamic = "force-dynamic";
 
 const KIND: Record<string, string> = { pharmacy: "Pharmacy", main: "Main store", quarantine: "Quarantine", emergency: "Emergency", department: "Department", branch: "Branch" };
@@ -22,10 +19,10 @@ const exp = (d: string | null) => (d ? new Intl.DateTimeFormat("en-GB", { month:
 
 export default async function Stock({ searchParams }: { searchParams: Promise<{ store?: string }> }) {
   const ctx = await requireTenant({ operation: "admin.area", permission: "view_stock", allowPendingTenant: true, next: "/admin/stock" });
-  const { stores, access, members } = await listStores(ctx.tenantId);
+  const { stores } = await listStores(ctx.tenantId);
   const want = (await searchParams).store;
   const store = stores.find((s) => s.id === want) ?? stores.find((s) => s.kind === "pharmacy") ?? stores[0];
-  if (!store) return <PageHeader title="Stock & stores" subtitle="No stores yet." />;
+  if (!store) return <PageHeader title="Stock" subtitle="No stores yet." />;
   const [lots, items, { data: myAccess }, alerts] = await Promise.all([
     stockInStore(ctx.tenantId, store.id), listItems(ctx.tenantId),
     serviceClient().rpc("store_access", { p_tenant: ctx.tenantId, p_member: ctx.memberId, p_store: store.id }),
@@ -47,7 +44,7 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
 
   return (
     <>
-      <PageHeader title="Stock & stores" subtitle={`${store.name}: ${rows.length} items, ${npr(value)} at cost${expired ? `, ${expired} expired lots` : ""}${near ? `, ${near} near expiry` : ""}.`} />
+      <PageHeader title="Stock" subtitle={`${store.name}: ${rows.length} items, ${npr(value)} at cost${expired ? `, ${expired} expired lots` : ""}${near ? `, ${near} near expiry` : ""}.`} />
       <nav aria-label="Stores" className="mb-5 flex flex-wrap gap-2">
         {stores.map((s) => (
           <Link key={s.id} href={`/admin/stock?store=${s.id}`} className={cn("rounded-control border px-3 py-1.5 text-sm", s.id === store.id ? "border-pine bg-pine-tint font-medium text-pine-deep" : "border-line-strong")}>
@@ -55,7 +52,6 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
           </Link>
         ))}
         <span className="mx-1 self-center text-line-strong" aria-hidden>|</span>
-        <Link href="/admin/stock/transfers" className="rounded-control border border-line-strong px-3 py-1.5 text-sm">Transfers</Link>
         <Link href={`/admin/stock/counts?store=${store.id}`} className="rounded-control border border-line-strong px-3 py-1.5 text-sm">Stock count</Link>
         <Link href="/admin/stock/reorder" className="rounded-control border border-line-strong px-3 py-1.5 text-sm">Reorder</Link>
         <Link href="/admin/stock/recalls" className="rounded-control border border-line-strong px-3 py-1.5 text-sm">Recalls</Link>
@@ -117,25 +113,6 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
           </Panel>
         ) : null}
 
-        {can(ctx, "manage_settings") ? (
-          <Panel title="Add a store" aside={<span className="text-sm text-ink-faint">E.g. a main store that supplies the pharmacy</span>}>
-            <ActionForm action={createStore} submitLabel="Add store">
-              <div className="grid gap-3 sm:grid-cols-4">
-                <label className="block sm:col-span-2"><span className={label}>Name</span><input name="name" required placeholder="Main store" className={field} /></label>
-                <label className="block"><span className={label}>Code</span><input name="code" required maxLength={12} placeholder="MAIN" className={field} /></label>
-                <label className="block"><span className={label}>Kind</span>
-                  <select name="kind" className={field}><option value="main">Main store</option><option value="department">Department</option><option value="emergency">Emergency</option><option value="branch">Branch</option></select></label>
-              </div>
-              <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="is_sellable" />Sells to patients (its sales use the clinic&apos;s bill header)</label>
-            </ActionForm>
-          </Panel>
-        ) : null}
-
-        {can(ctx, "manage_staff") ? (
-          <Panel title={`Who works in ${store.name}`} aside={<span className="text-sm text-ink-faint">Operate: sell and receive. Manage: also post stock documents.</span>}>
-            <StoreAccess storeId={store.id} members={members} access={access.filter((a) => a.store_id === store.id)} />
-          </Panel>
-        ) : null}
       </div>
     </>
   );

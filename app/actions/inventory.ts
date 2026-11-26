@@ -3,7 +3,6 @@
 import { revalidatePath } from "next/cache";
 import { requireTenant } from "@/lib/auth/context";
 import { serviceClient } from "@/lib/supabase/service";
-import { audit } from "@/lib/audit";
 import { listItems, type ItemRow } from "@/lib/inventory/data";
 
 // Inventory actions (B5a). Item edits need the Admin area + manage_items; stock postings need
@@ -114,22 +113,9 @@ export async function postOpeningStock(input: { idempotencyKey: string; storeId:
   return { ok: true, message: `Opening stock posted: ${lines.length} line${lines.length === 1 ? "" : "s"}.` };
 }
 
-/** Who works in which store (permissions.md §5a). Changing it is staff management. */
-export async function setStoreAccess(input: { storeId: string; memberId: string; access: "view" | "operate" | "manage" | "none" }): Promise<{ ok: true } | Fail> {
-  const ctx = await requireTenant({ operation: "staff.manage", permission: "manage_staff", allowPendingTenant: true, next: "/admin/stock" });
-  const db = serviceClient();
-  const { error } = input.access === "none"
-    ? await db.from("store_members").delete().eq("tenant_id", ctx.tenantId).eq("store_id", input.storeId).eq("member_id", input.memberId)
-    : await db.from("store_members").upsert({ tenant_id: ctx.tenantId, store_id: input.storeId, member_id: input.memberId, access: input.access }, { onConflict: "store_id,member_id" });
-  if (error) return { ok: false, error: /foreign key/.test(error.message) ? "That store or person isn't at this clinic." : friendly(error) };
-  await audit({ tenantId: ctx.tenantId, actorKind: "member", actorId: ctx.memberId, sessionLevel: ctx.level, action: "store.access_change", targetType: "store", targetId: input.storeId, detail: { member: input.memberId, access: input.access } });
-  revalidatePath("/admin/stock");
-  return { ok: true };
-}
-
 // ── B5b: transfers, adjustments, counts, block/recall, disposal, stores ──────
 const MORE_ERRORS: [RegExp, string][] = [
-  [/INSUFFICIENT_STOCK/, "Not enough stock for that."],
+  [/INSUFFICIENT_STOCK|stock_balances_check/, "Not enough stock for that. Stock on hold for customers (Pharmacy → Holds) can't be moved, counted below or disposed of until the hold ends."],
   [/LOT_NOT_SELLABLE/, "That lot is expired or blocked, so it can only go to quarantine."],
   [/TRANSFER_NOT_APPROVED/, "This transfer needs approval before it can be sent."],
   [/TRANSFER_NOT_DISPATCHED/, "This transfer hasn't been sent yet."],
@@ -158,47 +144,41 @@ type R = { ok: true; message?: string } | Fail;
 const stockOp = () => requireTenant({ operation: "stock.operate", permission: "view_stock", allowPendingTenant: true, next: "/admin/stock" });
 const stockPost = (permission: "manage_stock" | "block_batches" | "dispose_stock") =>
   requireTenant({ operation: "stock.post", permission, allowPendingTenant: true, next: "/admin/stock" });
-const refresh = () => { revalidatePath("/admin/stock"); revalidatePath("/admin/stock/transfers"); revalidatePath("/admin/stock/counts"); revalidatePath("/admin/medicines"); };
+const refresh = () => { revalidatePath("/admin/stock"); revalidatePath("/admin/stock/counts"); revalidatePath("/admin/medicines"); };
 const rpc = async (fn: string, args: Record<string, unknown>): Promise<{ ok: true; data: unknown } | Fail> => {
   const { data, error } = await serviceClient().rpc(fn, args);
   return error ? { ok: false, error: friendlier(error) } : { ok: true, data };
 };
 
 export type TransferItem = { item_id: string; unit_id: string; qty: number | string; batch_id?: string | null };
-export async function requestTransfer(input: { fromStoreId: string; toStoreId: string; items: TransferItem[]; note?: string }): Promise<R & { id?: string }> {
+async function requestTransfer(input: { fromStoreId: string; toStoreId: string; items: TransferItem[]; note?: string }): Promise<R & { id?: string }> {
   const ctx = await stockOp();
   const r = await rpc("request_transfer", { p_tenant: ctx.tenantId, p_by: ctx.memberId, p_from: input.fromStoreId, p_to: input.toStoreId, p_items: (input.items ?? []).slice(0, 100), p_note: String(input.note ?? "").slice(0, 300) });
   if (!r.ok) return r;
   refresh();
   return { ok: true, id: r.data as string, message: "Transfer created." };
 }
-export async function decideTransfer(input: { id: string; action: "approve" | "reject" | "cancel"; reason?: string }): Promise<R> {
-  const ctx = input.action === "cancel" ? await stockOp() : await stockPost("manage_stock");
-  const r = await rpc("decide_transfer", { p_tenant: ctx.tenantId, p_by: ctx.memberId, p_transfer: input.id, p_action: input.action, p_reason: input.reason ?? null });
-  if (!r.ok) return r;
-  refresh();
-  return { ok: true };
-}
-export async function dispatchTransfer(input: { id: string; idempotencyKey: string }): Promise<R> {
+async function dispatchTransfer(input: { id: string; idempotencyKey: string }): Promise<R> {
   const ctx = await stockOp();
   const r = await rpc("dispatch_transfer", { p_tenant: ctx.tenantId, p_idempotency_key: input.idempotencyKey, p_transfer: input.id, p_by: ctx.memberId, p_session_level: ctx.level, p_device: ctx.deviceId });
   if (!r.ok) return r;
   refresh();
   return { ok: true, message: "Sent." };
 }
-export async function receiveTransfer(input: { id: string; idempotencyKey: string; lines?: { line_id: string; received_base_qty: number; loss_base_qty: number; loss_reason?: string }[] }): Promise<R> {
+async function receiveTransfer(input: { id: string; idempotencyKey: string; lines?: { line_id: string; received_base_qty: number; loss_base_qty: number; loss_reason?: string }[] }): Promise<R> {
   const ctx = await stockOp();
   const r = await rpc("receive_transfer", { p_tenant: ctx.tenantId, p_idempotency_key: input.idempotencyKey, p_transfer: input.id, p_lines: input.lines ?? null, p_by: ctx.memberId, p_session_level: ctx.level, p_device: ctx.deviceId });
   if (!r.ok) return r;
   refresh();
   return { ok: true, message: "Received." };
 }
-/** One click for the common case: move a lot into quarantine (request, send and receive). */
+// Transfers have no screen of their own (D-149): moving a lot to quarantine is the one use, done in one click.
+/** Move a lot into quarantine (request, send and receive). */
 export async function moveToQuarantine(input: { fromStoreId: string; batchId: string; itemId: string; unitId: string; qtyBase: number; quarantineId: string }): Promise<R> {
   const created = await requestTransfer({ fromStoreId: input.fromStoreId, toStoreId: input.quarantineId, items: [{ item_id: input.itemId, unit_id: input.unitId, qty: input.qtyBase, batch_id: input.batchId }], note: "Moved to quarantine" });
   if (!created.ok || !created.id) return created;
   const sent = await dispatchTransfer({ id: created.id, idempotencyKey: crypto.randomUUID() });
-  if (!sent.ok) return { ok: false, error: `${sent.error} The transfer was created; finish it in Transfers.` };
+  if (!sent.ok) return { ok: false, error: `${sent.error} Nothing was moved. Try again.` };
   const got = await receiveTransfer({ id: created.id, idempotencyKey: crypto.randomUUID() });
   if (!got.ok) return { ok: false, error: `Sent, but not yet received in quarantine: ${got.error}` };
   return { ok: true, message: "Moved to quarantine." };
@@ -253,23 +233,6 @@ export async function disposeStock(input: { idempotencyKey: string; storeId: str
   return { ok: true, message: "Disposal recorded." };
 }
 
-export async function createStore(fd: FormData): Promise<{ ok: true; message: string } | Fail> {
-  const ctx = await requireTenant({ operation: "settings.change", permission: "manage_settings", allowPendingTenant: true, next: "/admin/stock" });
-  const kind = String(fd.get("kind") ?? "");
-  const name = String(fd.get("name") ?? "").trim();
-  const code = String(fd.get("code") ?? "").trim().toUpperCase();
-  if (!["main", "emergency", "department", "branch"].includes(kind)) return { ok: false, error: "Choose the kind of store." };
-  if (name.length < 2 || !/^[A-Z0-9-]{1,12}$/.test(code)) return { ok: false, error: "Give a name and a short code (letters, numbers, -)." };
-  const { data: bp } = await serviceClient().from("billing_profiles").select("id").eq("tenant_id", ctx.tenantId).eq("is_default", true).maybeSingle<{ id: string }>();
-  const { error } = await serviceClient().from("stores").insert({ tenant_id: ctx.tenantId, name, code, kind, billing_profile_id: bp?.id ?? null,
-    is_sellable: fd.get("is_sellable") === "on", is_dispensing: fd.get("is_sellable") === "on", is_receiving: true });
-  if (error) return { ok: false, error: friendlier(error) };
-  await audit({ tenantId: ctx.tenantId, actorKind: "member", actorId: ctx.memberId, sessionLevel: ctx.level, action: "store.create", detail: { name, code, kind } });
-  refresh();
-  return { ok: true, message: `${name} added.` };
-}
-
-/** Check every balance against the stock ledger now (the nightly job does the same). */
 export async function runReconciliation(): Promise<{ ok: true; message: string } | Fail> {
   const ctx = await requireTenant({ operation: "stock.post", permission: "manage_stock", allowPendingTenant: true, next: "/admin/stock/reorder" });
   const { data, error } = await serviceClient().rpc("reconcile_stock_balances", { p_tenant: ctx.tenantId, p_by: ctx.memberId });
@@ -297,28 +260,3 @@ export async function recallBatch(input: { itemId: string; batchNo: string; reas
 
 // ── Pharmacy track step 2 (D-143): per-store stock levels for an item ─────────
 /** Set (or clear, when all are blank) one store's min / reorder / max for an item, in base units. */
-export async function saveStoreLevels(fd: FormData): Promise<{ ok: true; message: string } | Fail> {
-  const itemId = String(fd.get("item_id") ?? ""), storeId = String(fd.get("store_id") ?? "");
-  const ctx = await requireTenant({ operation: "admin.area", permission: "manage_items", allowPendingTenant: true, next: `/admin/medicines/${itemId}` });
-  if (!UUID.test(itemId) || !UUID.test(storeId)) return { ok: false, error: "Reload the page and try again." };
-  const n = (k: string) => { const v = String(fd.get(k) ?? "").replace(/,/g, "").trim(); return v === "" ? null : Number(v); };
-  const min = n("min"), reorder = n("reorder"), max = n("max");
-  if ([min, reorder, max].some((v) => v !== null && (!Number.isFinite(v) || v < 0))) return { ok: false, error: "Use plain numbers of 0 or more." };
-  if (max === 0) return { ok: false, error: "The maximum must be more than 0, or blank." };
-  if (min !== null && reorder !== null && reorder < min) return { ok: false, error: "Reorder at should be at least the minimum." };
-  if (max !== null && reorder !== null && max < reorder) return { ok: false, error: "The maximum should be at least the reorder level." };
-  const db = serviceClient();
-  const [{ data: st }, { data: it }] = await Promise.all([
-    db.from("stores").select("id").eq("tenant_id", ctx.tenantId).eq("id", storeId).maybeSingle(),
-    db.from("inventory_items").select("id").eq("tenant_id", ctx.tenantId).eq("id", itemId).maybeSingle(),
-  ]);
-  if (!st || !it) return { ok: false, error: "Reload the page and try again." };
-  const { error } = min === null && reorder === null && max === null
-    ? await db.from("store_item_levels").delete().eq("tenant_id", ctx.tenantId).eq("store_id", storeId).eq("item_id", itemId)
-    : await db.from("store_item_levels").upsert({ tenant_id: ctx.tenantId, store_id: storeId, item_id: itemId, min_stock_level: min, reorder_level: reorder, max_stock_level: max }, { onConflict: "store_id,item_id" });
-  if (error) return { ok: false, error: "Couldn't save. Nothing was changed." };
-  await audit({ tenantId: ctx.tenantId, actorKind: "member", actorId: ctx.memberId, sessionLevel: ctx.level, action: "item.store_levels", targetType: "inventory_item", targetId: itemId,
-    detail: { store: storeId, min, reorder, max } });
-  refresh();
-  return { ok: true, message: min === null && reorder === null && max === null ? "Cleared: this store uses the item's own levels." : "Saved for this store." };
-}

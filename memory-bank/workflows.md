@@ -225,8 +225,12 @@ other hides and its MRN still finds the person; `undo_patient_merge` reverses it
    unit → quantity (default: prescribed minus already dispensed) → **FEFO lot suggestion**
    shown with expiry and price → optional override (`override_batch`).
 3. **Partial dispense:** a smaller quantity is fine, and the remainder stays in the queue.
-   **Substitution** (same generic, different brand or strength-equivalent) needs a reason
-   and records `substituted_item_id`.
+   **Substitution (D-147):** when the prescription names a catalogue item, another brand may be
+   given only if it is the same medicine (`medicine_equivalent`: same generic, strength and
+   form, not a combination), with a reason stored on the bill line (`substitution_reason`,
+   printed on the bill). The counter picks the prescribed item, or the first same medicine
+   in stock when it has none, and lists the others (`equiv` key). Free-text prescription
+   lines have no catalogue item, so any medicine may be chosen.
 4. "Bill": a **pharmacy invoice** is created under the pharmacy store's billing profile,
    with `visit_id` and `patient_id` copied as **references** from the prescription (never
    re-typed), then W-13 steps 3–5. A `dispensations` row is written per Rx item. If the
@@ -486,15 +490,19 @@ printable slip.
    report service, with exactly-once delivery).
 3. P2 (M-47): cashier shifts with an expected vs counted cash variance posting.
 
-## W-30 Medicine reservation (M-45, P2)
-1. When dispensing is partial because stock is short, or the patient will collect later, the
-   pharmacist reserves specific lots for that patient/Rx with an expiry (e.g. 48h).
-2. `stock_reservations` raises `qty_reserved`, so others can't sell the reserved quantity
-   (available = on hand − reserved).
-3. Collection converts the reservation into the sale allocation. Expiry or cancellation
-   releases it (by cron).
-4. MVP behaviour without reservations: stock is allocated only at invoice issue, and the
-   dispensing queue shows a "stock short" flag.
+## W-30 Medicine reservation: stock holds (M-45, done, D-145) [A1, `pharmacy_sell`]
+1. On the Sale tab, the pharmacist adds the medicines (or opens a prescription) and chooses
+   **Hold for later** (1–7 days) for a linked patient or a named customer. `create_stock_hold`
+   takes lots earliest expiry first (or a chosen lot, `override_batch`); one hold line per lot.
+2. `stock_balances.qty_reserved` = Σ held − collected over holds still held (`sync_reserved`).
+   allocate_stock already takes on hand − reserved; a chosen-lot movement can't go below it.
+3. **Collect and bill** (Holds tab) opens the sale with each held lot as a line
+   (`hold_line_id`): up to the held quantity, from that lot, for that patient (or the record it
+   was merged into). After the bill, the hold is `collected` and anything not taken goes back.
+4. **Release** (reason) ends it by hand. Holds past their time end as `expired` at the next
+   allocation in that store, at the next counter sale, and in the nightly job (which also
+   rebuilds every reserved quantity). A lot that becomes recalled / blocked / quarantined ends
+   every hold on it.
 
 ## W-31 Integrated patient journey: booking to finance (Revision 4)
 How the modules connect, with each step's single source of truth (`architecture.md` §2c).

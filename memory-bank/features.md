@@ -84,11 +84,11 @@ the same MVP.
 | M-42 | Telemedicine | F | |
 | M-43 | Interoperability | F | FHIR export, LIS devices |
 | M-44 | Payroll & attendance | F | HRestroSewa payroll/rota patterns are available as a reference |
-| M-45 | Stock reservations | P2 | hold lots for a patient or Rx awaiting collection; `qty_reserved`; expiry auto-release (`database.md` §9.5) |
+| M-45 | Stock reservations (done, D-145) | P2 | hold lots for a patient or Rx awaiting collection; `qty_reserved`; expiry auto-release (`database.md` §9.5) |
 | M-46 | Purchase suggestions & supplier performance | P2 | velocity × lead-time reorder suggestions per store; supplier fill rate, on-time rate, return rate, price trend, shelf life at receipt; PO approvals + email to vendor |
 | M-47 | Cashier shifts & till reconciliation | **F (dropped from P2, D-137)** | open/close shift per counter, expected vs counted cash, variance posting |
 | M-48 | Controlled-drug register | **F (dropped from P2, D-137)**; still **required before controlled/narcotic items can be sold** (P-22) | register of receipt, dispensing, balance, prescriber; stricter disposal |
-| M-49 | Advanced barcode | P2 | GS1 DataMatrix parsing (GTIN + batch + expiry), camera scanning on phones, shelf and price label printing |
+| M-49 | Advanced barcode (moved to Future, D-146) | F | GS1 DataMatrix parsing (GTIN + batch + expiry), camera scanning on phones, shelf and price label printing |
 | M-50 | Accounting export & e-billing integration | F | export journal (CSV/Tally-style); IRD/CBMS real-time invoice reporting if required (P-08) |
 | M-52 | Patient advances / deposits | P2 | deposits before procedures, applied to invoices (`PATIENT_ADVANCES` liability; HRestroSewa room-advance pattern): **done** (D-139) |
 | M-51 | Bulk recall | P2 | block a batch number across all stores, notify, list affected sales by patient: **done** (D-140) |

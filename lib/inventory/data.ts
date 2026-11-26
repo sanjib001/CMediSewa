@@ -33,8 +33,13 @@ export async function listItems(tenantId: string, q = ""): Promise<ItemRow[]> {
   const db = serviceClient();
   let iq = db.from("inventory_items").select("id, item_code, item_type, name, is_active, category_id, manufacturer_id, reorder_level, min_stock_level")
     .eq("tenant_id", tenantId).is("deleted_at", null).order("name").limit(300);
-  const term = q.trim();
-  if (term) iq = iq.or(`name.ilike.%${term.replace(/[%,()]/g, "")}%,item_code.ilike.%${term.replace(/[%,()]/g, "")}%`);
+  const term = q.trim().replace(/[%,()]/g, "");
+  if (term) {
+    // Name, code, or generic name (typing "paracetamol" finds every paracetamol brand).
+    const gen = ((await db.from("generics").select("id").eq("tenant_id", tenantId).ilike("name", `%${term}%`)).data ?? []) as { id: string }[];
+    const byGeneric = gen.length ? (((await db.from("medicine_details").select("item_id").eq("tenant_id", tenantId).in("generic_id", gen.map((x) => x.id))).data ?? []) as { item_id: string }[]).map((x) => x.item_id) : [];
+    iq = iq.or([`name.ilike.%${term}%`, `item_code.ilike.%${term}%`, ...(byGeneric.length ? [`id.in.(${byGeneric.slice(0, 200).join(",")})`] : [])].join(","));
+  }
   const items = rows<{ id: string; item_code: string; item_type: string; name: string; is_active: boolean; category_id: string | null; manufacturer_id: string | null; reorder_level: number | null; min_stock_level: number | null }>(await iq, "items");
   if (!items.length) return [];
   const ids = items.map((i) => i.id);
@@ -143,42 +148,6 @@ export async function stockInStore(tenantId: string, storeId: string): Promise<B
 }
 
 // ── B5b: transfers and counts ────────────────────────────────────────────────
-export type TransferRow = {
-  id: string; transfer_no: string; status: string; from_store_id: string; to_store_id: string; note: string | null; requested_at: string; decision_reason: string | null;
-  items: { item: string; qty: number; unit: string; batch_no: string | null }[];
-  lines: { id: string; item: string; batch_no: string; dispatched: number; received: number | null; loss: number | null; unit: string }[];
-};
-export async function listTransfers(tenantId: string): Promise<TransferRow[]> {
-  const db = serviceClient();
-  const t = rows<{ id: string; transfer_no: string; status: string; from_store_id: string; to_store_id: string; note: string | null; requested_at: string; decision_reason: string | null }>(
-    await db.from("stock_transfers").select("id, transfer_no, status, from_store_id, to_store_id, note, requested_at, decision_reason").eq("tenant_id", tenantId).order("requested_at", { ascending: false }).limit(60), "transfers");
-  if (!t.length) return [];
-  const ids = t.map((x) => x.id);
-  const [ti, tl] = await Promise.all([
-    db.from("stock_transfer_items").select("transfer_id, item_id, unit_id, requested_qty, batch_id").eq("tenant_id", tenantId).in("transfer_id", ids),
-    db.from("stock_transfer_lines").select("id, transfer_id, item_id, batch_id, dispatched_base_qty, received_base_qty, loss_base_qty").eq("tenant_id", tenantId).in("transfer_id", ids),
-  ]);
-  const its = rows<{ transfer_id: string; item_id: string; unit_id: string; requested_qty: number; batch_id: string | null }>(ti, "transfer items");
-  const lns = rows<{ id: string; transfer_id: string; item_id: string; batch_id: string; dispatched_base_qty: number; received_base_qty: number | null; loss_base_qty: number | null }>(tl, "transfer lines");
-  const itemIds = [...new Set([...its.map((x) => x.item_id), ...lns.map((x) => x.item_id)])];
-  const batchIds = [...new Set([...its.map((x) => x.batch_id).filter(Boolean), ...lns.map((x) => x.batch_id)])] as string[];
-  const [inv, un, bt] = await Promise.all([
-    db.from("inventory_items").select("id, name").in("id", itemIds),
-    db.from("item_units").select("id, item_id, name, is_base").in("item_id", itemIds),
-    batchIds.length ? db.from("item_batches").select("id, batch_no").in("id", batchIds) : Promise.resolve({ data: [], error: null }),
-  ]);
-  const nm = (id: string) => ((inv.data ?? []) as { id: string; name: string }[]).find((x) => x.id === id)?.name ?? "";
-  const units = (un.data ?? []) as { id: string; item_id: string; name: string; is_base: boolean }[];
-  const bno = (id: string | null) => (id ? ((bt.data ?? []) as { id: string; batch_no: string }[]).find((x) => x.id === id)?.batch_no ?? null : null);
-  return t.map((x) => ({
-    ...x,
-    items: its.filter((i) => i.transfer_id === x.id).map((i) => ({ item: nm(i.item_id), qty: Number(i.requested_qty), unit: units.find((u) => u.id === i.unit_id)?.name ?? "", batch_no: bno(i.batch_id) })),
-    lines: lns.filter((l) => l.transfer_id === x.id).map((l) => ({ id: l.id, item: nm(l.item_id), batch_no: bno(l.batch_id) ?? "", dispatched: Number(l.dispatched_base_qty),
-      received: l.received_base_qty === null ? null : Number(l.received_base_qty), loss: l.loss_base_qty === null ? null : Number(l.loss_base_qty),
-      unit: units.find((u) => u.item_id === l.item_id && u.is_base)?.name ?? "" })),
-  }));
-}
-
 export async function getOpenCount(tenantId: string, storeId: string) {
   const db = serviceClient();
   const { data: k } = await db.from("stock_counts").select("id, count_no, blind, started_at, started_by").eq("tenant_id", tenantId).eq("store_id", storeId).eq("status", "counting").maybeSingle();

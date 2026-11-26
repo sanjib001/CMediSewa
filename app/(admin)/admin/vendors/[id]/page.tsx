@@ -2,7 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { randomUUID } from "node:crypto";
 import { requireTenant, can } from "@/lib/auth/context";
-import { listPurchases, listVendorPayments, listVendors, vendorPerformance, vendorStatement } from "@/lib/purchasing/data";
+import { listPurchases, listVendorPayments, listVendors } from "@/lib/purchasing/data";
 import { applyVendorCredit, payVendor, postVendorOpening, saveVendor } from "@/app/actions/purchasing";
 import { ActionForm, field, label } from "@/components/platform/action-form";
 import { ButtonLink, PageHeader, Panel } from "@/components/ui/primitives";
@@ -19,8 +19,7 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
   if (!/^[0-9a-f-]{36}$/.test(id)) notFound();
   const v = (await listVendors(ctx.tenantId)).find((x) => x.id === id);
   if (!v) notFound();
-  const [bills, payments, statement, perf] = await Promise.all([listPurchases(ctx.tenantId, id), listVendorPayments(ctx.tenantId, id), vendorStatement(ctx.tenantId, id), vendorPerformance(ctx.tenantId, id)]);
-  const pct = (n: number | null) => (n === null ? "—" : `${n}%`);
+  const [bills, payments] = await Promise.all([listPurchases(ctx.tenantId, id), listVendorPayments(ctx.tenantId, id)]);
   const hasOpening = bills.some((b) => b.kind === "opening" && b.status === "posted");
   const open = bills.filter((b) => b.outstanding > 0).sort((a, b) => a.vendor_invoice_date.localeCompare(b.vendor_invoice_date));
 
@@ -52,47 +51,6 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
             )}
           </Panel>
 
-          <Panel title="How this vendor has done" aside={<span className="text-sm text-ink-faint">Last 12 months</span>}>
-            {perf.orders === 0 && perf.bills === 0 ? <p className="text-ink-soft">No orders or bills in the last year yet.</p> : (
-              <>
-                <dl className="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
-                  {([
-                    ["Fill rate", pct(perf.fill_rate), "of what was ordered came"],
-                    ["On time", pct(perf.on_time_rate), "orders delivered by the expected date"],
-                    ["Delivery time", perf.delivery_days === null ? "—" : `${perf.delivery_days} days`, "order to first bill, on average"],
-                    ["Bought", npr(perf.purchased), `${perf.bills} bill${perf.bills === 1 ? "" : "s"}`],
-                    ["Returned", pct(perf.return_rate), npr(perf.returned)],
-                    ["Shelf life at receipt", perf.shelf_life_days === null ? "—" : `${perf.shelf_life_days} days`, perf.short_dated_lots ? `${perf.short_dated_lots} lot${perf.short_dated_lots === 1 ? "" : "s"} under 6 months` : "no short-dated lots"],
-                  ] as const).map(([k, val, hint]) => (
-                    <div key={k}><dt className="text-sm text-ink-faint">{k}</dt><dd className="text-lg font-medium tabular-nums">{val}</dd><dd className="text-xs text-ink-faint">{hint}</dd></div>
-                  ))}
-                </dl>
-                {perf.price_changes.length ? (
-                  <div className="mt-4 border-t border-line pt-3">
-                    <p className="mb-1 text-sm font-medium">Price changes (last two bills, per base unit)</p>
-                    <ul className="text-sm">{perf.price_changes.map((c) => (
-                      <li key={c.item} className="flex justify-between gap-3 py-0.5"><span>{c.item}</span>
-                        <span className={`tabular-nums ${c.change_pct > 0 ? "text-alert" : "text-ok"}`}>Rs. {c.previous} → Rs. {c.last} ({c.change_pct > 0 ? "+" : ""}{c.change_pct}%)</span></li>))}</ul>
-                  </div>
-                ) : null}
-              </>
-            )}
-          </Panel>
-
-          <Panel title="Account statement" aside={<span className="text-sm text-ink-faint">From the accounts</span>} flush>
-            {statement.length === 0 ? <p className="px-5 py-4 text-ink-soft">No entries yet.</p> : (
-              <table className="w-full text-left text-sm">
-                <thead className="text-ink-faint"><tr><th className="px-5 py-2 font-medium">Date</th><th className="py-2 font-medium">Document</th><th className="py-2 text-right font-medium">Bill / owed</th><th className="py-2 text-right font-medium">Paid</th><th className="px-5 py-2 text-right font-medium">Balance owed</th></tr></thead>
-                <tbody className="divide-y divide-line">
-                  {statement.map((s, i) => (
-                    <tr key={i}><td className="px-5 py-1.5">{day(s.at)}</td><td className="py-1.5">{s.doc}{s.memo ? ` (${s.memo})` : ""}</td>
-                      <td className="py-1.5 text-right tabular-nums">{s.credit ? npr(s.credit) : ""}</td><td className="py-1.5 text-right tabular-nums">{s.debit ? npr(s.debit) : ""}</td>
-                      <td className="px-5 py-1.5 text-right tabular-nums">{npr(s.balance)}</td></tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
-          </Panel>
         </div>
 
         <div className="space-y-6">
@@ -148,7 +106,7 @@ export default async function VendorPage({ params }: { params: Promise<{ id: str
               <label className="block"><span className={label}>Address</span><input name="address" defaultValue={v.address ?? ""} className={field} /></label>
               <label className="block"><span className={label}>Payment terms (days)</span><input name="payment_terms_days" type="number" min={0} max={365} defaultValue={v.payment_terms_days ?? ""} className={field} /></label>
               <label className="block"><span className={label}>Delivery time (days)</span><input name="lead_time_days" type="number" min={1} max={120} defaultValue={v.lead_time_days ?? ""} className={field} />
-                <span className="mt-1 block text-xs text-ink-faint">Blank = worked out from past orders{perf.delivery_days !== null ? ` (about ${perf.delivery_days} days)` : ""}, else 7. Reorder suggestions use it.</span></label>
+                <span className="mt-1 block text-xs text-ink-faint">Optional. Reorder suggestions use it (blank = worked out from past deliveries, else 7).</span></label>
               <label className="flex items-center gap-2 text-sm"><input type="checkbox" name="is_active" defaultChecked={v.is_active} />In use</label>
             </ActionForm>
           </Panel>

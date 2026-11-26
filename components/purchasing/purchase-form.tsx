@@ -17,15 +17,19 @@ type Row = { po_line_id?: string; item: ItemRow; unit_id: string; qty: string; f
 function Picker({ onPick }: { onPick: (i: ItemRow) => void }) {
   const [q, setQ] = useState("");
   const [list, setList] = useState<ItemRow[]>([]);
+  const [looked, setLooked] = useState("");
   useEffect(() => {
     if (q.trim().length < 2) return;
     let live = true;
-    const t = setTimeout(() => findItems(q).then((r) => { if (live) setList(r); }), 250);
+    const t = setTimeout(() => findItems(q).then((r) => { if (live) { setList(r); setLooked(q.trim()); } }), 250);
     return () => { live = false; clearTimeout(t); };
   }, [q]);
   return (
     <div className="relative max-w-md">
-      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Add an item: type its name" aria-label="Add an item" className={f} />
+      <input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Add an item: type its name, generic or code" aria-label="Add an item" className={f} />
+      {q.trim().length >= 2 && looked === q.trim() && !list.length ? (
+        <p className="mt-1 text-sm text-ink-soft">No item matches &quot;{q.trim()}&quot;. <a href="/admin/medicines/new" target="_blank" rel="noreferrer" className="text-pine underline">Add it in Medicines</a> (opens a new tab), then type it again here.</p>
+      ) : null}
       {q.trim().length >= 2 && list.length ? (
         <ul className="absolute z-10 mt-1 max-h-64 w-full overflow-auto rounded-control border border-line bg-surface shadow-lg">
           {list.map((i) => <li key={i.id}><button type="button" className="block w-full px-3 py-2 text-left text-sm hover:bg-sunken" onClick={() => { onPick(i); setQ(""); setList([]); }}>
@@ -58,16 +62,21 @@ export function PurchaseForm({ vendors, stores, defaultVendor, today, po }: { ve
   const key = useRef(crypto.randomUUID());
   const set = (i: number, p: Partial<Row>) => setRows(rows.map((r, j) => (j === i ? { ...r, ...p } : r)));
 
+  // The same arithmetic and rounding as post_purchase_invoice, so "Pay all" matches the bill to the paisa.
+  const r2 = (n: number) => Math.round(n * 100) / 100;
   const calc = rows.map((r) => {
-    const gross = (Number(r.qty) || 0) * (Number(r.unit_cost) || 0);
-    const net = gross - gross * (Number(r.discount_pct) || 0) / 100;
-    return { gross, net, tax: net * r.tax_rate / 100 };
+    const gross = r2((Number(r.qty) || 0) * (Number(r.unit_cost) || 0));
+    const net = gross - r2(gross * (Number(r.discount_pct) || 0) / 100);
+    return { gross, net, tax: r2(net * r.tax_rate / 100) };
   });
-  const net = calc.reduce((s, c) => s + c.net, 0);
-  const tax = calc.reduce((s, c) => s + c.tax, 0);
-  const bd = Number(billDiscount) || 0;
-  const total = Math.round((net - bd + (net > 0 ? tax * (net - bd) / net : 0)) * 100) / 100;
-  const credit = Math.max(0, total - (Number(cash) || 0) - (Number(online) || 0));
+  const net = r2(calc.reduce((s, c) => s + c.net, 0));
+  const bd = r2(Number(billDiscount) || 0);
+  const taxLines = r2(calc.reduce((s, c) => s + c.tax, 0));
+  const tax = bd > 0 && net > 0 ? r2(taxLines * (net - bd) / net) : taxLines;
+  const total = r2(net - bd + tax);
+  const paidNow = Math.round(((Number(cash) || 0) + (Number(online) || 0)) * 100) / 100;
+  const credit = Math.max(0, Math.round((total - paidNow) * 100) / 100);
+  const over = paidNow > total + 0.004;
 
   return (
     <div className="space-y-6">
@@ -116,23 +125,45 @@ export function PurchaseForm({ vendors, stores, defaultVendor, today, po }: { ve
         <div className="grid grid-cols-2 gap-3">
           <label className="block"><span className={lbl}>Bill discount (Rs.)</span><input value={billDiscount} onChange={(e) => setBillDiscount(e.target.value)} inputMode="decimal" className={cn(f, "py-2")} /></label>
           <span />
-          <label className="block"><span className={lbl}>Paid now in cash</span><input value={cash} onChange={(e) => setCash(e.target.value)} inputMode="decimal" className={cn(f, "py-2")} /></label>
-          <label className="block"><span className={lbl}>Paid now online</span><input value={online} onChange={(e) => setOnline(e.target.value)} inputMode="decimal" className={cn(f, "py-2")} /></label>
-          {Number(online) > 0 ? <label className="block"><span className={lbl}>Online via</span>
-            <select value={channel} onChange={(e) => setChannel(e.target.value)} className={cn(f, "py-2")}><option value="bank_transfer">Bank transfer</option><option value="esewa">eSewa</option><option value="khalti">Khalti</option><option value="fonepay">Fonepay</option><option value="card">Card</option><option value="other">Other</option></select></label> : null}
+          <p className="col-span-2 text-sm font-medium">Paying the vendor now? <span className="font-normal text-ink-soft">Leave both blank to keep the whole bill on credit.</span></p>
+          <label className="block"><span className={lbl}>Cash now (Rs.)</span><input value={cash} onChange={(e) => setCash(e.target.value)} inputMode="decimal" placeholder="0" aria-label="Cash paid now" className={cn(f, "py-2")} /></label>
+          <label className="block"><span className={lbl}>Online now (Rs.)</span><input value={online} onChange={(e) => setOnline(e.target.value)} inputMode="decimal" placeholder="0" aria-label="Online paid now" className={cn(f, "py-2")} /></label>
+          <label className={cn("block", Number(online) > 0 ? "" : "opacity-60")}><span className={lbl}>Online via</span>
+            <select value={channel} onChange={(e) => setChannel(e.target.value)} disabled={!(Number(online) > 0)} aria-label="Online via" className={cn(f, "py-2")}><option value="bank_transfer">Bank transfer</option><option value="esewa">eSewa</option><option value="khalti">Khalti</option><option value="fonepay">Fonepay</option><option value="card">Card</option><option value="other">Other</option></select></label>
+          <div className="col-span-2 flex flex-wrap gap-2 text-sm">
+            <button type="button" disabled={!total} onClick={() => { setCash(String(total)); setOnline(""); }} className="rounded-control border border-line px-2 py-1 disabled:opacity-50">Pay all in cash</button>
+            <button type="button" disabled={!total} onClick={() => { setOnline(String(total)); setCash(""); }} className="rounded-control border border-line px-2 py-1 disabled:opacity-50">Pay all online</button>
+            <button type="button" onClick={() => { setCash(""); setOnline(""); }} className="rounded-control border border-line px-2 py-1">All on credit</button>
+          </div>
         </div>
         <dl className="grid grid-cols-[1fr_auto] content-start gap-y-1.5 text-[0.95rem]">
           <dt className="text-ink-soft">Items after discounts</dt><dd className="text-right tabular-nums">{npr(net)}</dd>
           {bd ? <><dt className="text-ink-soft">Bill discount</dt><dd className="text-right tabular-nums">− {npr(bd)}</dd></> : null}
-          {tax ? <><dt className="text-ink-soft">VAT</dt><dd className="text-right tabular-nums">{npr(total - (net - bd))}</dd></> : null}
+          {tax ? <><dt className="text-ink-soft">VAT</dt><dd className="text-right tabular-nums">{npr(tax)}</dd></> : null}
           <dt className="border-t border-line pt-1.5 font-semibold">Bill total</dt><dd className="border-t border-line pt-1.5 text-right font-semibold tabular-nums">{npr(total)}</dd>
-          <dt className="text-ink-soft">On credit (you owe)</dt><dd className="text-right tabular-nums">{npr(credit)}</dd>
+          {Number(cash) > 0 ? <><dt className="text-ink-soft">Paid now in cash</dt><dd className="text-right tabular-nums">− {npr(Number(cash))}</dd></> : null}
+          {Number(online) > 0 ? <><dt className="text-ink-soft">Paid now online</dt><dd className="text-right tabular-nums">− {npr(Number(online))}</dd></> : null}
+          <dt className="font-medium">On credit (you owe)</dt><dd className="text-right font-medium tabular-nums">{npr(credit)}</dd>
+          {over ? <dd className="col-span-2 text-sm text-alert">That&apos;s more than the bill total. Enter only what you pay for this bill (extra payments go in Vendors → Pay this vendor).</dd> : null}
         </dl>
       </section>
 
       {error ? <p role="alert" className="rounded-control bg-alert-tint px-3 py-2 text-sm text-alert">{error}</p> : null}
-      <Button type="button" disabled={pending || !rows.length || !billNo.trim()} onClick={() => {
-        if (!window.confirm(`Post bill ${billNo} for about ${npr(total)}? Stock is received now and the bill can only be voided while nothing from it has been used.`)) return;
+      <Button type="button" disabled={pending} onClick={() => {
+        setError(null); setBadLine(null);
+        const missing = !billNo.trim() ? "Enter the vendor's bill number (top of the form)."
+          : !rows.length ? "Add at least one item: type its name in \"Add an item\"."
+          : null;
+        if (missing) { setError(missing); return; }
+        if (over) { setError("You've entered more paid than the bill total. Enter only what you pay for this bill."); return; }
+        const n = rows.findIndex((r) => !(Number(r.qty) > 0) || r.unit_cost === "" || (r.item.item_type === "medicine" && (!r.batch_no.trim() || !r.expiry_date)));
+        if (n >= 0) {
+          const r = rows[n]!;
+          setBadLine(n + 1);
+          setError(`Line ${n + 1} (${r.item.name}): ${!(Number(r.qty) > 0) ? "enter the quantity" : r.unit_cost === "" ? "enter the rate" : !r.batch_no.trim() ? "enter the batch number" : "enter the expiry date"}.`);
+          return;
+        }
+        if (!window.confirm(`Post bill ${billNo} for about ${npr(total)}${paidNow ? `, paying ${npr(paidNow)} now` : ", all on credit"}? Stock is received now and the bill can only be voided while nothing from it has been used.`)) return;
         start(async () => {
           setError(null); setBadLine(null);
           const r = await postPurchase({

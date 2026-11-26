@@ -421,12 +421,15 @@ qty_reserved numeric(14,3) CHECK (>= 0 and <= qty_on_hand), updated_at`.
   `recall_affected_sales` lists the issued bills that sold them, net of returns, with the
   patient or walk-in contact (audited read).
 
-### 9.5 Reservations (P2, designed now)
-`stock_reservations (store_id, batch_id, qty_base, ref_type (prescription|invoice_draft|
-transfer), ref_id, expires_at, status)`. It raises `stock_balances.qty_reserved` through the
-same trigger discipline. **Available = on_hand − reserved.** Expired reservations are
-released by cron. The MVP has **no reservations**: a draft cart holds nothing, and stock is
-allocated only when the invoice is issued.
+### 9.5 Reservations: stock holds (M-45, migration 0063, D-145)
+`stock_holds` (hold_no HD-, store, patient or customer name/phone, expires_at, status
+held|collected|released|expired, client_key for retries, ended_*, invoice_id) and
+`stock_hold_lines` (one per lot: item, batch, unit, qty_base, collected_base,
+prescription_item_id). `stock_balances.qty_reserved` is set by `sync_reserved` from the
+holds still held (never by hand). **Available = on_hand − reserved**; the existing CHECK
+`qty_reserved <= qty_on_hand` makes held stock untouchable by any movement. Writes only
+through `create_stock_hold`, `release_stock_hold`, `issue_counter_sale` (collection),
+`release_expired_holds` and the lot-status trigger. A draft cart still holds nothing.
 
 ## 10. Purchasing
 - **vendors**: `vendor_code, name (unique lower per tenant), pan_vat_no, contact_person,

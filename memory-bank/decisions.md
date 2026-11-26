@@ -1260,6 +1260,100 @@ interaction checks (need a licensed drug database). Then the UI (Nepali and the 
 
 ---
 
+## Pharmacy track, step 4 (2026-11-26)
+
+**D-145 Stock holds (M-45 reservations, migration 0063).**
+- **What a hold is:** specific lots kept aside in one selling store for a linked patient or a
+  named customer (phone optional), for 1 to 168 hours (the counter offers 1, 2, 3 or 7 days).
+  Lots are taken earliest expiry first like a sale (shelf-life margin applies), or a chosen
+  lot with `override_batch`. Prescription lines keep their prescription item. Services and
+  controlled items can't be held. `pharmacy_sell`, A1 (PIN) is enough, like the counter.
+- **Reserved quantity:** `stock_balances.qty_reserved` (there since B5) = Σ (held − collected)
+  over holds still held, recomputed per lot by `sync_reserved` whenever a hold changes. FEFO
+  (`allocate_stock`) already sold only on hand − reserved; a chosen-lot movement trying to
+  take held stock is refused as INSUFFICIENT_STOCK (the CHECK), with the message pointing to
+  Holds.
+- **Collection is an ordinary counter sale:** each line names its hold line and sells from
+  that lot, at most what was held, only for the hold's patient (or the record it was merged
+  into). No `override_batch` needed. When the bill is issued the hold is `collected` with the
+  invoice; what wasn't taken goes back. One collection per hold.
+- **Ending without collection:** Release with a reason (audited `hold.release`); expiry
+  without a frequent cron (Vercel Hobby, D-128): expired holds end at the next
+  `allocate_stock` in that store, at the start of every counter sale, and in
+  `run_daily_jobs` (`holds_expired`), which also rebuilds every reserved quantity from the
+  holds. A lot leaving `active` (recall, block, quarantine) ends every hold on it with the
+  reason, so recalled stock is never handed over and can be disposed of.
+- **Not in it:** holding stock that hasn't arrived (back-orders), deposits on a hold (the
+  patient advance already covers that, D-52 M-52), reminders to the customer (needs SMS).
+
+---
+
+**D-146 M-49 advanced barcodes moved to Future (owner, 2026-11-26).** GS1 code reading, camera
+scanning and shelf/price label printing are not in this version; they may or may not come
+later. What already exists stays as it is: barcodes are optional on a medicine (D-126), and a
+USB/keyboard scanner works at the counter. Pharmacy track: step 5 is dropped, so step 6
+(substitutes) is next, then the UI.
+
+---
+
+## Pharmacy track, step 6 (2026-11-26)
+
+**D-147 Substitutes: another brand of the same medicine (migration 0064).**
+- **Same medicine** (`medicine_equivalent`) = same generic, same strength (value and unit, or
+  the written strength when there is no value), same dosage form; never a combination product
+  (written strength with "+"). Strength equivalence across forms or units (e.g. 5 ml syrup vs
+  tablets) is not attempted: that is the doctor's call.
+- **Against a prescription** that names a catalogue item: selling or holding another brand
+  needs it to be the same medicine (NOT_EQUIVALENT otherwise) and a reason (3+ characters;
+  quick choices on the counter). The reason is on the bill line and printed on the bill, and
+  travels with a hold to the collecting bill. It counts toward the prescription line as
+  before. Free-text prescription lines and walk-in sales are not restricted.
+- **On the counter:** a prescription line starts with the prescribed item, or with the first
+  same medicine in stock when the prescribed one has none (reason pre-filled "Prescribed brand
+  out of stock"); its list shows only the prescribed item and the same medicine. Search shows
+  medicines with none in stock and offers the same medicine in stock instead.
+  `medicine_substitutes` lists them for other screens.
+- **dispensing_queue** now returns each line's catalogue item: the app can't read
+  prescription_items directly (C7), and the counter needs it.
+- **Testing note:** the M-37 browser Undo check failed once more on a full run and passed on
+  the rerun (known flake, D-143).
+- **Pharmacy track complete** (D-142 steps 1–4 and 6; step 5 moved to Future, D-146). Next:
+  the UI.
+
+---
+
+## Simpler screens (2026-11-26)
+
+**D-148 No Nepali UI in this version (owner).** English only; the UI step is now about making
+the screens simpler. P-13 stays open for later.
+
+**D-149 Removed from the screens and the app code (owner): vendor extras, multi-store tools,
+the pharmacy Dues tab.** The owner's rule: hide what isn't essential now, simplify detailed
+forms, and delete what isn't wanted.
+- **Vendor extras:** the "How this vendor has done" panel, the account statement and the
+  Payables check panel (vendorPerformance, vendorStatement, lastPayableCheck, runPayableCheck
+  deleted). The nightly payables check still runs and still shows on the Super Admin overview.
+- **Multi-store tools:** the Transfers page and transfer forms, "Add a store", "Who works in
+  this store", "Levels per store" (createStore, setStoreAccess, decideTransfer, saveStoreLevels,
+  listTransfers deleted). Moving a lot to quarantine stays (one click, it uses the transfer
+  functions internally, which are no longer exported). A clinic is one Pharmacy store plus
+  Quarantine.
+- **Store access from the role (migration 0065):** with no explicit store_members row,
+  manage_stock → manage; a key that sells, dispenses, receives, moves, buys, returns,
+  disposes or blocks stock → operate; view_stock → view. Rows set before still win.
+- **Pharmacy Dues tab:** gone; dues are collected at the Registrar desk and in Billing.
+- **Kept in the database:** the tables and functions behind the removed screens (transfers,
+  store levels, vendor_performance, stores) stay, so old data and the tests are intact and a
+  later version can bring them back. Removing them would need a migration that drops data.
+- **Medicine form:** essentials first (kind, name, generic, strength, form, sold OTC or with a
+  prescription, pack from a common preset with a summary like "1 box = 10 strip = 100 tab",
+  reorder level); everything else folded under "More details" with sensible defaults.
+- **Kept, by the owner's answers:** patient merge, patient advances, books check, audit log,
+  settings, holds, batch choice, the pharmacy Stock tab, purchase orders, counts and recalls.
+- Admin menu "Stock & stores" is now "Stock".
+
+---
+
 ## Pending decisions
 
 | ID | Question | Alternatives | Recommended default | Blocking? |

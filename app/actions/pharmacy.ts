@@ -13,7 +13,15 @@ type Fail = { ok: false; error: string };
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
 const ERRORS: [RegExp, string][] = [
   [/PATIENT_REQUIRED_FOR_ADVANCE/, "Only a bill with a patient on it can go into an advance."],
-  [/INSUFFICIENT_STOCK/, "There isn't enough sellable stock for that quantity."],
+  [/INSUFFICIENT_STOCK/, "There isn't enough sellable stock for that quantity. Stock on hold for customers doesn't count."],
+  [/HOLD_NOT_VALID/, "That hold isn't open for this customer here any more. Reload the Holds tab."],
+  [/MORE_THAN_HELD/, "That's more than was held. Add another line for the extra."],
+  [/HOLD_NOT_HELD/, "This hold has already ended."],
+  [/HOLD_NOT_FOUND/, "That hold wasn't found."],
+  [/NAME_REQUIRED/, "Link a patient, or enter the customer's name, to hold stock."],
+  [/BAD_HOURS/, "Hold for 1 to 168 hours (7 days)."],
+  [/NOT_EQUIVALENT/, "That isn't the same medicine as prescribed (generic, strength and form must match). Ask the doctor before changing it."],
+  [/SUBSTITUTION_REASON_REQUIRED/, "Give the reason for giving another brand than the one prescribed."],
   [/CONTROLLED_BLOCKED/, "Controlled and narcotic medicines can't be sold here yet."],
   [/RX_REQUIRED/, "This medicine needs a prescription. Link the doctor's prescription or record the outside one."],
   [/RX_NOT_VALID/, "That prescription item isn't open for this patient any more."],
@@ -63,7 +71,7 @@ function friendly(e: { message?: string; code?: string } | null): string {
 const counter = () => requireTenant({ operation: "pharmacy.counter", next: "/employee/pharmacy" });
 
 export type SaleLine =
-  | { kind: "item"; item_id: string; unit_id: string; qty: number; discount_pct?: number; batch_id?: string | null; prescription_item_id?: string | null; substitution_reason?: string | null }
+  | { kind: "item"; item_id: string; unit_id: string; qty: number; discount_pct?: number; batch_id?: string | null; prescription_item_id?: string | null; substitution_reason?: string | null; hold_line_id?: string | null }
   | { kind: "service"; service_id: string; qty: number; discount_pct?: number };
 export type SaleInput = {
   idempotencyKey: string; storeId: string; patientId?: string | null; customerName?: string; customerPhone?: string;
@@ -78,8 +86,9 @@ export async function issueSale(input: SaleInput): Promise<{ ok: true; id: strin
   const lines = (input.lines ?? []).slice(0, 60).map((l) => l.kind === "service"
     ? { kind: "service", service_id: l.service_id, qty: Number(l.qty), discount_pct: Number(l.discount_pct ?? 0) }
     : { kind: "item", item_id: l.item_id, unit_id: l.unit_id, qty: Number(l.qty), discount_pct: Number(l.discount_pct ?? 0),
-        batch_id: l.batch_id || null, prescription_item_id: l.prescription_item_id || null, substitution_reason: l.substitution_reason?.slice(0, 200) || null });
-  for (const l of lines) for (const k of ["item_id", "unit_id", "service_id", "batch_id", "prescription_item_id"] as const) {
+        batch_id: l.batch_id || null, prescription_item_id: l.prescription_item_id || null, substitution_reason: l.substitution_reason?.slice(0, 200) || null,
+        hold_line_id: l.hold_line_id || null });
+  for (const l of lines) for (const k of ["item_id", "unit_id", "service_id", "batch_id", "prescription_item_id", "hold_line_id"] as const) {
     const v = (l as Record<string, unknown>)[k];
     if (v && !UUID.test(String(v))) return { ok: false, error: "Something in the bill isn't valid. Reload the page." };
   }
@@ -97,6 +106,42 @@ export async function issueSale(input: SaleInput): Promise<{ ok: true; id: strin
   revalidatePath("/employee/pharmacy");
   const r = data as { invoice_id: string; invoice_no: string; total: number; due: number; from_advance?: number };
   return { ok: true, id: r.invoice_id, no: r.invoice_no, total: Number(r.total), due: Number(r.due ?? 0), fromAdvance: Number(r.from_advance ?? 0) };
+}
+
+// ── M-45 (D-145): hold stock for a customer who collects later ────────────────
+export type HoldInput = {
+  idempotencyKey: string; storeId: string; patientId?: string | null; customerName?: string; customerPhone?: string; hours: number; note?: string;
+  lines: { item_id: string; unit_id: string; qty: number; batch_id?: string | null; prescription_item_id?: string | null; substitution_reason?: string | null }[];
+};
+export async function holdStock(input: HoldInput): Promise<{ ok: true; id: string; no: string; expiresAt: string } | Fail> {
+  const ctx = await counter();
+  if (!UUID.test(input.idempotencyKey ?? "") || !UUID.test(input.storeId ?? "")) return { ok: false, error: "Choose the store." };
+  if (input.patientId && !UUID.test(input.patientId)) return { ok: false, error: "That patient wasn't found." };
+  const lines = (input.lines ?? []).slice(0, 60).map((l) => ({ item_id: l.item_id, unit_id: l.unit_id, qty: Number(l.qty), batch_id: l.batch_id || null, prescription_item_id: l.prescription_item_id || null,
+    substitution_reason: l.substitution_reason?.trim().slice(0, 200) || null }));
+  if (!lines.length) return { ok: false, error: "Add the medicines to hold." };
+  for (const l of lines) for (const v of [l.item_id, l.unit_id, l.batch_id, l.prescription_item_id]) if (v && !UUID.test(String(v))) return { ok: false, error: "Something in the list isn't valid. Reload the page." };
+  const hours = Math.round(Number(input.hours));
+  const { data, error } = await serviceClient().rpc("create_stock_hold", {
+    p_tenant: ctx.tenantId, p_key: input.idempotencyKey, p_store: input.storeId, p_patient: input.patientId || null,
+    p_name: String(input.customerName ?? "").trim().slice(0, 120), p_phone: String(input.customerPhone ?? "").trim().slice(0, 20),
+    p_hours: Number.isFinite(hours) ? hours : 0, p_note: String(input.note ?? "").slice(0, 300), p_lines: lines, p_by: ctx.memberId, p_session_level: ctx.level,
+  });
+  if (error) return { ok: false, error: friendly(error) };
+  revalidatePath("/employee/pharmacy");
+  const r = data as { hold_id: string; hold_no: string; expires_at: string };
+  return { ok: true, id: r.hold_id, no: r.hold_no, expiresAt: r.expires_at };
+}
+
+export async function releaseHold(input: { id: string; reason: string }): Promise<{ ok: true } | Fail> {
+  const ctx = await counter();
+  if (!UUID.test(input.id ?? "")) return { ok: false, error: "That hold wasn't found." };
+  const reason = String(input.reason ?? "").trim().slice(0, 300);
+  if (reason.length < 3) return { ok: false, error: "Say why the stock goes back (e.g. customer not coming)." };
+  const { error } = await serviceClient().rpc("release_stock_hold", { p_tenant: ctx.tenantId, p_hold: input.id, p_reason: reason, p_by: ctx.memberId, p_session_level: ctx.level });
+  if (error) return { ok: false, error: friendly(error) };
+  revalidatePath("/employee/pharmacy");
+  return { ok: true };
 }
 
 /** Find a patient to link to the sale (needed for dues and prescriptions). */
