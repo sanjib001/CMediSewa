@@ -29,5 +29,7 @@ export async function tenantBarProps(ctx: TenantContext, area: "admin" | "employ
     displayName: ctx.displayName,
     levelLabel: LEVEL_LABEL[ctx.level],
     showAdminSwitch: area === "admin" || canEnterAdmin(ctx),
+    // Staff who open the Admin area for purchases and stock (e.g. pharmacy) see it named for that work.
+    adminLabel: ctx.membershipRole === "tenant_admin" ? "Admin" : "Purchase & management",
   };
 }

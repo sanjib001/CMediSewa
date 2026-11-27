@@ -37,6 +37,7 @@ const refresh = (patientId: string) => {
 
 export async function getAdvance(patientId: string): Promise<{ ok: true; summary: AdvanceSummary } | Fail> {
   const ctx = await ctxOf();
+  if (!["view_billing", "manage_billing", "pharmacy_sell"].some((k) => ctx.permissions.has(k))) return { ok: false, error: "You don't have permission for this." };
   if (!UUID.test(patientId ?? "")) return { ok: false, error: "That patient wasn't found." };
   return { ok: true, summary: await advanceSummary(ctx.tenantId, patientId) };
 }

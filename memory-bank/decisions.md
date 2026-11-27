@@ -1382,6 +1382,22 @@ misvalue the stock, and a different vendor would break returns to the vendor.
   are limited to what it brought; returnableLots matches the bill's lines by lot.
 - Existing duplicate lots are not merged after the fact (none on the real clinics).
 
+**D-153 What a role sees follows its keys, on the menu and the dashboard too (owner bug report).**
+Pharmacy staff hold Admin-area keys (purchases, medicines, billing), so they open Admin; there
+they saw things their role doesn't allow. Page guards were already right; the leaks were:
+- Menu: "Doctors & schedules" and "Departments & services" had no key; now manage_schedules and
+  manage_catalogue, the keys their pages need. Reports shows when any report is allowed
+  (NavItem.anyOf: view_reports, view_stock_reports, view_financial_reports, manage_purchases);
+  it used to need view_reports and hid the stock reports from pharmacy staff.
+- Admin dashboard: patient counts, OPD queues and the registrar button need view_queue or
+  view_appointments; website booking requests need view/manage_appointments; stock alerts need
+  view_stock; the setup checklist and go-live banner need tenant admin or manage_settings. Data
+  a role can't see is no longer even loaded.
+- getAdvance (a patient's advance balance and history) needs view_billing, manage_billing or
+  pharmacy_sell; it only needed a signed-in member. The money actions were already re-checked by
+  the database.
+- Rule for new work: every menu entry and every dashboard part names the key its page needs.
+
 ---
 
 ## Pending decisions

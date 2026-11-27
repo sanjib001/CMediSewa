@@ -12,6 +12,8 @@ export type NavItem = {
   icon: string; // lucide icon name, resolved in the shell
   module?: ModuleKey;
   permission?: string;
+  /** Shown when the member holds ANY of these keys (a page whose parts follow different keys). */
+  anyOf?: string[];
 };
 
 export type NavGroup = { label: string; items: NavItem[] };
@@ -26,8 +28,8 @@ export const ADMIN_NAV: NavGroup[] = [
     items: [
       { href: "/admin/patients", label: "Patients", icon: "Users", permission: "view_patients" },
       { href: "/admin/appointments", label: "Appointments", icon: "CalendarDays", module: "appointments", permission: "view_appointments" },
-      { href: "/admin/doctors", label: "Doctors & schedules", icon: "Stethoscope", module: "appointments" },
-      { href: "/admin/services", label: "Departments & services", icon: "ClipboardList", module: "appointments" },
+      { href: "/admin/doctors", label: "Doctors & schedules", icon: "Stethoscope", module: "appointments", permission: "manage_schedules" },
+      { href: "/admin/services", label: "Departments & services", icon: "ClipboardList", module: "appointments", permission: "manage_catalogue" },
     ],
   },
   {
@@ -45,7 +47,7 @@ export const ADMIN_NAV: NavGroup[] = [
       { href: "/admin/billing", label: "Billing", icon: "Receipt", permission: "view_billing" },
       { href: "/admin/expenses", label: "Expenses", icon: "Wallet", module: "expenses_finance", permission: "add_expenses" },
       { href: "/admin/finance", label: "Finance", icon: "CreditCard", module: "expenses_finance", permission: "view_finance" },
-      { href: "/admin/reports", label: "Reports", icon: "BarChart3", permission: "view_reports" },
+      { href: "/admin/reports", label: "Reports", icon: "BarChart3", anyOf: ["view_reports", "view_stock_reports", "view_financial_reports", "manage_purchases"] },
     ],
   },
   {

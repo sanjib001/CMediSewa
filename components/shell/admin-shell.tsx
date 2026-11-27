@@ -29,7 +29,8 @@ export function AdminShell({
   // Navigation = guards: an item shows only if its module is on and the member holds its key.
   const groups = ADMIN_NAV.map((g) => ({
     ...g,
-    items: g.items.filter((i) => (!i.module || modules.includes(i.module)) && (!i.permission || permissions.includes(i.permission))),
+    items: g.items.filter((i) => (!i.module || modules.includes(i.module)) && (!i.permission || permissions.includes(i.permission))
+      && (!i.anyOf || i.anyOf.some((k) => permissions.includes(k)))),
   })).filter((g) => g.items.length > 0);
   // Mobile: the sidebar sits in a <details> disclosure, so it works before any JS loads.
   const mobileMenu = (

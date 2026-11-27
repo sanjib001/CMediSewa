@@ -11,6 +11,8 @@ export type TenantBarProps = {
   displayName: string;
   levelLabel: string;
   showAdminSwitch: boolean;
+  /** What the switch into the Admin area is called: "Admin" for clinic admins, "Purchase & management" for staff (owner). */
+  adminLabel: string;
   unread: number;
   idleLockMinutes: number;
   searchHref: string | null;
@@ -24,7 +26,7 @@ const initials = (name: string) =>
  * Top bar shared by the Admin and Employee areas: the clinic, today's date in BS and AD,
  * patient search (wired in B4), the Admin ⇄ workspace switch, and the signed-in person.
  */
-export function TenantBar({ area, tenantName, displayName, levelLabel, showAdminSwitch, unread, searchHref, idleLockMinutes, menu }: TenantBarProps) {
+export function TenantBar({ area, tenantName, displayName, levelLabel, showAdminSwitch, adminLabel, unread, searchHref, idleLockMinutes, menu }: TenantBarProps) {
   const today = localDate(new Date());
   return (
     <header className="sticky top-0 z-30 border-b border-line bg-surface/95 backdrop-blur">
@@ -53,7 +55,7 @@ export function TenantBar({ area, tenantName, displayName, levelLabel, showAdmin
         <nav className="ml-auto flex items-center gap-1 md:ml-2" aria-label="Account">
           {showAdminSwitch ? (
             <Link href={area === "admin" ? "/employee" : "/admin"} className="hidden rounded-control px-3 py-2 text-[0.95rem] font-medium text-pine hover:bg-pine-tint sm:block">
-              {area === "admin" ? "Staff workspace" : "Admin"}
+              {area === "admin" ? "Staff workspace" : adminLabel}
             </Link>
           ) : null}
           <Link href="/employee/notifications" className="relative rounded-control p-2 text-ink-soft hover:bg-sunken" aria-label={unread ? `Notifications, ${unread} unread` : "Notifications"}>

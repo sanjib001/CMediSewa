@@ -21,22 +21,30 @@ export const dynamic = "force-dynamic";
 
 export default async function AdminDashboard() {
   const ctx = await requireTenant({ operation: "admin.area", allowPendingTenant: true, next: "/admin" });
-  const { items: SETUP, blockers } = await getSetupStatus(ctx.tenantId);
+  // Each part of the dashboard follows its own key (a pharmacy role must not see the OPD queues,
+  // patient counts, booking requests or the clinic setup list).
+  const seesSetup = ctx.membershipRole === "tenant_admin" || can(ctx, "manage_settings");
+  const seesDesk = can(ctx, "view_queue") || can(ctx, "view_appointments");
+  const seesRequests = can(ctx, "view_appointments") || can(ctx, "manage_appointments");
+  const seesStock = can(ctx, "view_stock");
+  const { items: SETUP, blockers } = seesSetup ? await getSetupStatus(ctx.tenantId) : { items: [], blockers: [] };
   const setupDone = SETUP.filter((s) => s.done).length;
-  const pending = ctx.tenantStatus === "pending";
+  const pending = ctx.tenantStatus === "pending" && seesSetup;
   const today = todayIn();
   const money = can(ctx, "view_finance") || can(ctx, "view_reports");
   const [{ doctors }, board, alerts, fin, pl, check, requests] = await Promise.all([
-    getDeskSetup(ctx.tenantId), getToday(ctx.tenantId, today), getAlerts(ctx.tenantId),
+    seesDesk ? getDeskSetup(ctx.tenantId) : Promise.resolve({ doctors: [] as Awaited<ReturnType<typeof getDeskSetup>>["doctors"] }),
+    seesDesk ? getToday(ctx.tenantId, today) : Promise.resolve(null),
+    seesStock ? getAlerts(ctx.tenantId) : Promise.resolve([]),
     money ? financeReport(ctx.tenantId, today, today) : Promise.resolve(null),
     money ? profitAndLoss(ctx.tenantId, null, today, today) : Promise.resolve(null),
     can(ctx, "view_finance") ? lastFinanceCheck(ctx.tenantId) : Promise.resolve(null),
-    serviceClient().from("appointments").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId).eq("status", "requested"),
+    seesRequests ? serviceClient().from("appointments").select("id", { count: "exact", head: true }).eq("tenant_id", ctx.tenantId).eq("status", "requested") : Promise.resolve({ count: 0 }),
   ]);
   const received = (fin?.money ?? []).find((m) => m.kind === "payment");
-  const live = board.visits.filter((v) => v.status !== "cancelled");
+  const live = (board?.visits ?? []).filter((v) => v.status !== "cancelled");
   const flow = {
-    booked: board.appointments.filter((a) => !["cancelled"].includes(a.status)).length,
+    booked: (board?.appointments ?? []).filter((a) => !["cancelled"].includes(a.status)).length,
     arrived: live.length,
     waiting: live.filter((v) => v.status === "waiting").length,
     done: live.filter((v) => ["closed", "awaiting_billing"].includes(v.status)).length,
@@ -48,7 +56,7 @@ export default async function AdminDashboard() {
       <PageHeader
         title="Today at the clinic"
         subtitle={dateLine}
-        actions={<ButtonLink href="/employee/registrar" tone="secondary">Open registrar desk</ButtonLink>}
+        actions={can(ctx, "view_queue") ? <ButtonLink href="/employee/registrar" tone="secondary">Open registrar desk</ButtonLink> : null}
       />
       {pending ? (
         <section aria-label="Getting ready" className="mb-6 rounded-panel border border-pine/40 bg-surface p-5">
@@ -70,16 +78,19 @@ export default async function AdminDashboard() {
         </section>
       ) : null}
       {/* Patients flow, written as one sentence-like line rather than four look-alike tiles. */}
-      <section aria-label="Patients today" className="mb-6 flex flex-wrap items-baseline gap-x-8 gap-y-2 border-y border-line py-4">
-        <Figure value={flow.booked} label="booked" />
-        <Figure value={flow.arrived} label="registered" />
-        <Figure value={flow.waiting} label="waiting now" emphasis />
-        <Figure value={flow.done} label="seen" />
-      </section>
+      {seesDesk ? (
+        <section aria-label="Patients today" className="mb-6 flex flex-wrap items-baseline gap-x-8 gap-y-2 border-y border-line py-4">
+          <Figure value={flow.booked} label="booked" />
+          <Figure value={flow.arrived} label="registered" />
+          <Figure value={flow.waiting} label="waiting now" emphasis />
+          <Figure value={flow.done} label="seen" />
+        </section>
+      ) : null}
 
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1.4fr_1fr]">
         <div className="space-y-6">
-          <Panel title="OPD queues" aside={<Link className="text-sm font-medium text-pine hover:underline" href="/employee/registrar">Registrar view</Link>} flush>
+          {seesDesk ? (
+          <Panel title="OPD queues" aside={can(ctx, "view_queue") ? <Link className="text-sm font-medium text-pine hover:underline" href="/employee/registrar">Registrar view</Link> : null} flush>
             <ul className="divide-y divide-line">
               {doctors.length === 0 ? <li className="px-5 py-4 text-ink-soft">No doctors set up yet.</li> : null}
               {doctors.map((d) => {
@@ -101,10 +112,13 @@ export default async function AdminDashboard() {
               })}
             </ul>
           </Panel>
+          ) : null}
 
-          <Panel title="Stock that needs attention" aside={<Link className="text-sm font-medium text-pine hover:underline" href="/admin/stock">Stock & stores</Link>} flush>
-            <AlertList alerts={alerts} showStore limit={8} />
-          </Panel>
+          {seesStock ? (
+            <Panel title="Stock that needs attention" aside={<Link className="text-sm font-medium text-pine hover:underline" href="/admin/stock">Stock</Link>} flush>
+              <AlertList alerts={alerts} showStore limit={8} />
+            </Panel>
+          ) : null}
         </div>
 
         <div className="space-y-6">
@@ -125,12 +139,13 @@ export default async function AdminDashboard() {
 
           <Panel title="Also today">
             <ul className="space-y-2 text-[0.95rem]">
-              <li><Link href="/employee/registrar" className="hover:underline">{requests.count ?? 0} website booking request{requests.count === 1 ? "" : "s"} waiting</Link></li>
+              {seesRequests ? <li><Link href="/employee/registrar" className="hover:underline">{requests.count ?? 0} website booking request{requests.count === 1 ? "" : "s"} waiting</Link></li> : null}
               {check ? <li className={check.mismatches ? "text-alert" : "text-ink-soft"}><Link href="/admin/finance" className="hover:underline">{check.mismatches ? `Books check: ${check.mismatches} figure(s) differ` : "Books check: everything matches"}</Link></li> : null}
               <li><Link href="/employee/notifications" className="hover:underline">Your notifications</Link></li>
             </ul>
           </Panel>
 
+          {seesSetup ? (
           <Panel title="Setting up" aside={<span className="text-sm text-ink-faint">{setupDone} of {SETUP.length}</span>}>
             <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-sunken" role="progressbar" aria-valuemin={0} aria-valuemax={SETUP.length} aria-valuenow={setupDone}>
               <div className="h-full bg-pine" style={{ width: `${(setupDone / SETUP.length) * 100}%` }} />
@@ -144,6 +159,7 @@ export default async function AdminDashboard() {
               ))}
             </ul>
           </Panel>
+          ) : null}
         </div>
       </div>
     </>
