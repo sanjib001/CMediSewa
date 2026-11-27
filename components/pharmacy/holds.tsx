@@ -16,14 +16,14 @@ export function ReleaseHold({ id }: { id: string }) {
   return (
     <div className="flex flex-wrap items-center gap-2">
       <input value={reason} onChange={(e) => setReason(e.target.value)} maxLength={300} autoFocus aria-label="Why release it"
-        placeholder="Why? e.g. customer not coming" className="min-w-56 rounded-control border border-line-strong px-3 py-2 text-sm" />
+        placeholder="Why? e.g. customer not coming" className="min-w-56 rounded-control border border-line-strong px-3 py-2 text-[0.95rem]" />
       <Button type="button" disabled={pending} onClick={() => start(async () => {
         setError(null);
         const r = await releaseHold({ id, reason });
         if (r.ok) router.refresh(); else setError(r.error);
       })}>Back to the shelf</Button>
-      <button type="button" className="text-sm text-ink-soft" onClick={() => setOpen(false)}>Cancel</button>
-      {error ? <p role="alert" className="w-full text-sm text-alert">{error}</p> : null}
+      <button type="button" className="text-[0.95rem] text-ink-soft" onClick={() => setOpen(false)}>Cancel</button>
+      {error ? <p role="alert" className="w-full text-[0.95rem] text-alert">{error}</p> : null}
     </div>
   );
 }

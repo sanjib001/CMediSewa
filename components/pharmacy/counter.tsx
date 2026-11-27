@@ -11,7 +11,7 @@ import { cn } from "@/lib/cn";
 import { normalizePhone, phoneProblem } from "@/lib/phone";
 
 const npr = (n: number) => `Rs. ${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
-const field = "w-full rounded-control border border-line-strong bg-surface px-3 py-2 text-[0.95rem]";
+const field = "w-full rounded-control border border-line-strong bg-surface px-3 py-2.5 text-base";
 const CHANNELS = [["esewa", "eSewa"], ["khalti", "Khalti"], ["fonepay", "Fonepay"], ["bank_transfer", "Bank transfer"], ["card", "Card"], ["other", "Other"]] as const;
 
 type Row =
@@ -230,30 +230,30 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
   return (
     <form onSubmit={submit} className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_23rem]">
       <div className="min-w-0 space-y-5">
-      {hold ? <p className="rounded-control bg-pine/5 px-3 py-2 text-sm">Collecting hold {hold.holdNo}{hold.patient ? ` for ${hold.patient.full_name}` : hold.name ? ` for ${hold.name}` : ""}. Each line sells from the batch kept aside; reduce a quantity to take less, and the rest goes back to the shelf.</p> : null}
-      {prefill ? <p className="rounded-control bg-pine/5 px-3 py-2 text-sm">Dispensing {prefill.rxNumber} for {prefill.patient.full_name}. Choose the medicine for each line; reduce a quantity to dispense part.</p> : null}
+      {hold ? <p className="rounded-control bg-pine/5 px-3 py-2 text-[0.95rem]">Collecting hold {hold.holdNo}{hold.patient ? ` for ${hold.patient.full_name}` : hold.name ? ` for ${hold.name}` : ""}. Each line sells from the batch kept aside; reduce a quantity to take less, and the rest goes back to the shelf.</p> : null}
+      {prefill ? <p className="rounded-control bg-pine/5 px-3 py-2 text-[0.95rem]">Dispensing {prefill.rxNumber} for {prefill.patient.full_name}. Choose the medicine for each line; reduce a quantity to dispense part.</p> : null}
       <div className="relative">
-        <label className="block"><span className="mb-1 block text-sm font-medium">Add medicine or service</span>
+        <label className="block"><span className="mb-1 block text-[0.95rem] font-medium">Add medicine or service</span>
           <input ref={searchRef} value={q} onChange={(e) => { setQ(e.target.value); setHi(0); }} className={field} placeholder="Scan a barcode, or type a brand, generic or code" autoFocus={!prefill}
             onKeyDown={onSearchKey} aria-label="Add medicine or service" role="combobox" aria-expanded={options.length > 0} aria-controls="counter-matches" /></label>
-        {options.length ? <p className="mt-1 text-xs text-ink-faint">↑ ↓ to choose, Enter to add{options[Math.min(hi, options.length - 1)] ? `: ${options[Math.min(hi, options.length - 1)]!.label}` : ""}</p>
-          : rows.length && !q ? <p className="mt-1 text-xs text-ink-faint">Enter here goes to the payment.</p> : null}
+        {options.length ? <p className="mt-1 text-sm text-ink-soft">↑ ↓ to choose, Enter to add{options[Math.min(hi, options.length - 1)] ? `: ${options[Math.min(hi, options.length - 1)]!.label}` : ""}</p>
+          : rows.length && !q ? <p className="mt-1 text-sm text-ink-soft">Enter here goes to the payment.</p> : null}
         {matches.length || svcMatches.length ? (
           <ul id="counter-matches" className="absolute z-10 mt-1 w-full divide-y divide-line rounded-panel border border-line bg-surface shadow-sm">
             {matches.map((i, idx) => (
               <li key={i.id} className={cn(idx === hi && "bg-pine/10")} data-active={idx === hi || undefined}>{i.available <= 0 && !i.blocked ? (
                 <div className="px-4 py-2">
-                  <div className="flex justify-between gap-3"><span><span className="font-medium">{i.name}</span> <span className="text-sm text-ink-soft">{[i.generic, i.strength].filter(Boolean).join(" ")}</span></span><span className="text-sm text-alert">none in stock</span></div>
-                  {subsFor(i).length ? <div className="mt-1 flex flex-wrap items-center gap-2 text-sm"><span className="text-ink-soft">Same medicine:</span>
+                  <div className="flex justify-between gap-3"><span><span className="font-medium">{i.name}</span> <span className="text-[0.95rem] text-ink-soft">{[i.generic, i.strength].filter(Boolean).join(" ")}</span></span><span className="text-[0.95rem] text-alert">none in stock</span></div>
+                  {subsFor(i).length ? <div className="mt-1 flex flex-wrap items-center gap-2 text-[0.95rem]"><span className="text-ink-soft">Same medicine:</span>
                     {subsFor(i).slice(0, 4).map((s) => <button key={s.id} type="button" onClick={() => addItem(s)} className="rounded-control border border-pine/40 px-2 py-0.5 text-pine hover:bg-pine/5">{s.name} ({s.available} {s.units.find((u) => u.factor_to_base === 1)?.name ?? ""})</button>)}</div>
-                    : <div className="mt-1 text-sm text-ink-faint">No other brand of the same medicine in stock.</div>}
+                    : <div className="mt-1 text-[0.95rem] text-ink-soft">No other brand of the same medicine in stock.</div>}
                 </div>
               ) : <button type="button" disabled={i.blocked} onClick={() => addItem(i)} className="flex w-full justify-between gap-3 px-4 py-2 text-left hover:bg-pine/5 disabled:opacity-50">
-                <span><span className="font-medium">{i.name}</span> <span className="text-sm text-ink-soft">{[i.generic, i.strength].filter(Boolean).join(" ")}</span>{i.rx_only ? <span className="ml-2 text-xs text-warn">Rx</span> : null}{i.blocked ? <span className="ml-2 text-xs text-alert">blocked</span> : null}</span>
-                <span className="text-sm text-ink-faint">{i.available} {i.units[0]?.name}{i.lots[0]?.expiry_date ? `, exp ${i.lots[0].expiry_date.slice(0, 7)}` : ""}</span>
+                <span><span className="font-medium">{i.name}</span> <span className="text-[0.95rem] text-ink-soft">{[i.generic, i.strength].filter(Boolean).join(" ")}</span>{i.rx_only ? <span className="ml-2 text-sm text-warn">Rx</span> : null}{i.blocked ? <span className="ml-2 text-sm text-alert">blocked</span> : null}</span>
+                <span className="text-[0.95rem] text-ink-soft">{i.available} {i.units[0]?.name}{i.lots[0]?.expiry_date ? `, exp ${i.lots[0].expiry_date.slice(0, 7)}` : ""}</span>
               </button>}</li>
             ))}
-            {svcMatches.map((s, j) => <li key={s.id} className={cn(matches.length + j === hi && "bg-pine/10")} data-active={matches.length + j === hi || undefined}><button type="button" onClick={() => addService(s)} className="flex w-full justify-between px-4 py-2 text-left hover:bg-pine/5"><span>{s.name}</span><span className="text-sm text-ink-faint">{npr(s.price)}</span></button></li>)}
+            {svcMatches.map((s, j) => <li key={s.id} className={cn(matches.length + j === hi && "bg-pine/10")} data-active={matches.length + j === hi || undefined}><button type="button" onClick={() => addService(s)} className="flex w-full justify-between px-4 py-2 text-left hover:bg-pine/5"><span>{s.name}</span><span className="text-[0.95rem] text-ink-soft">{npr(s.price)}</span></button></li>)}
           </ul>
         ) : null}
       </div>
@@ -267,47 +267,47 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
               return (
                 <li key={r.key} className="grid items-end gap-3 px-4 py-3 sm:grid-cols-[1fr_5rem_5rem_7rem_auto]">
                   <div className="font-medium">{s?.name}</div>
-                  <label><span className="block text-xs text-ink-faint">Qty</span><input type="number" min={1} step={1} value={r.qty} onChange={(e) => set(r.key, { qty: e.target.value })} data-qty-for={r.key} className={field} /></label>
-                  <label><span className="block text-xs text-ink-faint">Disc. %</span><input type="number" min={0} max={100} value={r.disc} onChange={(e) => set(r.key, { disc: e.target.value })} onKeyDown={backToSearch} className={field} /></label>
+                  <label><span className="block text-sm text-ink-soft">Qty</span><input type="number" min={1} step={1} value={r.qty} onChange={(e) => set(r.key, { qty: e.target.value })} data-qty-for={r.key} className={field} /></label>
+                  <label><span className="block text-sm text-ink-soft">Disc. %</span><input type="number" min={0} max={100} value={r.disc} onChange={(e) => set(r.key, { disc: e.target.value })} onKeyDown={backToSearch} className={field} /></label>
                   <div className="text-right tabular-nums">{npr(p.net)}</div>
-                  <button type="button" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} className="text-sm text-alert">Remove</button>
+                  <button type="button" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} className="text-[0.95rem] text-alert">Remove</button>
                 </li>
               );
             }
             const it = item(r.itemId);
             return (
               <li key={r.key} className="space-y-2 px-4 py-3">
-                {r.rxText ? <div className="text-sm"><span className="text-ink-faint">Prescribed:</span> <span className="font-medium">{r.rxText}</span></div> : null}
+                {r.rxText ? <div className="text-[0.95rem]"><span className="text-ink-soft">Prescribed:</span> <span className="font-medium">{r.rxText}</span></div> : null}
                 <div className="grid items-end gap-3 sm:grid-cols-[1fr_6rem_6rem_5rem_7rem_auto]">
                   {r.rxText ? (
-                    <label><span className="block text-xs text-ink-faint">Medicine</span>
+                    <label><span className="block text-sm text-ink-soft">Medicine</span>
                       <select value={r.itemId} onChange={(e) => { const x = item(e.target.value); set(r.key, { itemId: e.target.value, unitId: x?.units[0]?.id ?? "", batchId: "" }); }} className={field}>
                         <option value="">Choose</option>{(r.prescribedId && item(r.prescribedId) ? [item(r.prescribedId)!, ...items.filter((x) => x.id !== r.prescribedId && item(r.prescribedId!)!.equiv && x.equiv === item(r.prescribedId!)!.equiv)] : items)
                           .filter((x) => !x.blocked).map((x) => <option key={x.id} value={x.id}>{x.name}{x.generic ? ` (${x.generic})` : ""}{x.id === r.prescribedId ? " · prescribed" : ""}{x.available <= 0 ? " · none in stock" : ""}</option>)}</select></label>
-                  ) : <div><div className="font-medium">{it?.name}</div><div className="text-sm text-ink-soft">{[it?.generic, it?.strength].filter(Boolean).join(" ")}{it?.rx_only ? " · needs a prescription" : ""}</div></div>}
-                  <label><span className="block text-xs text-ink-faint">Qty</span><input type="number" min={0.001} step="any" value={r.qty} onChange={(e) => set(r.key, { qty: e.target.value })} data-qty-for={r.key} aria-label={`Quantity of ${it?.name ?? "medicine"}`} className={field} /></label>
-                  <label><span className="block text-xs text-ink-faint">Unit</span>
+                  ) : <div><div className="font-medium">{it?.name}</div><div className="text-[0.95rem] text-ink-soft">{[it?.generic, it?.strength].filter(Boolean).join(" ")}{it?.rx_only ? " · needs a prescription" : ""}</div></div>}
+                  <label><span className="block text-sm text-ink-soft">Qty</span><input type="number" min={0.001} step="any" value={r.qty} onChange={(e) => set(r.key, { qty: e.target.value })} data-qty-for={r.key} aria-label={`Quantity of ${it?.name ?? "medicine"}`} className={field} /></label>
+                  <label><span className="block text-sm text-ink-soft">Unit</span>
                     <select value={r.unitId} onChange={(e) => set(r.key, { unitId: e.target.value })} disabled={Boolean(r.held)} className={field}>{it?.units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>
-                  <label><span className="block text-xs text-ink-faint">Disc. %</span><input type="number" min={0} max={100} value={r.disc} onChange={(e) => set(r.key, { disc: e.target.value })} onKeyDown={backToSearch} aria-label={`Discount on ${it?.name ?? "medicine"}`} className={field} /></label>
+                  <label><span className="block text-sm text-ink-soft">Disc. %</span><input type="number" min={0} max={100} value={r.disc} onChange={(e) => set(r.key, { disc: e.target.value })} onKeyDown={backToSearch} aria-label={`Discount on ${it?.name ?? "medicine"}`} className={field} /></label>
                   <div className="text-right tabular-nums">{npr(p.net + p.tax)}</div>
-                  <button type="button" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} className="text-sm text-alert">Remove</button>
+                  <button type="button" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} className="text-[0.95rem] text-alert">Remove</button>
                 </div>
                 {needsReason(r) ? (
-                  <div className="flex flex-wrap items-center gap-2 rounded-control bg-warn/10 px-3 py-2 text-sm">
+                  <div className="flex flex-wrap items-center gap-2 rounded-control bg-warn/10 px-3 py-2 text-[0.95rem]">
                     <span>Another brand than prescribed ({item(r.prescribedId!)?.name}). Reason:</span>
                     <input value={r.subReason ?? ""} onChange={(e) => set(r.key, { subReason: e.target.value })} list="sub-reasons" maxLength={200} aria-label="Reason for another brand" required
                       className="min-w-56 flex-1 rounded-control border border-line-strong bg-surface px-2 py-1" />
                   </div>
                 ) : null}
                 {r.rxText && it && it.available <= 0 && !r.held && subsFor(it).length ? (
-                  <div className="flex flex-wrap items-center gap-2 text-sm"><span className="text-alert">None in stock.</span><span className="text-ink-soft">Same medicine:</span>
+                  <div className="flex flex-wrap items-center gap-2 text-[0.95rem]"><span className="text-alert">None in stock.</span><span className="text-ink-soft">Same medicine:</span>
                     {subsFor(it).slice(0, 4).map((s) => <button key={s.id} type="button" onClick={() => set(r.key, { itemId: s.id, unitId: s.units[0]?.id ?? "", batchId: "", subReason: r.subReason || SUB_REASONS[0] })}
                       className="rounded-control border border-pine/40 px-2 py-0.5 text-pine hover:bg-pine/5">{s.name} ({s.available})</button>)}</div>
                 ) : null}
-                {it && r.held ? <div className={p.short ? "text-sm text-alert" : "text-sm text-ink-soft"}>{p.short ? `Only ${r.held.qty} ${it.units.find((u) => u.is_base)?.name ?? ""} were held. Add another line for more.` : `Held: batch ${p.lots.join(", ")}`}</div>
-                : it ? <div className="flex flex-wrap items-center gap-3 text-sm">
+                {it && r.held ? <div className={p.short ? "text-[0.95rem] text-alert" : "text-[0.95rem] text-ink-soft"}>{p.short ? `Only ${r.held.qty} ${it.units.find((u) => u.is_base)?.name ?? ""} were held. Add another line for more.` : `Held: batch ${p.lots.join(", ")}`}</div>
+                : it ? <div className="flex flex-wrap items-center gap-3 text-[0.95rem]">
                   <span className={p.short ? "text-alert" : "text-ink-soft"}>{p.short ? `Only ${it.available} ${it.units[0]?.name} sellable here.` : p.lots.length ? `From batch ${p.lots.join(", ")}` : ""}</span>
-                  {canOverride && it.lots.length > 1 ? <select value={r.batchId} onChange={(e) => set(r.key, { batchId: e.target.value })} className="rounded-control border border-line px-2 py-1 text-sm" aria-label="Batch">
+                  {canOverride && it.lots.length > 1 ? <select value={r.batchId} onChange={(e) => set(r.key, { batchId: e.target.value })} className="rounded-control border border-line px-2 py-1 text-[0.95rem]" aria-label="Batch">
                     <option value="">Earliest expiry first</option>{it.lots.filter((l) => l.qty > 0).map((l) => <option key={l.batch_id} value={l.batch_id}>{l.batch_no} exp {l.expiry_date ?? "—"} ({l.qty} left)</option>)}</select> : null}
                 </div> : null}
               </li>
@@ -319,13 +319,13 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
       <datalist id="sub-reasons">{SUB_REASONS.map((s) => <option key={s} value={s} />)}</datalist>
       {needsExt ? (
         <fieldset className="rounded-panel border border-warn/40 p-4">
-          <legend className="px-1 text-sm font-medium">Outside prescription</legend>
-          {!canSellRx ? <p className="text-sm text-alert">Only a verified pharmacist can sell prescription medicines.</p> : (
+          <legend className="px-1 text-[0.95rem] font-medium">Outside prescription</legend>
+          {!canSellRx ? <p className="text-[0.95rem] text-alert">Only a verified pharmacist can sell prescription medicines.</p> : (
             <div className="grid gap-3 sm:grid-cols-4">
-              <label className="sm:col-span-2"><span className="block text-xs text-ink-faint">Prescriber</span><input required value={ext.prescriber_name} onChange={(e) => setExt({ ...ext, prescriber_name: e.target.value })} className={field} placeholder="Dr. …" /></label>
-              <label><span className="block text-xs text-ink-faint">NMC no.</span><input value={ext.prescriber_reg_no} onChange={(e) => setExt({ ...ext, prescriber_reg_no: e.target.value })} className={field} /></label>
-              <label><span className="block text-xs text-ink-faint">Date</span><input type="date" value={ext.rx_date} onChange={(e) => setExt({ ...ext, rx_date: e.target.value })} className={field} /></label>
-              <label className="sm:col-span-4"><span className="block text-xs text-ink-faint">Hospital or clinic</span><input value={ext.facility} onChange={(e) => setExt({ ...ext, facility: e.target.value })} className={field} /></label>
+              <label className="sm:col-span-2"><span className="block text-sm text-ink-soft">Prescriber</span><input required value={ext.prescriber_name} onChange={(e) => setExt({ ...ext, prescriber_name: e.target.value })} className={field} placeholder="Dr. …" /></label>
+              <label><span className="block text-sm text-ink-soft">NMC no.</span><input value={ext.prescriber_reg_no} onChange={(e) => setExt({ ...ext, prescriber_reg_no: e.target.value })} className={field} /></label>
+              <label><span className="block text-sm text-ink-soft">Date</span><input type="date" value={ext.rx_date} onChange={(e) => setExt({ ...ext, rx_date: e.target.value })} className={field} /></label>
+              <label className="sm:col-span-4"><span className="block text-sm text-ink-soft">Hospital or clinic</span><input value={ext.facility} onChange={(e) => setExt({ ...ext, facility: e.target.value })} className={field} /></label>
             </div>
           )}
         </fieldset>
@@ -336,53 +336,53 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
       {/* The pay panel: who it's for, the total (the counter's one big number), how it's paid. */}
       <aside aria-label="Customer and payment" className="space-y-5 rounded-panel border border-line bg-canvas p-4 lg:sticky lg:top-20">
         <fieldset className="space-y-3">
-          <legend className="mb-1 text-sm font-medium">Customer</legend>
+          <legend className="mb-1.5 text-lg font-semibold">Customer</legend>
           {patient ? (
-            <div className="flex items-center justify-between rounded-control border border-line px-3 py-2"><span>{patient.full_name} <span className="text-sm text-ink-faint">{patient.mrn}, {patient.age}{patient.phone ? `, ${patient.phone}` : ""}</span></span>
-              {!prefill && !hold ? <button type="button" onClick={() => setPatient(null)} className="text-sm text-pine">Change</button> : null}</div>
+            <div className="flex items-center justify-between rounded-control border border-line px-3 py-2"><span>{patient.full_name} <span className="text-[0.95rem] text-ink-soft">{patient.mrn}, {patient.age}{patient.phone ? `, ${patient.phone}` : ""}</span></span>
+              {!prefill && !hold ? <button type="button" onClick={() => setPatient(null)} className="text-[0.95rem] text-pine">Change</button> : null}</div>
           ) : (
             <>
               <div className="relative">
                 <input value={pq} onChange={(e) => searchPatient(e.target.value)} className={field} placeholder="Link a patient: name, phone or MRN (optional)" />
                 {pres.length ? <ul className="absolute z-10 mt-1 w-full divide-y divide-line rounded-panel border border-line bg-surface shadow-sm">{pres.map((x) => (
-                  <li key={x.id}><button type="button" onClick={() => { setPatient(x); setPres([]); setPq(""); }} className="w-full px-3 py-2 text-left hover:bg-pine/5">{x.full_name} <span className="text-sm text-ink-faint">{x.mrn} · {x.phone ?? ""}</span></button></li>))}</ul> : null}
+                  <li key={x.id}><button type="button" onClick={() => { setPatient(x); setPres([]); setPq(""); }} className="w-full px-3 py-2 text-left hover:bg-pine/5">{x.full_name} <span className="text-[0.95rem] text-ink-soft">{x.mrn} · {x.phone ?? ""}</span></button></li>))}</ul> : null}
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <input value={name} onChange={(e) => setName(e.target.value)} className={field} placeholder="Name (optional)" />
                 <input value={phone} onChange={(e) => setPhone(e.target.value)} onBlur={() => setPhone(normalizePhone(phone))} type="tel" inputMode="tel" aria-label="Customer phone"
                   aria-invalid={Boolean(phoneProblem(normalizePhone(phone)))} className={cn(field, phoneProblem(normalizePhone(phone)) && "border-alert")} placeholder="Phone (optional)" />
               </div>
-              {phoneProblem(normalizePhone(phone)) ? <p role="alert" className="text-sm text-alert">{phoneProblem(normalizePhone(phone))}</p> : null}
+              {phoneProblem(normalizePhone(phone)) ? <p role="alert" className="text-[0.95rem] text-alert">{phoneProblem(normalizePhone(phone))}</p> : null}
             </>
           )}
         </fieldset>
         <fieldset className="space-y-3 border-t border-line pt-4">
           <legend className="sr-only">Payment</legend>
           <div className="flex items-end justify-between gap-3">
-            <span className="text-ink-soft">Total<span className="block text-xs text-ink-faint">{rows.length ? `${rows.length} line${rows.length === 1 ? "" : "s"}, estimate` : "no lines yet"}</span></span>
-            <span className="text-[2.25rem] font-semibold leading-none tracking-[-0.01em] tabular-nums" data-testid="counter-total">{npr(total)}</span>
+            <span className="text-ink-soft">Total<span className="block text-sm text-ink-soft">{rows.length ? `${rows.length} line${rows.length === 1 ? "" : "s"}, estimate` : "no lines yet"}</span></span>
+            <span className="text-[2.6rem] font-semibold leading-none tracking-[-0.01em] tabular-nums" data-testid="counter-total">{npr(total)}</span>
           </div>
-          {fromAdvance > 0 ? <div className="flex items-baseline justify-between text-sm"><span className="text-ink-soft">From the advance ({npr(held)} held)</span><span className="tabular-nums">− {npr(fromAdvance)}; take {npr(toTake)}</span></div> : null}
+          {fromAdvance > 0 ? <div className="flex items-baseline justify-between text-[0.95rem]"><span className="text-ink-soft">From the advance ({npr(held)} held)</span><span className="tabular-nums">− {npr(fromAdvance)}; take {npr(toTake)}</span></div> : null}
           <div className="grid grid-cols-2 gap-3">
-            <label><span className="block text-xs text-ink-faint">Cash</span><input ref={cashRef} type="number" min={0} step="0.01" value={cash} onChange={(e) => setCash(e.target.value)} aria-label="Cash" className={field} /></label>
-            <label><span className="block text-xs text-ink-faint">Online</span><input type="number" min={0} step="0.01" value={online} onChange={(e) => setOnline(e.target.value)} className={field} /></label>
-            <label className="col-span-2"><span className="block text-xs text-ink-faint">Online paid by</span><select value={channel} onChange={(e) => setChannel(e.target.value)} disabled={!Number(online)} className={field}><option value="">—</option>{CHANNELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+            <label><span className="block text-sm text-ink-soft">Cash</span><input ref={cashRef} type="number" min={0} step="0.01" value={cash} onChange={(e) => setCash(e.target.value)} aria-label="Cash" className={field} /></label>
+            <label><span className="block text-sm text-ink-soft">Online</span><input type="number" min={0} step="0.01" value={online} onChange={(e) => setOnline(e.target.value)} className={field} /></label>
+            <label className="col-span-2"><span className="block text-sm text-ink-soft">Online paid by</span><select value={channel} onChange={(e) => setChannel(e.target.value)} disabled={!Number(online)} className={field}><option value="">—</option>{CHANNELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
           </div>
-          <div className="flex flex-wrap gap-2 text-sm">
+          <div className="flex flex-wrap gap-2 text-[0.95rem]">
             <button type="button" onClick={() => { setCash(String(toTake)); setOnline(""); }} className="rounded-control border border-line px-2 py-1">All cash</button>
             <button type="button" onClick={() => { setOnline(String(toTake)); setCash(""); }} className="rounded-control border border-line px-2 py-1">All online</button>
-            <span className="self-center text-ink-faint">{paid < toTake ? (allowCredit && patient ? `${npr(toTake - paid)} will be left as due` : `${npr(toTake - paid)} still to take`) : paid > toTake ? `Change ${npr(paid - toTake)}: enter only the amount to take` : "Paid in full"}</span>
+            <span className="self-center text-ink-soft">{paid < toTake ? (allowCredit && patient ? `${npr(toTake - paid)} will be left as due` : `${npr(toTake - paid)} still to take`) : paid > toTake ? `Change ${npr(paid - toTake)}: enter only the amount to take` : "Paid in full"}</span>
           </div>
         </fieldset>
 
-        {err ? <p role="alert" className="rounded-control bg-alert-tint px-3 py-2 text-sm text-alert">{err}</p> : null}
+        {err ? <p role="alert" className="rounded-control bg-alert-tint px-3 py-2 text-[0.95rem] text-alert">{err}</p> : null}
         <Button type="submit" className="w-full text-base" disabled={pending || !rows.length}>{pending ? "Issuing…" : hold ? "Issue bill and hand over" : "Issue bill"}</Button>
         {!hold ? (
-          <div className="flex items-center gap-2 border-t border-line pt-4 text-sm">
-            <span className="text-ink-soft">Or keep it aside for</span>
-            <select value={holdHours} onChange={(e) => setHoldHours(e.target.value)} aria-label="Hold for" className="rounded-control border border-line-strong bg-surface px-2 py-2">
+          <div className="flex flex-wrap items-center gap-2 border-t border-line pt-4 text-[0.95rem]">
+            <span className="w-full text-ink-soft">Or keep it aside for a customer</span>
+            <select value={holdHours} onChange={(e) => setHoldHours(e.target.value)} aria-label="Hold for" className="flex-1 rounded-control border border-line-strong bg-surface px-2 py-2">
               {HOLD_HOURS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-            <Button type="button" tone="secondary" className="ml-auto" disabled={pending || !rows.length} onClick={holdForLater}>Hold for later</Button>
+            <Button type="button" tone="secondary" className="whitespace-nowrap" disabled={pending || !rows.length} onClick={holdForLater}>Hold for later</Button>
           </div>
         ) : null}
       </aside>

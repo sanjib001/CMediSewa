@@ -53,17 +53,17 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
           <section key={rx.prescription_id} aria-label={`Prescription ${rx.rx_number} for ${rx.patient.full_name}`} className="rounded-panel border border-line bg-surface">
             <header className="flex flex-wrap items-center gap-x-4 gap-y-2 border-b border-line px-5 py-3">
               <div className="min-w-0 flex-1">
-                <h2 className="font-semibold">{rx.patient.full_name} <span className="font-normal text-ink-faint">{rx.patient.mrn}</span></h2>
-                <p className="text-sm text-ink-soft">{rx.rx_number} by {drName(rx.doctor)}, {new Date(rx.issued_at).toLocaleString("en-GB", { timeZone: "Asia/Kathmandu", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
+                <h2 className="text-lg font-semibold">{rx.patient.full_name} <span className="font-normal text-ink-soft">{rx.patient.mrn}</span></h2>
+                <p className="text-[0.95rem] text-ink-soft">{rx.rx_number} by {drName(rx.doctor)}, {new Date(rx.issued_at).toLocaleString("en-GB", { timeZone: "Asia/Kathmandu", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" })}</p>
               </div>
               {canSell && store ? <Link href={qs("sale", `&rx=${rx.prescription_id}`)} className="rounded-control bg-pine px-4 py-2 font-medium text-white hover:bg-pine-deep">Dispense and bill</Link> : null}
             </header>
             <div className="px-5 pt-3"><AllergyBanner allergy={rx.allergies.length ? rx.allergies.join(", ") : null} /></div>
             <ul className="divide-y divide-line">{rx.items.map((i) => (
-              <li key={i.id} className={cn("grid gap-x-6 px-5 py-3 sm:grid-cols-[1.6fr_1fr_auto]", i.dispensed && "text-ink-faint")}>
+              <li key={i.id} className={cn("grid gap-x-6 px-5 py-3 sm:grid-cols-[1.6fr_1fr_auto]", i.dispensed && "text-ink-soft")}>
                 <div><div className="font-medium">{i.medicine_text}{i.strength ? ` ${i.strength}` : ""}{i.form ? ` (${i.form})` : ""}</div>
-                  <div className="text-sm text-ink-soft">{[i.dose, i.frequency, i.duration_days ? `${i.duration_days} days` : null, i.instructions].filter(Boolean).join(", ")}</div></div>
-                <div className="text-sm">{i.dispensed ? "Dispensed" : Number(i.dispensed_base) > 0 ? `${Number(i.dispensed_base)} given, ${i.remaining ?? ""} left` : "To dispense"}
+                  <div className="text-[0.95rem] text-ink-soft">{[i.dose, i.frequency, i.duration_days ? `${i.duration_days} days` : null, i.instructions].filter(Boolean).join(", ")}</div></div>
+                <div className="text-[0.95rem]">{i.dispensed ? "Dispensed" : Number(i.dispensed_base) > 0 ? `${Number(i.dispensed_base)} given, ${i.remaining ?? ""} left` : "To dispense"}
                   {held.get(i.id) ? <span className="block text-warn">On hold {held.get(i.id)!.hold_no} until {when(held.get(i.id)!.expires_at)}</span> : null}</div>
                 <div className="font-semibold sm:text-right">{i.quantity ?? ""}</div>
               </li>))}</ul>
@@ -88,19 +88,19 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
         <div className="space-y-6">
           <form action="/employee/pharmacy" className="flex flex-wrap items-end gap-2">
             <input type="hidden" name="tab" value="stock" />
-            {ss.length > 1 ? <label><span className="block text-xs text-ink-faint">Store</span><select name="store" defaultValue={here.id} className="rounded-control border border-line-strong px-3 py-2">{ss.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label> : null}
-            <label className="min-w-56 flex-1"><span className="block text-xs text-ink-faint">Find</span><input type="search" name="q" defaultValue={sp.q ?? ""} placeholder="Brand, generic or code" className="w-full rounded-control border border-line-strong px-3 py-2" /></label>
+            {ss.length > 1 ? <label><span className="block text-sm text-ink-soft">Store</span><select name="store" defaultValue={here.id} className="rounded-control border border-line-strong px-3 py-2">{ss.map((x) => <option key={x.id} value={x.id}>{x.name}</option>)}</select></label> : null}
+            <label className="min-w-56 flex-1"><span className="block text-sm text-ink-soft">Find</span><input type="search" name="q" defaultValue={sp.q ?? ""} placeholder="Brand, generic or code" className="w-full rounded-control border border-line-strong px-3 py-2" /></label>
             <button className="rounded-control border border-line-strong px-3 py-2">Show</button>
           </form>
-          <Panel title={`On hand in ${here.name}`} aside={<span className="text-sm text-ink-faint">{rows.length} batch{rows.length === 1 ? "" : "es"}</span>} flush>
+          <Panel titleClassName="text-lg" title={`On hand in ${here.name}`} aside={<span className="text-[0.95rem] text-ink-soft">{rows.length} batch{rows.length === 1 ? "" : "es"}</span>} flush>
             {rows.length === 0 ? <p className="px-5 py-4 text-ink-soft">{term ? "Nothing matches." : "Nothing in this store."}</p> : (
               <div className="overflow-x-auto">
                 <table className="w-full min-w-[36rem] text-left text-[0.95rem]">
-                  <thead className="text-sm text-ink-faint"><tr><th className="px-5 py-2 font-medium">Medicine</th><th className="py-2 font-medium">Batch</th><th className="py-2 font-medium">Expires</th><th className="px-5 py-2 text-right font-medium">On hand</th></tr></thead>
+                  <thead className="text-[0.95rem] text-ink-soft"><tr><th className="px-5 py-2 font-medium">Medicine</th><th className="py-2 font-medium">Batch</th><th className="py-2 font-medium">Expires</th><th className="px-5 py-2 text-right font-medium">On hand</th></tr></thead>
                   <tbody className="divide-y divide-line">{rows.map(({ l, it }) => (
                     <tr key={l.batch_id}>
-                      <td className="px-5 py-2">{it?.name}<span className="block text-xs text-ink-faint">{[it?.generic, it?.strength].filter(Boolean).join(" ")}</span></td>
-                      <td className="py-2">{l.batch_no}{l.status !== "active" ? <span className="ml-2 text-xs text-alert">{l.status}</span> : null}</td>
+                      <td className="px-5 py-2">{it?.name}<span className="block text-sm text-ink-soft">{[it?.generic, it?.strength].filter(Boolean).join(" ")}</span></td>
+                      <td className="py-2">{l.batch_no}{l.status !== "active" ? <span className="ml-2 text-sm text-alert">{l.status}</span> : null}</td>
                       <td className={cn("py-2", l.expired ? "text-alert" : l.near_expiry ? "text-warn" : "")}>{exp(l.expiry_date)}{l.expired ? " (expired)" : ""}</td>
                       <td className="px-5 py-2 text-right tabular-nums">{it ? packText(l.qty_on_hand, it.units) : l.qty_on_hand}</td>
                     </tr>))}</tbody>
@@ -108,10 +108,10 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
               </div>
             )}
           </Panel>
-          <Panel title={open ? `Stock count ${open.count_no}${open.blind ? " (blind)" : ""}` : "Stock count"}>
+          <Panel titleClassName="text-lg" title={open ? `Stock count ${open.count_no}${open.blind ? " (blind)" : ""}` : "Stock count"}>
             {open ? <CountSheet countId={open.id} blind={open.blind} lots={sheet} lines={open.lines} canPost={ctx.permissions.has("manage_stock") && ctx.level !== "A1"} />
               : here.access !== "view" ? <StartCount storeId={here.id} /> : <p className="text-ink-soft">You can view this store only.</p>}
-            {open && ctx.level === "A1" ? <p className="mt-2 text-sm text-ink-soft">You can count with your PIN; posting the count needs your password.</p> : null}
+            {open && ctx.level === "A1" ? <p className="mt-2 text-[0.95rem] text-ink-soft">You can count with your PIN; posting the count needs your password.</p> : null}
           </Panel>
         </div>
       );
@@ -124,14 +124,14 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
     const open = holds.filter((h) => h.status === "held"), ended = holds.filter((h) => h.status !== "held");
     body = (
       <div className="space-y-6">
-        <Panel title="On hold" aside={<span className="text-sm text-ink-faint">{open.length ? `${open.length} waiting` : "Use Hold for later on the Sale tab"}</span>} flush>
+        <Panel titleClassName="text-lg" title="On hold" aside={<span className="text-[0.95rem] text-ink-soft">{open.length ? `${open.length} waiting` : "Use Hold for later on the Sale tab"}</span>} flush>
           {open.length === 0 ? <p className="px-5 py-4 text-ink-soft">Nothing on hold. To keep medicines aside for someone, add them on the Sale tab and choose Hold for later.</p> : (
             <ul className="divide-y divide-line">{open.map((h) => (
               <li key={h.id} className="grid gap-3 px-5 py-4 lg:grid-cols-[1fr_auto]">
                 <div>
-                  <div className="font-medium">{h.hold_no} · {h.customer}{h.phone ? <a href={`tel:${h.phone}`} className="ml-2 text-sm font-normal text-pine underline">{h.phone}</a> : null}</div>
-                  <ul className="mt-1 text-sm">{h.lines.map((l, i) => <li key={i}>{l.item} <span className="text-ink-faint">batch {l.batch_no}</span> · {l.qty}{l.rx ? <span className="ml-1 text-xs text-ink-faint">(prescription)</span> : null}</li>)}</ul>
-                  <div className={cn("mt-1 text-sm", h.overdue ? "text-alert" : "text-ink-soft")}>{h.overdue ? "Time ran out; it goes back to the shelf with the next sale." : `Held until ${when(h.expires_at)}`} · by {h.by}</div>
+                  <div className="font-medium">{h.hold_no} · {h.customer}{h.phone ? <a href={`tel:${h.phone}`} className="ml-2 text-[0.95rem] font-normal text-pine underline">{h.phone}</a> : null}</div>
+                  <ul className="mt-1 text-[0.95rem]">{h.lines.map((l, i) => <li key={i}>{l.item} <span className="text-ink-soft">batch {l.batch_no}</span> · {l.qty}{l.rx ? <span className="ml-1 text-sm text-ink-soft">(prescription)</span> : null}</li>)}</ul>
+                  <div className={cn("mt-1 text-[0.95rem]", h.overdue ? "text-alert" : "text-ink-soft")}>{h.overdue ? "Time ran out; it goes back to the shelf with the next sale." : `Held until ${when(h.expires_at)}`} · by {h.by}</div>
                 </div>
                 <div className="flex flex-wrap items-start gap-2">
                   {!h.overdue ? <Link href={qs("sale", `&hold=${h.id}`)} className="rounded-control bg-pine px-4 py-2 font-medium text-white">Collect and bill</Link> : null}
@@ -141,8 +141,8 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
           )}
         </Panel>
         {ended.length ? (
-          <Panel title="Ended in the last 3 days" flush>
-            <ul className="divide-y divide-line text-sm">{ended.map((h) => (
+          <Panel titleClassName="text-lg" title="Ended in the last 3 days" flush>
+            <ul className="divide-y divide-line text-[0.95rem]">{ended.map((h) => (
               <li key={h.id} className="flex flex-wrap justify-between gap-x-4 px-5 py-2.5">
                 <span><span className="font-medium">{h.hold_no}</span> · {h.customer} · {h.lines.map((l) => l.item).join(", ")}</span>
                 <span className="text-ink-soft">{HOLD_STATUS[h.status]}{h.ended_at ? ` ${when(h.ended_at)}` : ""}{h.end_reason ? `: ${h.end_reason}` : ""}
@@ -174,7 +174,7 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
           qty: i.remaining ?? i.quantity, item_id: i.item_id ?? null })) };
       }
     }
-    body = <section aria-label={hold ? `Collect ${hold.holdNo}` : prefill ? "Dispense" : "New sale"}>{sp.hold && !hold ? <p role="alert" className="mb-4 text-sm text-alert">That hold has ended or isn&apos;t in this store. Check the Holds tab.</p> : null}
+    body = <section aria-label={hold ? `Collect ${hold.holdNo}` : prefill ? "Dispense" : "New sale"}>{sp.hold && !hold ? <p role="alert" className="mb-4 text-[0.95rem] text-alert">That hold has ended or isn&apos;t in this store. Check the Holds tab.</p> : null}
       <CounterSale key={`${store.id}:${sp.rx ?? ""}:${sp.hold ?? ""}`} storeId={store.id} items={items} services={services} prefill={prefill} hold={hold}
       canOverride={ctx.permissions.has("override_batch")} canSellRx={ctx.permissions.has("sell_prescription_only")}
       allowCredit={Boolean((set.data as { allow_credit: boolean } | null)?.allow_credit) && ctx.permissions.has("allow_credit")} /></section>;
@@ -183,29 +183,29 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
     const total = bills.filter((b) => b.status === "issued").reduce((s, b) => s + b.total, 0);
     body = (
       <div className="grid grid-cols-1 gap-6 xl:grid-cols-[1fr_20rem]">
-        <Panel title="Recent bills" aside={<span className="text-sm text-ink-faint">{bills.length} bills, {npr(total)} today</span>} flush>
+        <Panel titleClassName="text-lg" title="Recent bills" aside={<span className="text-[0.95rem] text-ink-soft">{bills.length} bills, {npr(total)} today</span>} flush>
           {bills.length === 0 ? <p className="px-5 py-4 text-ink-soft">No bills yet today.</p> : (
             <div className="overflow-x-auto"><table className="w-full min-w-[32rem] text-left text-[0.95rem]">
-              <thead className="text-sm text-ink-faint"><tr><th className="px-5 py-2 font-medium">Bill</th><th className="py-2 font-medium">Customer</th><th className="py-2 font-medium">Time</th><th className="py-2 text-right font-medium">Amount</th><th className="px-5 py-2 text-right font-medium">Status</th></tr></thead>
+              <thead className="text-[0.95rem] text-ink-soft"><tr><th className="px-5 py-2 font-medium">Bill</th><th className="py-2 font-medium">Customer</th><th className="py-2 font-medium">Time</th><th className="py-2 text-right font-medium">Amount</th><th className="px-5 py-2 text-right font-medium">Status</th></tr></thead>
               <tbody className="divide-y divide-line">{bills.map((b) => (
-              <tr key={b.id} className={b.status === "void" ? "text-ink-faint" : ""}>
+              <tr key={b.id} className={b.status === "void" ? "text-ink-soft" : ""}>
                 <td className="px-5 py-2.5"><Link href={`/employee/pharmacy/bills/${b.id}`} className="font-medium text-pine hover:underline">{b.invoice_no}</Link></td>
                 <td className="py-2.5">{b.customer}</td>
-                <td className="py-2.5 text-sm text-ink-faint">{new Date(b.issued_at).toLocaleTimeString("en-GB", { timeZone: "Asia/Kathmandu", hour: "2-digit", minute: "2-digit" })}</td>
+                <td className="py-2.5 text-[0.95rem] text-ink-soft">{new Date(b.issued_at).toLocaleTimeString("en-GB", { timeZone: "Asia/Kathmandu", hour: "2-digit", minute: "2-digit" })}</td>
                 <td className="py-2.5 text-right tabular-nums">{npr(b.total)}</td>
-                <td className="px-5 py-2.5 text-right">{b.status === "void" ? <span className="rounded-full bg-sunken px-2 py-0.5 text-xs font-medium text-ink-soft">Void</span>
-                  : b.paid < b.total ? <span className="rounded-full bg-warn-tint px-2 py-0.5 text-xs font-medium text-warn">Due {npr(b.total - b.paid)}</span>
-                  : <span className="rounded-full bg-ok-tint px-2 py-0.5 text-xs font-medium text-ok">Paid</span>}</td>
+                <td className="px-5 py-2.5 text-right">{b.status === "void" ? <span className="rounded-full bg-sunken px-2 py-0.5 text-sm font-medium text-ink-soft">Void</span>
+                  : b.paid < b.total ? <span className="rounded-full bg-warn-tint px-2 py-0.5 text-sm font-medium text-warn">Due {npr(b.total - b.paid)}</span>
+                  : <span className="rounded-full bg-ok-tint px-2 py-0.5 text-sm font-medium text-ok">Paid</span>}</td>
               </tr>))}</tbody></table></div>
           )}
         </Panel>
-        <Panel title="Stock alerts" flush>
-          {alerts.length === 0 ? <p className="px-5 py-4 text-sm text-ink-soft">Nothing expiring or running low.</p> : (
+        <Panel titleClassName="text-lg" title="Stock alerts" flush>
+          {alerts.length === 0 ? <p className="px-5 py-4 text-[0.95rem] text-ink-soft">Nothing expiring or running low.</p> : (
             <ul className="divide-y divide-line">{alerts.slice(0, 12).map((a, i) => (
               <li key={i} className="px-5 py-3">
-                <div className={cn("text-sm font-medium", a.severity === "critical" ? "text-alert" : "text-warn")}>{ALERT_TEXT[a.kind]}</div>
+                <div className={cn("text-[0.95rem] font-medium", a.severity === "critical" ? "text-alert" : "text-warn")}>{ALERT_TEXT[a.kind]}</div>
                 <div className="font-medium">{a.item}</div>
-                <div className="text-sm text-ink-faint">{[a.batch_no ? `Batch ${a.batch_no}` : null, a.expiry_date ? `exp ${a.expiry_date}` : null, `${a.qty} on hand`].filter(Boolean).join(", ")}</div>
+                <div className="text-[0.95rem] text-ink-soft">{[a.batch_no ? `Batch ${a.batch_no}` : null, a.expiry_date ? `exp ${a.expiry_date}` : null, `${a.qty} on hand`].filter(Boolean).join(", ")}</div>
               </li>))}</ul>
           )}
         </Panel>
@@ -223,8 +223,8 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
       <nav aria-label="Pharmacy" className="mb-6 flex gap-1 overflow-x-auto border-b border-line">
         {tabs.map(([t, label]) => (
           <Link key={t} href={qs(t)} aria-current={t === tab ? "page" : undefined}
-            className={cn("flex items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2.5 text-[0.95rem]", t === tab ? "border-pine font-medium text-pine-deep" : "border-transparent text-ink-soft hover:text-ink")}>{label}
-            {tabCount[t] ? <span className="rounded-full bg-marigold-tint px-1.5 text-xs font-semibold tabular-nums text-marigold-ink" aria-label={`${tabCount[t]} waiting`}>{tabCount[t]}</span> : null}</Link>
+            className={cn("flex items-center gap-1.5 whitespace-nowrap border-b-2 px-4 py-3 text-[1.0625rem]", t === tab ? "border-pine font-medium text-pine-deep" : "border-transparent text-ink-soft hover:text-ink")}>{label}
+            {tabCount[t] ? <span className="rounded-full bg-marigold-tint px-1.5 text-sm font-semibold tabular-nums text-marigold-ink" aria-label={`${tabCount[t]} waiting`}>{tabCount[t]}</span> : null}</Link>
         ))}
       </nav>
       {body}

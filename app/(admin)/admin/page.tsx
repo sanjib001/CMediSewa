@@ -83,8 +83,8 @@ export default async function AdminDashboard() {
       {/* The BS date is the page's one bold moment: the day the clinic counts in. */}
       <header className="flex flex-wrap items-end justify-between gap-3 pb-5">
         <div>
-          <h1 className="text-[2.25rem] font-semibold leading-none tracking-[-0.015em]">{bsMonth} {bsDay}<span className="font-normal text-ink-soft">, {weekday}</span></h1>
-          <p className="mt-2 text-ink-soft">{bsYear} BS, {ad}</p>
+          <h1 className="text-[2.6rem] font-semibold leading-none tracking-[-0.015em]">{bsMonth} {bsDay}<span className="font-normal text-ink-soft">, {weekday}</span></h1>
+          <p className="mt-2 text-lg text-ink-soft">{bsYear} BS, {ad}</p>
         </div>
         {can(ctx, "view_queue") ? <ButtonLink href="/employee/registrar" tone="secondary">Open registrar desk</ButtonLink> : null}
       </header>
@@ -119,8 +119,8 @@ export default async function AdminDashboard() {
             </ol>
           ) : <span />}
           {pl ? (
-            <p className="sm:text-right"><span className="block text-[1.75rem] font-semibold leading-none tabular-nums">{npr(Number(pl.revenue))}</span>
-              <span className="text-sm text-ink-soft">sales today, before VAT</span></p>
+            <p className="sm:text-right"><span className="block text-[2.25rem] font-semibold leading-none tabular-nums">{npr(Number(pl.revenue))}</span>
+              <span className="text-base text-ink-soft">sales today, before VAT</span></p>
           ) : null}
         </section>
       ) : null}
@@ -128,22 +128,22 @@ export default async function AdminDashboard() {
       <div className={cn("grid grid-cols-1 gap-6", (fin && pl) || showSetup ? "xl:grid-cols-[1.35fr_1fr]" : "max-w-3xl")}>
         <div className="space-y-6">
           {seesRequests || seesStock || seesDues || check ? (
-            <Panel title="Needs you" aside={needs.length ? <span className="text-sm text-ink-faint">{plural(needs.length, "thing")}</span> : null} flush>
+            <Panel titleClassName="text-lg" title="Needs you" aside={needs.length ? <span className="text-base text-ink-soft">{plural(needs.length, "thing")}</span> : null} flush>
               {needs.length === 0 ? (
-                <p className="flex items-center gap-2 px-5 py-4 text-ink-soft"><Icon name="CheckCircle2" className="size-4 text-ok" />Nothing needs you right now.</p>
+                <p className="flex items-center gap-2 px-5 py-5 text-lg text-ink-soft"><Icon name="CheckCircle2" className="size-5 text-ok" />Nothing needs you right now.</p>
               ) : (
                 <ul className="divide-y divide-line">{needs.map((x) => (
-                  <li key={x.text} className="flex flex-wrap items-center gap-x-4 gap-y-1 px-5 py-3">
-                    <span aria-hidden className={cn("size-2.5 shrink-0 rounded-full", x.tone === "alert" ? "bg-alert" : x.tone === "warn" ? "bg-warn" : "bg-line-strong")} />
-                    <span className="min-w-0 flex-1">{x.text}</span>
-                    <Link href={x.href} className="text-sm font-medium text-pine hover:underline">{x.action}</Link>
+                  <li key={x.text} className="flex flex-wrap items-center gap-x-4 gap-y-2 px-5 py-4">
+                    <span aria-hidden className={cn("size-3 shrink-0 rounded-full", x.tone === "alert" ? "bg-alert" : x.tone === "warn" ? "bg-warn" : "bg-ink-faint")} />
+                    <span className="min-w-0 flex-1 basis-[15rem] text-[1.0625rem] text-ink">{x.text}</span>
+                    <Link href={x.href} className="ml-7 rounded-control border border-pine/30 px-3 py-1.5 text-[0.95rem] font-medium text-pine hover:bg-pine-tint sm:ml-0">{x.action}</Link>
                   </li>))}</ul>
               )}
             </Panel>
           ) : null}
 
           {seesDesk ? (
-            <Panel title="OPD queues" aside={can(ctx, "view_queue") ? <Link className="text-sm font-medium text-pine hover:underline" href="/employee/registrar">Registrar view</Link> : null} flush>
+            <Panel titleClassName="text-lg" title="OPD queues" aside={can(ctx, "view_queue") ? <Link className="text-[0.95rem] font-medium text-pine hover:underline" href="/employee/registrar">Registrar view</Link> : null} flush>
               <ul className="divide-y divide-line">
                 {(desk?.doctors ?? []).length === 0 ? <li className="px-5 py-4 text-ink-soft">No doctors set up yet.</li> : null}
                 {(desk?.doctors ?? []).map((d) => {
@@ -152,15 +152,15 @@ export default async function AdminDashboard() {
                   const waiting = q.filter((v) => v.status === "waiting").length;
                   const seen = q.filter((v) => ["closed", "awaiting_billing"].includes(v.status)).length;
                   return (
-                    <li key={d.id} className="flex flex-wrap items-center gap-x-5 gap-y-1 px-5 py-3.5">
-                      <span className={cn("grid h-9 min-w-12 place-items-center rounded-control px-2 text-lg font-semibold tabular-nums",
+                    <li key={d.id} className="flex flex-wrap items-center gap-x-5 gap-y-1 px-5 py-4">
+                      <span className={cn("grid h-11 min-w-14 place-items-center rounded-control px-2 text-xl font-semibold tabular-nums",
                         now ? "bg-marigold-tint text-marigold-ink" : "bg-sunken text-ink-faint")} title={now ? "Token being seen now" : "Nobody with the doctor"}>{now ? now.token : "–"}</span>
                       <div className="min-w-0 flex-1">
-                        <div className="font-medium">{d.name}</div>
-                        <div className="text-sm text-ink-faint">{[d.specialty, d.room].filter(Boolean).join(", ") || "OPD"}</div>
+                        <div className="text-[1.0625rem] font-medium">{d.name}</div>
+                        <div className="text-[0.95rem] text-ink-soft">{[d.specialty, d.room].filter(Boolean).join(", ") || "OPD"}</div>
                       </div>
-                      <div className="text-sm text-ink-soft">{now ? "Seeing a patient" : q.length ? "Between patients" : "Not started"}</div>
-                      <div className="w-36 text-right text-sm"><span className={cn("font-medium", waiting > 3 && "text-warn")}>{waiting} waiting</span><span className="text-ink-faint">, {seen} seen</span></div>
+                      <div className="text-[0.95rem] text-ink-soft">{now ? "Seeing a patient" : q.length ? "Between patients" : "Not started"}</div>
+                      <div className="w-40 text-right"><span className={cn("font-semibold", waiting > 3 && "text-warn")}>{waiting} waiting</span><span className="text-ink-soft">, {seen} seen</span></div>
                     </li>
                   );
                 })}
@@ -171,8 +171,8 @@ export default async function AdminDashboard() {
 
         <div className="space-y-6">
           {fin && pl ? (
-            <Panel title="Money today" aside={can(ctx, "view_finance") ? <Link className="text-sm font-medium text-pine hover:underline" href="/admin/finance">Finance</Link> : null}>
-              <dl className="grid grid-cols-[1fr_auto] gap-y-2 text-[0.95rem] tabular-nums">
+            <Panel titleClassName="text-lg" title="Money today" aside={can(ctx, "view_finance") ? <Link className="text-[0.95rem] font-medium text-pine hover:underline" href="/admin/finance">Finance</Link> : null}>
+              <dl className="money-ledger grid grid-cols-[1fr_auto] gap-y-2.5 text-[1.0625rem] tabular-nums">
                 <dt className="text-ink-soft">OPD and services</dt><dd className="text-right">{npr(Number(pl.revenue_services))}</dd>
                 <dt className="text-ink-soft">Pharmacy</dt><dd className="text-right">{npr(Number(pl.revenue_pharmacy))}</dd>
                 <dt className="mt-3 border-t border-line pt-3 text-ink-soft">Cash received</dt><dd className="mt-3 border-t border-line pt-3 text-right">{npr(cashIn)}</dd>
@@ -180,12 +180,12 @@ export default async function AdminDashboard() {
                 <dt className="mt-3 border-t border-line pt-3 text-ink-soft">Owed by patients</dt><dd className={cn("mt-3 border-t border-line pt-3 text-right", Number(fin.balances.AR_PATIENTS.closing) > 0 && "text-warn")}>{npr(Number(fin.balances.AR_PATIENTS.closing))}</dd>
                 <dt className="text-ink-soft">Owed to vendors</dt><dd className="text-right">{npr(Number(fin.balances.AP_VENDORS.closing))}</dd>
               </dl>
-              {check && !check.mismatches ? <p className="mt-4 flex items-center gap-2 text-sm text-ink-faint"><Icon name="CheckCircle2" className="size-4 text-ok" />Books check: everything matches</p> : null}
+              {check && !check.mismatches ? <p className="mt-4 flex items-center gap-2 text-[0.95rem] text-ink-soft"><Icon name="CheckCircle2" className="size-4 text-ok" />Books check: everything matches</p> : null}
             </Panel>
           ) : null}
 
           {showSetup ? (
-            <Panel title="Setting up" aside={<span className="text-sm text-ink-faint">{setupDone} of {SETUP.length}</span>}>
+            <Panel titleClassName="text-lg" title="Setting up" aside={<span className="text-base text-ink-soft">{setupDone} of {SETUP.length}</span>}>
               <div className="mb-4 h-1.5 overflow-hidden rounded-full bg-sunken" role="progressbar" aria-valuemin={0} aria-valuemax={SETUP.length} aria-valuenow={setupDone}>
                 <div className="h-full bg-pine" style={{ width: `${(setupDone / SETUP.length) * 100}%` }} />
               </div>

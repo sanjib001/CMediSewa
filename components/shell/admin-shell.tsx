@@ -8,7 +8,7 @@ function Sidebar({ groups }: { groups: NavGroup[] }) {
     <nav aria-label="Admin" className="space-y-5">
       {groups.map((group) => (
         <div key={group.label}>
-          <p className="px-3 pb-1.5 text-sm font-medium text-ink-faint">{group.label}</p>
+          <p className="px-3 pb-1.5 text-sm font-medium text-ink-soft">{group.label}</p>
           <ul className="space-y-0.5">
             {group.items.map((item) => (
               <li key={item.href}>

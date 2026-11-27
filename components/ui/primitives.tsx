@@ -55,13 +55,13 @@ export function PageHeader({
 
 // ── Panel: a bordered section with an optional title row ──────────────────────
 export function Panel({
-  title, aside, children, className, flush,
-}: { title?: string; aside?: React.ReactNode; children: React.ReactNode; className?: string; flush?: boolean }) {
+  title, aside, children, className, flush, titleClassName,
+}: { title?: string; aside?: React.ReactNode; children: React.ReactNode; className?: string; flush?: boolean; titleClassName?: string }) {
   return (
     <section className={cn("rounded-panel border border-line bg-surface", className)}>
       {title ? (
         <div className="flex items-center justify-between gap-3 border-b border-line px-5 py-3">
-          <h2 className="font-semibold">{title}</h2>
+          <h2 className={cn("font-semibold", titleClassName)}>{title}</h2>
           {aside}
         </div>
       ) : null}
