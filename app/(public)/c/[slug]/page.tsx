@@ -4,6 +4,7 @@ import { serviceClient } from "@/lib/supabase/service";
 import { Icon } from "@/components/ui/icon";
 import { BookingForm } from "@/components/public/booking-form";
 import { adToBs, formatBs, localDate } from "@/lib/clinic-time";
+import { cn } from "@/lib/cn";
 
 // The clinic's public website (U7, D-34; redesigned D-156). Everything shown comes from
 // public_clinic_profile(): an allow-list of fields, only for an ACTIVE clinic with a PUBLISHED
@@ -98,21 +99,21 @@ export default async function ClinicSite({ params }: { params: Promise<{ slug: s
           {/* Who sits today: the first thing patients come to check. Not shown without doctors (a pharmacy-only site). */}
           {p.doctors.length ? <div className="mt-8 rounded-panel border border-line" aria-labelledby="today">
             <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-5 py-3" style={{ borderTop: `4px solid ${accent}`, borderTopLeftRadius: "inherit", borderTopRightRadius: "inherit" }}>
-              <h2 id="today" className="text-lg font-semibold">{sittingToday.length ? "In OPD today" : "No OPD today"}</h2>
+              <h2 id="today" className="text-xl font-semibold">{sittingToday.length ? "In OPD today" : "No OPD today"}</h2>
               <p className="text-ink-soft">{DAY_NAMES[wd]}, {bs[1]} {bs[2]}</p>
             </div>
             {sittingToday.length ? (
               <ul className="divide-y divide-line">{sittingToday.map((d) => (
                 <li key={d.id} className="grid grid-cols-[1fr_auto] items-center gap-x-4 gap-y-1 px-5 py-4 sm:grid-cols-[1.3fr_auto_auto_auto]">
                   <div className="min-w-0">
-                    <p className="font-semibold">{d.name}</p>
-                    {d.specialty ? <p className="text-sm text-ink-soft">{d.specialty}</p> : null}
+                    <p className="text-[1.0625rem] font-semibold">{d.name}</p>
+                    {d.specialty ? <p className="text-[0.95rem] text-ink-soft">{d.specialty}</p> : null}
                   </div>
                   <p className="text-right text-[1.35rem] font-semibold leading-tight tabular-nums sm:text-left">
                     {windowsOn(d, wd).map((w) => `${hm(w.start)}–${hm(w.end)}`).join(", ")}
                   </p>
-                  <p className="text-ink-soft tabular-nums">{d.fee !== null ? npr(d.fee) : ""}</p>
-                  {canBook ? <a href={`#book-${d.id}`} className="justify-self-end rounded-control px-4 py-2 text-sm font-semibold" style={{ background: accent, color: on }}>Book</a> : <span />}
+                  <p className="font-medium tabular-nums">{d.fee !== null ? npr(d.fee) : ""}</p>
+                  {canBook ? <a href={`#book-${d.id}`} className="justify-self-end rounded-control px-5 py-2.5 font-semibold" style={{ background: accent, color: on }}>Book</a> : <span />}
                 </li>))}</ul>
             ) : (
               <p className="px-5 py-4 text-ink-soft">
@@ -124,7 +125,7 @@ export default async function ClinicSite({ params }: { params: Promise<{ slug: s
             )}
           </div> : null}
 
-          <ul className="mt-6 flex flex-wrap gap-x-8 gap-y-2 text-ink-soft">
+          <ul className="mt-6 flex flex-wrap gap-x-8 gap-y-2 text-[1.0625rem] text-ink-soft">
             {p.address ? <li className="flex items-center gap-2"><Icon name="MapPin" />{p.map_url ? <a className="hover:underline" href={p.map_url} rel="noopener noreferrer" target="_blank">{p.address}</a> : p.address}</li> : null}
             {p.hours ? <li className="flex items-center gap-2"><Icon name="Clock" />{p.hours}</li> : null}
           </ul>
@@ -138,22 +139,23 @@ export default async function ClinicSite({ params }: { params: Promise<{ slug: s
                 <li key={d.id} className="border-t border-line pt-5">
                   <div className="flex flex-wrap items-baseline justify-between gap-x-6 gap-y-1">
                     <div>
-                      <p className="text-lg font-semibold">{d.name}</p>
-                      <p className="text-ink-soft">{[d.specialty, d.qualification].filter(Boolean).join(", ")}</p>
-                      {d.registration ? <p className="text-sm text-ink-faint">{d.registration}</p> : null}
+                      <p className="text-xl font-semibold">{d.name}</p>
+                      <p className="text-[1.0625rem] text-ink-soft">{[d.specialty, d.qualification].filter(Boolean).join(", ")}</p>
+                      {d.registration ? <p className="text-[0.95rem] text-ink-soft">{d.registration}</p> : null}
                     </div>
-                    {d.fee !== null ? <p className="font-medium tabular-nums">Fee {npr(d.fee)}</p> : null}
+                    {d.fee !== null ? <p className="text-lg font-semibold tabular-nums">Fee {npr(d.fee)}</p> : null}
                   </div>
-                  {d.bio ? <p className="mt-2 max-w-prose text-ink-soft">{d.bio}</p> : null}
+                  {d.bio ? <p className="mt-2 max-w-prose text-[1.0625rem] text-ink-soft">{d.bio}</p> : null}
                   {/* The week as a strip, Sunday first as in Nepal; today is outlined. */}
-                  <ol className="mt-4 grid grid-cols-7 gap-1 text-center text-sm" aria-label={`${d.name}'s OPD days`}>
+                  <ol className="mt-4 grid grid-cols-1 gap-1.5 sm:grid-cols-7 sm:text-center" aria-label={`${d.name}'s OPD days`}>
                     {DAYS.map((name, i) => {
                       const ws = windowsOn(d, i);
                       return (
-                        <li key={name} className="rounded-control px-0.5 py-2" aria-current={i === wd ? "date" : undefined}
+                        <li key={name} className="flex items-baseline justify-between gap-3 rounded-control px-3 py-2.5 sm:block sm:px-1" aria-current={i === wd ? "date" : undefined}
                           style={ws.length ? { background: `color-mix(in srgb, ${accent} 12%, white)`, boxShadow: i === wd ? `inset 0 0 0 2px ${accent}` : undefined } : { background: "var(--color-sunken)", boxShadow: i === wd ? "inset 0 0 0 2px var(--color-line-strong)" : undefined }}>
-                          <span className="block font-medium">{name}</span>
-                          <span className="block text-xs leading-tight tabular-nums text-ink-soft">{ws.length ? ws.map((w) => hm(w.start)).join(" ") : "–"}</span>
+                          <span className="block font-semibold">{name}{i === wd ? <span className="font-normal text-ink-soft sm:hidden">, today</span> : null}</span>
+                          <span className={cn("block text-[0.95rem] leading-snug tabular-nums", ws.length ? "text-ink" : "text-ink-soft")}>
+                            {ws.length ? ws.map((w) => <span key={w.start} className="block">{hm(w.start)}–{hm(w.end)}</span>) : "No OPD"}</span>
                         </li>
                       );
                     })}
@@ -168,9 +170,9 @@ export default async function ClinicSite({ params }: { params: Promise<{ slug: s
           <section aria-labelledby="services" className="border-t border-line bg-canvas">
             <div className="mx-auto max-w-5xl px-4 py-10 sm:px-6">
               <h2 id="services" className="text-[1.5rem] font-semibold">Services and prices</h2>
-              <dl className="mt-5 max-w-2xl divide-y divide-line">
+              <dl className="mt-5 grid gap-x-12 text-[1.0625rem] md:grid-cols-2">
                 {[...consultations, ...others].map((s) => (
-                  <div key={s.name} className="flex justify-between gap-6 py-2.5"><dt>{s.name}</dt><dd className="tabular-nums text-ink-soft">{s.price !== null ? npr(s.price) : ""}</dd></div>
+                  <div key={s.name} className="flex justify-between gap-6 border-b border-line py-3"><dt>{s.name}</dt><dd className="font-medium tabular-nums">{s.price !== null ? npr(s.price) : ""}</dd></div>
                 ))}
               </dl>
             </div>
@@ -180,19 +182,19 @@ export default async function ClinicSite({ params }: { params: Promise<{ slug: s
         <section aria-labelledby="visit" className="mx-auto grid max-w-5xl gap-8 px-4 py-10 sm:px-6 md:grid-cols-2">
           <div>
             <h2 id="visit" className="text-[1.5rem] font-semibold">Visit us</h2>
-            <dl className="mt-4 space-y-3">
-              {p.address ? <div><dt className="text-sm text-ink-faint">Address</dt><dd>{p.map_url ? <a className="underline" href={p.map_url} rel="noopener noreferrer" target="_blank">{p.address}, open the map</a> : p.address}</dd></div> : null}
-              {p.hours ? <div><dt className="text-sm text-ink-faint">Opening hours</dt><dd>{p.hours}</dd></div> : null}
-              {p.phone ? <div><dt className="text-sm text-ink-faint">Phone</dt><dd><a className="underline" href={tel(p.phone)}>{p.phone}</a></dd></div> : null}
-              {p.whatsapp ? <div><dt className="text-sm text-ink-faint">WhatsApp</dt><dd><a className="underline" href={`https://wa.me/${p.whatsapp.replace(/\D/g, "")}`} rel="noopener noreferrer" target="_blank">{p.whatsapp}</a></dd></div> : null}
-              {p.email ? <div><dt className="text-sm text-ink-faint">Email</dt><dd><a className="underline" href={`mailto:${p.email}`}>{p.email}</a></dd></div> : null}
+            <dl className="mt-4 space-y-4 text-[1.0625rem]">
+              {p.address ? <div><dt className="text-[0.95rem] text-ink-soft">Address</dt><dd>{p.map_url ? <a className="underline" href={p.map_url} rel="noopener noreferrer" target="_blank">{p.address}, open the map</a> : p.address}</dd></div> : null}
+              {p.hours ? <div><dt className="text-[0.95rem] text-ink-soft">Opening hours</dt><dd>{p.hours}</dd></div> : null}
+              {p.phone ? <div><dt className="text-[0.95rem] text-ink-soft">Phone</dt><dd><a className="underline" href={tel(p.phone)}>{p.phone}</a></dd></div> : null}
+              {p.whatsapp ? <div><dt className="text-[0.95rem] text-ink-soft">WhatsApp</dt><dd><a className="underline" href={`https://wa.me/${p.whatsapp.replace(/\D/g, "")}`} rel="noopener noreferrer" target="_blank">{p.whatsapp}</a></dd></div> : null}
+              {p.email ? <div><dt className="text-[0.95rem] text-ink-soft">Email</dt><dd><a className="underline" href={`mailto:${p.email}`}>{p.email}</a></dd></div> : null}
             </dl>
           </div>
           {p.about ? (
             <div>
               <h2 className="text-[1.5rem] font-semibold">About us</h2>
-              <div className="mt-4 max-w-prose space-y-3 text-ink-soft">{p.about.split(/\n\s*\n/).map((para, i) => <p key={i} className="whitespace-pre-line">{para}</p>)}</div>
-              {p.departments.length ? <p className="mt-4 text-ink-soft">Departments: {p.departments.map((d) => d.name).join(", ")}</p> : null}
+              <div className="mt-4 max-w-prose space-y-3 text-[1.0625rem] text-ink-soft">{p.about.split(/\n\s*\n/).map((para, i) => <p key={i} className="whitespace-pre-line">{para}</p>)}</div>
+              {p.departments.length ? <p className="mt-4 text-[1.0625rem] text-ink-soft">Departments: {p.departments.map((d) => d.name).join(", ")}</p> : null}
             </div>
           ) : null}
         </section>
@@ -203,7 +205,7 @@ export default async function ClinicSite({ params }: { params: Promise<{ slug: s
               <h2 id="faq" className="text-[1.5rem] font-semibold">Questions</h2>
               <div className="mt-4 max-w-prose divide-y divide-line border-y border-line">
                 {p.faqs.map((f) => (
-                  <details key={f.q} className="py-3"><summary className="cursor-pointer font-medium">{f.q}</summary><p className="mt-2 whitespace-pre-line text-ink-soft">{f.a}</p></details>
+                  <details key={f.q} className="py-4"><summary className="cursor-pointer text-[1.0625rem] font-semibold">{f.q}</summary><p className="mt-2 whitespace-pre-line text-[1.0625rem] text-ink-soft">{f.a}</p></details>
                 ))}
               </div>
             </div>
@@ -217,7 +219,7 @@ export default async function ClinicSite({ params }: { params: Promise<{ slug: s
               <>
                 <p className="mb-6 mt-2 max-w-2xl text-ink-soft">Choose a doctor and a time and send a request. The clinic will call or email you to confirm{p.phone ? <>, or call <a className="font-medium underline" href={tel(p.phone)}>{p.phone}</a></> : null}.</p>
                 <BookingForm slug={p.slug} today={today} accent={accent} onAccent={on}
-                  doctors={p.doctors.map((d) => ({ id: d.id, name: d.name, specialty: d.specialty, fee: d.fee }))} />
+                  doctors={p.doctors.map((d) => ({ id: d.id, name: d.name, specialty: d.specialty, fee: d.fee, weekdays: DAYS.map((_, i) => i).filter((i) => windowsOn(d, i).length > 0) }))} />
               </>
             ) : (
               <p className="mt-2 text-ink-soft">{p.phone ? <>Call <a className="font-medium underline" href={tel(p.phone)}>{p.phone}</a> to book.</> : "Please contact the clinic to book."}</p>
@@ -227,7 +229,7 @@ export default async function ClinicSite({ params }: { params: Promise<{ slug: s
       </main>
 
       <footer className="border-t border-line">
-        <div className="mx-auto max-w-5xl px-4 py-6 text-sm text-ink-faint sm:px-6">{p.name}. Website by CMediSewa.</div>
+        <div className="mx-auto max-w-5xl px-4 pb-24 pt-6 text-[0.95rem] text-ink-soft sm:px-6 sm:pb-6">{p.name}. Website by CMediSewa.</div>
       </footer>
 
       {/* Phones: calling and booking stay one tap away. */}
