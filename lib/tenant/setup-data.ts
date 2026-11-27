@@ -179,12 +179,15 @@ export const BLOCKER_LABELS: Record<string, { label: string; href: string }> = {
 
 export async function getSetupStatus(tenantId: string) {
   const db = serviceClient();
-  const [b, staff, unverified, site] = await Promise.all([
+  const [b, staff, unverified, site, consult, sched] = await Promise.all([
     db.rpc("go_live_blockers", { p_tenant: tenantId }),
     db.from("tenant_members").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("membership_role", "tenant_member").eq("is_active", true),
     db.from("member_credentials").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).is("verified_at", null),
     db.from("site_settings").select("published").eq("tenant_id", tenantId).maybeSingle(),
+    db.from("services").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId).eq("kind", "consultation").eq("is_active", true),
+    db.from("doctor_schedules").select("id", { count: "exact", head: true }).eq("tenant_id", tenantId),
   ]);
+  const consults = consult.count ?? 0, scheduled = sched.count ?? 0;
   if (b.error) throw new Error(`blockers: ${b.error.message}`);
   const blockers = (b.data ?? []) as string[];
   const has = (k: string) => !blockers.includes(k);
@@ -192,8 +195,8 @@ export async function getSetupStatus(tenantId: string) {
     blockers,
     items: [
       { label: "Clinic details and bill header", done: has("clinic_phone") && has("billing_profile"), href: "/admin/settings", required: true },
-      { label: "Consultation services and fees", done: has("consultation_service"), href: "/admin/services", required: true },
-      { label: "Doctors and OPD schedules", done: has("doctor_with_schedule"), href: "/admin/doctors", required: true },
+      { label: "Consultation services and fees (for OPD)", done: consults > 0, href: "/admin/services", required: false },
+      { label: "Doctors and OPD schedules (for OPD)", done: scheduled > 0, href: "/admin/doctors", required: false },
       { label: "Invite your staff", done: (staff.count ?? 0) > 0, href: "/admin/staff", required: false },
       { label: "Verify registration numbers", done: (staff.count ?? 0) > 0 && (unverified.count ?? 0) === 0, href: "/admin/staff", required: false },
       { label: "Publish the clinic website", done: Boolean((site.data as { published?: boolean } | null)?.published), href: "/admin/website", required: false },

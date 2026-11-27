@@ -131,15 +131,11 @@ test("go-live: blockers listed until the clinic is ready, then pending → activ
     const t = await makeTenant(c);
     const admin = await member(c, t, { admin: true });
     let r = (await c.query(`select go_live($1, $2) b`, [t, admin])).rows[0].b;
-    assert.deepEqual(r.sort(), ["billing_profile", "clinic_phone", "consultation_service", "doctor_with_schedule", "pharmacy_store"].sort());
+    assert.deepEqual(r.sort(), ["billing_profile", "clinic_phone", "pharmacy_store"].sort());
     await c.query(`update tenants set phone = '01-5551234' where id = $1`, [t]);
     const { rows: [bp] } = await c.query(`insert into billing_profiles (tenant_id, name, legal_name, is_default) values ($1, 'Clinic', 'Test Clinic Pvt Ltd', true) returning id`, [t]);
-    await c.query(`insert into services (tenant_id, name, price_npr) values ($1, 'General OPD', 500)`, [t]);
     await c.query(`insert into stores (tenant_id, code, name, kind, billing_profile_id, is_sellable) values ($1, 'PHARM', 'Pharmacy', 'pharmacy', $2, true)`, [t, bp.id]);
-    const d = await doctor(c, t);
-    r = (await c.query(`select go_live($1, $2) b`, [t, admin])).rows[0].b;
-    assert.deepEqual(r, ["doctor_with_schedule"]);
-    await c.query(`insert into doctor_schedules (tenant_id, member_id, weekday, start_time, end_time, slot_minutes) values ($1, $2, 1, '09:00', '12:00', 15)`, [t, d]);
+    // no doctor, no OPD schedule and no consultation service needed (D-157: pharmacy-only clinics)
     r = (await c.query(`select go_live($1, $2) b`, [t, admin])).rows[0].b;
     assert.deepEqual(r, []);
     assert.equal((await c.query(`select status from tenants where id = $1`, [t])).rows[0].status, "active");

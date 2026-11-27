@@ -95,8 +95,8 @@ export default async function ClinicSite({ params }: { params: Promise<{ slug: s
           <h1 className="max-w-3xl text-[2rem] font-semibold leading-[1.1] tracking-[-0.015em] sm:text-[2.5rem]">{p.hero_title}</h1>
           {p.hero_subtitle ? <p className="mt-3 max-w-2xl text-lg text-ink-soft">{p.hero_subtitle}</p> : null}
 
-          {/* Who sits today: the first thing patients come to check. */}
-          <div className="mt-8 rounded-panel border border-line" aria-labelledby="today">
+          {/* Who sits today: the first thing patients come to check. Not shown without doctors (a pharmacy-only site). */}
+          {p.doctors.length ? <div className="mt-8 rounded-panel border border-line" aria-labelledby="today">
             <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-line px-5 py-3" style={{ borderTop: `4px solid ${accent}`, borderTopLeftRadius: "inherit", borderTopRightRadius: "inherit" }}>
               <h2 id="today" className="text-lg font-semibold">{sittingToday.length ? "In OPD today" : "No OPD today"}</h2>
               <p className="text-ink-soft">{DAY_NAMES[wd]}, {bs[1]} {bs[2]}</p>
@@ -122,7 +122,7 @@ export default async function ClinicSite({ params }: { params: Promise<{ slug: s
                 {canBook ? <> You can still <a href="#book" className="font-medium underline">book a later day</a>.</> : null}
               </p>
             )}
-          </div>
+          </div> : null}
 
           <ul className="mt-6 flex flex-wrap gap-x-8 gap-y-2 text-ink-soft">
             {p.address ? <li className="flex items-center gap-2"><Icon name="MapPin" />{p.map_url ? <a className="hover:underline" href={p.map_url} rel="noopener noreferrer" target="_blank">{p.address}</a> : p.address}</li> : null}
