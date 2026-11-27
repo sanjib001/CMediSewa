@@ -51,6 +51,7 @@ insert into permission_catalog (key, section, module_key, requires_profession, s
   ('dispense_prescription', 'pharmacy', 'pharmacy_counter', array['pharmacist']::text[], true),
   ('sell_prescription_only', 'pharmacy', 'pharmacy_counter', array['pharmacist']::text[], true),
   ('override_batch', 'pharmacy', 'pharmacy_counter', null, true),
+  ('other_sales', 'pharmacy', 'pharmacy_counter', null, true),
   ('view_stock', 'inventory', 'inventory', null, true),
   ('receive_stock', 'inventory', 'inventory', null, true),
   ('transfer_stock', 'inventory', 'inventory', null, true),

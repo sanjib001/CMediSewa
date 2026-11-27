@@ -45,7 +45,7 @@ export function BillView({ b, back, canCollect, canReturn, canVoid }: {
           <p>{[b.profile.phone ? `Phone ${b.profile.phone}` : null, b.profile.pan ? `PAN ${b.profile.pan}` : null].filter(Boolean).join(" · ")}</p>
         </header>
 
-        <p className="bill-title">{b.tax > 0 ? "Tax invoice" : "Invoice"}{b.status === "void" ? <span className="bill-void"> · Void</span> : null}</p>
+        <p className="bill-title">{b.tax > 0 ? "Tax invoice" : "Invoice"}{b.title ? `: ${b.title}` : ""}{b.status === "void" ? <span className="bill-void"> · Void</span> : null}</p>
 
         <dl className="bill-meta">
           <div><dt>Bill no.</dt><dd className="font-semibold">{b.invoice_no}</dd></div>

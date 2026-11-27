@@ -121,7 +121,7 @@ Every platform action (sign-ins, approvals, status changes, settings) with who d
 ## 4. Part C: Clinic Admin, setting up the clinic (in order)
 
 The **Admin dashboard shows a setup checklist** ("Getting ready") with each step and a link.
-The first three are required before you can go live; the rest are strongly recommended.
+Only the clinic details and bill header are required before you can go live (plus an active pharmacy store if you use the pharmacy counter). Doctors, OPD schedules and a consultation service are needed only if you run an OPD: a pharmacy-only business can go live and publish its website without them.
 
 ### C1. First sign-in
 1. Open the **setup link** from CMediSewa.
@@ -260,8 +260,9 @@ On any other device they must use their password.
 
 ## 5. Part D: Going live
 
-When the three required steps are done (clinic details and bill header, a consultation
-service, a doctor with an OPD schedule), the dashboard shows **Go live**. Anything missing is
+When the required steps are done (clinic phone and bill header; an active pharmacy store if
+you use the pharmacy counter), the dashboard shows **Go live**. Doctors and OPD schedules are
+optional: without them the website simply leaves out the OPD times and booking. Anything missing is
 listed with a link to fix it.
 
 **Before you press Go live:**
@@ -326,6 +327,7 @@ back to the search for the next medicine. When done, **Enter in the empty search
 |---|---|
 | **Dispense** | Issued prescriptions waiting. Open one, the batches are suggested (earliest expiry first), adjust, take payment, print the bill. You can give part now: the line shows "8 given, 12 left" and the prescription stays until all is given. The prescribed medicine is chosen for you; if it's out of stock, another brand of the **same medicine** (same generic, strength and form) is offered, and you give the reason. A different medicine can't be given against the prescription: ask the doctor. |
 | **Sale** | Counter sales: type or **scan** a medicine, choose the unit (tab/strip/box), quantity; link a patient or record a walk-in; payment (cash/online/mixed). A linked patient's **advance** pays first; take only the rest. Expired and blocked batches are never offered. Prescription-only items need a prescription. A medicine with none in stock shows the **same medicine** from other brands that are in stock, to add instead. **Hold for later** (1, 2, 3 or 7 days) keeps the medicines on the list aside for a linked patient or a named customer instead of billing now. |
+| **Other sales** | Only for staff whose role has the **Other sales** permission (Admin → Staff → edit the role, e.g. Pharmacy). Where the pharmacy is also the billing counter: give the bill a title (e.g. *Lab*, *X-ray*), type each item with its quantity and rate, take the payment and **Issue bill**. No stock is used and no VAT is added; the money shows as **Other income** in Finance. The printed bill reads *Invoice: Lab*. To correct one, void the bill (same day). |
 | **Holds** | Medicines kept aside for someone who collects later (the rest of a prescription, a phone order). Nobody else can sell, move or dispose of held stock. **Collect and bill** opens the sale with the held batches (take less if they want less; the rest goes back). **Release** puts it back on the shelf, with a reason. A hold that isn't collected in time goes back by itself, and so does a hold on a batch that gets recalled or blocked. The Dispense tab shows "On hold" against the prescription. |
 | **Bills** | Today's and earlier bills: **print**, **return items** (batch by batch; refund in cash or online, reduce what's owed, or put it into the patient's advance), **print the return slip**, **void** (same day only). |
 | **Stock** | What's on hand and stock counts (PIN level). Dues are collected at the Registrar desk or in Billing. |

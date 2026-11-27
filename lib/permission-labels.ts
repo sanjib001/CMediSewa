@@ -9,6 +9,7 @@ const LABELS: Partial<Record<Permission, string>> = {
   record_vitals: "Record vitals", write_consultation: "Write consultations", issue_prescriptions: "Issue prescriptions",
   break_glass: "Emergency access to any patient's record", pharmacy_sell: "Sell at the pharmacy counter",
   dispense_prescription: "Dispense prescriptions", override_batch: "Choose a different batch than suggested",
+  other_sales: "Other sales: bill typed-in items such as lab tests",
   all_stores: "Work in every store", manage_catalogue: "Departments, services and doctors", manage_website: "Edit the clinic website",
   manage_staff: "Staff, roles and devices", manage_settings: "Clinic settings", view_audit_log: "See the audit log",
   view_cost_prices: "See cost prices", allow_credit: "Allow sales on credit", void_invoices: "Void bills",

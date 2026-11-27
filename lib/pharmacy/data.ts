@@ -104,6 +104,8 @@ export async function todaysBills(tenantId: string, storeId: string): Promise<Bi
 
 export type BillDetail = {
   id: string; invoice_no: string; fiscal_year: string; issued_at: string; status: string; customer: string; phone: string | null;
+  /** Other sales (D-158): a heading such as "Lab". */
+  title: string | null;
   subtotal: number; discount: number; tax: number; total: number; paid: number; store: string; by: string;
   profile: { name: string; pan: string | null; address: string | null; phone: string | null; footer: string | null };
   lines: { n: number; text: string; qty: number; unit: string; price: number; discount: number; tax: number; total: number; lots: string }[];
@@ -147,7 +149,7 @@ export async function getBill(tenantId: string, id: string): Promise<BillDetail 
   const paper = (["80mm", "58mm", "a5", "a4"].includes(paperRaw ?? "") ? paperRaw : "80mm") as BillDetail["paper"];
   const prof = bp.data as { name: string; legal_name: string; pan_vat_no: string | null; address: string | null; phone: string | null; receipt_footer: string | null } | null;
   return {
-    id: h.id, invoice_no: h.invoice_no, fiscal_year: h.fiscal_year, issued_at: h.issued_at, status: h.status,
+    id: h.id, invoice_no: h.invoice_no, fiscal_year: h.fiscal_year, issued_at: h.issued_at, status: h.status, title: h.title ?? null,
     customer: p ? `${p.full_name} (${p.mrn})` : h.customer_name ?? "Walk-in", phone: p?.phone ?? h.customer_phone ?? null,
     subtotal: Number(h.subtotal), discount: Number(h.discount_total), tax: Number(h.tax_total), total: Number(h.total),
     paid: rows<{ amount: number }>(pa, "payments").reduce((s, x) => s + Number(x.amount), 0),

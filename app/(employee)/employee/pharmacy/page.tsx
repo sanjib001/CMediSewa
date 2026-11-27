@@ -9,6 +9,7 @@ import { ageText, type PatientLite } from "@/lib/desk/data";
 import { serviceClient } from "@/lib/supabase/service";
 import { CounterSale, type HoldStart, type RxPrefill } from "@/components/pharmacy/counter";
 import { ReleaseHold } from "@/components/pharmacy/holds";
+import { OtherSale } from "@/components/pharmacy/other-sale";
 import { AllergyBanner, PageHeader, Panel } from "@/components/ui/primitives";
 import { cn } from "@/lib/cn";
 import { LiveRefresh } from "@/components/notify/live-refresh";
@@ -20,7 +21,7 @@ export const metadata = { title: "Pharmacy" };
 const npr = (n: number) => `Rs. ${n.toLocaleString("en-IN", { maximumFractionDigits: 2 })}`;
 const UUID = /^[0-9a-f-]{36}$/;
 const ALERT_TEXT = { expired: "Expired", blocked: "Blocked", near_expiry: "Near expiry", critical_stock: "Very low", low_stock: "Low stock" } as const;
-type Tab = "dispense" | "sale" | "holds" | "bills" | "stock";
+type Tab = "dispense" | "sale" | "other" | "holds" | "bills" | "stock";
 const HOLD_STATUS = { held: "Held", collected: "Collected", released: "Released", expired: "Ran out of time" } as const;
 const when = (s: string) => new Date(s).toLocaleString("en-GB", { timeZone: "Asia/Kathmandu", dateStyle: "medium", timeStyle: "short" });
 
@@ -33,7 +34,11 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
   const canSell = ctx.permissions.has("pharmacy_sell"), canDispense = ctx.permissions.has("dispense_prescription");
   const tabs: [Tab, string][] = [];
   if (canDispense) tabs.push(["dispense", "Dispense"]);
-  if (canSell) tabs.push(["sale", "Sale"], ["holds", "Holds"], ["bills", "Bills"]);
+  if (canSell) tabs.push(["sale", "Sale"]);
+  // D-158: typed-in items (lab tests, ...) where the pharmacy is also the billing counter.
+  const canOther = canSell && ctx.permissions.has("other_sales");
+  if (canOther) tabs.push(["other", "Other sales"]);
+  if (canSell) tabs.push(["holds", "Holds"], ["bills", "Bills"]);
   if (ctx.permissions.has("view_stock")) tabs.push(["stock", "Stock"]);
   const tab: Tab = (sp.rx || sp.hold) && canSell ? "sale" : tabs.find(([t]) => t === sp.tab)?.[0] ?? tabs[0]?.[0] ?? "bills";
   const stores = await counterStores(ctx.tenantId, ctx.memberId);
@@ -152,6 +157,10 @@ export default async function PharmacyDesk({ searchParams }: { searchParams: Pro
         ) : null}
       </div>
     );
+  } else if (tab === "other" && store) {
+    const { data: st } = await serviceClient().from("tenant_settings").select("allow_credit").eq("tenant_id", ctx.tenantId).single();
+    body = <section aria-label="Other sales"><OtherSale key={store.id} storeId={store.id}
+      allowCredit={Boolean((st as { allow_credit: boolean } | null)?.allow_credit) && ctx.permissions.has("allow_credit")} /></section>;
   } else if (tab === "sale") {
     const db = serviceClient();
     const [items, services, set] = await Promise.all([

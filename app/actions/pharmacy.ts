@@ -45,6 +45,10 @@ const ERRORS: [RegExp, string][] = [
   [/BAD_QTY/, "Quantities must be more than zero."],
   [/BAD_DISCOUNT/, "Discount is a percentage from 0 to 100."],
   [/NO_LINES/, "Add at least one item."],
+  [/NO_PERMISSION_OTHER_SALES/, "You don't have permission for Other sales. Ask the admin."],
+  [/BAD_DESCRIPTION/, "Enter what each line is for (up to 120 characters)."],
+  [/BAD_PRICE/, "Enter a rate of 0 or more for each line."],
+  [/BAD_TITLE/, "Keep the bill title to 60 characters."],
   [/NO_PERMISSION/, "You don't have permission for this."],
   [/customer_phone_check/, "The customer's phone number isn't valid: use 7 to 20 digits, e.g. 9841234567."],
   [/REAUTH_REQUIRED/, "Confirm your password again to do this."],
@@ -73,11 +77,14 @@ const counter = () => requireTenant({ operation: "pharmacy.counter", next: "/emp
 
 export type SaleLine =
   | { kind: "item"; item_id: string; unit_id: string; qty: number; discount_pct?: number; batch_id?: string | null; prescription_item_id?: string | null; substitution_reason?: string | null; hold_line_id?: string | null }
-  | { kind: "service"; service_id: string; qty: number; discount_pct?: number };
+  | { kind: "service"; service_id: string; qty: number; discount_pct?: number }
+  | { kind: "other"; description: string; qty: number; unit_price: number; discount_pct?: number };
 export type SaleInput = {
   idempotencyKey: string; storeId: string; patientId?: string | null; customerName?: string; customerPhone?: string;
   lines: SaleLine[]; externalRx?: { prescriber_name: string; prescriber_reg_no?: string; facility?: string; rx_date?: string } | null;
   cash: number; online: number; channel?: string | null; reference?: string;
+  /** Other sales (D-158): a heading for the bill, such as "Lab". */
+  title?: string | null;
 };
 
 export async function issueSale(input: SaleInput): Promise<{ ok: true; id: string; no: string; total: number; due: number; fromAdvance: number } | Fail> {
@@ -87,7 +94,9 @@ export async function issueSale(input: SaleInput): Promise<{ ok: true; id: strin
   const salePhone = normalizePhone(input.customerPhone);
   const salePhoneProblem = phoneProblem(salePhone);
   if (salePhoneProblem) return { ok: false, error: `Customer phone: ${salePhoneProblem}` };
-  const lines = (input.lines ?? []).slice(0, 60).map((l) => l.kind === "service"
+  const lines = (input.lines ?? []).slice(0, 60).map((l) => l.kind === "other"
+    ? { kind: "other", description: String(l.description ?? "").trim().slice(0, 120), qty: Number(l.qty), unit_price: Number(l.unit_price), discount_pct: Number(l.discount_pct ?? 0) }
+    : l.kind === "service"
     ? { kind: "service", service_id: l.service_id, qty: Number(l.qty), discount_pct: Number(l.discount_pct ?? 0) }
     : { kind: "item", item_id: l.item_id, unit_id: l.unit_id, qty: Number(l.qty), discount_pct: Number(l.discount_pct ?? 0),
         batch_id: l.batch_id || null, prescription_item_id: l.prescription_item_id || null, substitution_reason: l.substitution_reason?.slice(0, 200) || null,
@@ -105,6 +114,7 @@ export async function issueSale(input: SaleInput): Promise<{ ok: true; id: strin
     p_customer_name: String(input.customerName ?? "").slice(0, 120), p_customer_phone: salePhone.slice(0, 20),
     p_lines: lines, p_external_rx: ext, p_cash: Number(input.cash) || 0, p_online: Number(input.online) || 0, p_channel: input.channel || null,
     p_reference: String(input.reference ?? "").slice(0, 60), p_by: ctx.memberId, p_session_level: ctx.level, p_device: ctx.deviceId,
+    p_title: String(input.title ?? "").trim().slice(0, 60) || null,
   });
   if (error) return { ok: false, error: friendly(error) };
   revalidatePath("/employee/pharmacy");

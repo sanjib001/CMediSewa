@@ -1430,6 +1430,18 @@ forms for Enter, anything under [data-kbd="off"]. Boxes inside a closed <details
   doctor via #book-<id>), "No OPD today" names the next OPD day; each doctor's week as a Sun–Sat
   strip with today outlined; services and prices; Visit us; a Call / Book bar pinned on phones.
   Fixed: the booking form's fieldsets widened the page on phones (min-w-0).
+- **Other sales (D-158, owner: the pharmacy is also the billing counter):** new key `other_sales`
+  (pharmacy section, store-scoped, in no role template: the admin grants it). Pharmacy tab "Other
+  sales": a bill title (invoices.title, ≤ 60, printed "Invoice: Lab") and typed lines (description,
+  qty, rate), customer, payment. Migration 0068: invoice_lines.line_type 'other' (description
+  required); issue_counter_sale gains p_title and 'other' lines (no stock, no VAT, REV_OTHER, the
+  DB re-checks the key). Not returnable line by line (no stock): void the bill. Catalogue file
+  0009 regenerated (parity test) and 0068 inserts the key for existing databases.
+- **Go live without doctors (D-157, owner: pharmacy-only and other businesses):** migration 0067 drops
+  consultation_service and doctor_with_schedule from go_live_blockers; still required: clinic phone,
+  bill header and (with the pharmacy counter) an active pharmacy store. The setup list keeps
+  "Consultation services" and "Doctors and OPD schedules" as optional "(for OPD)" steps. The website
+  hides the In-OPD-today block, the doctors section and booking while there are no doctors.
 - The app's role on the dev database has an 8 s statement timeout; a few E2E runs hit it in
   the advance step (the call normally takes ~0.2 s, worst seen 2.9 s). Watch for it in production.
 

@@ -46,6 +46,7 @@ export const PERMISSION_CATALOG = {
   dispense_prescription:  { section: "pharmacy", module: "pharmacy_counter", requiresProfession: ["pharmacist"], storeScoped: true },
   sell_prescription_only: { section: "pharmacy", module: "pharmacy_counter", requiresProfession: ["pharmacist"], storeScoped: true },
   override_batch:         { section: "pharmacy", module: "pharmacy_counter", storeScoped: true },
+  other_sales:            { section: "pharmacy", module: "pharmacy_counter", storeScoped: true },
   // Inventory (store-scoped)
   view_stock:           { section: "inventory", module: "inventory", storeScoped: true },
   receive_stock:        { section: "inventory", module: "inventory", storeScoped: true },
