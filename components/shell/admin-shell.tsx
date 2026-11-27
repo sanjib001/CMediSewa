@@ -2,6 +2,7 @@ import { ADMIN_NAV, type NavGroup } from "@/lib/nav";
 import { NavLink } from "./nav-link";
 import { TenantBar, type TenantBarProps } from "./tenant-bar";
 import { MobileDrawer } from "./mobile-drawer";
+import { PullToRefresh } from "@/components/pwa/pull-to-refresh";
 
 function Sidebar({ groups }: { groups: NavGroup[] }) {
   return (
@@ -42,6 +43,7 @@ export function AdminShell({
   return (
     <div className="min-h-dvh">
       <TenantBar {...bar} menu={mobileMenu} />
+      <PullToRefresh />
       <div className="mx-auto flex max-w-[1440px]">
         <aside className="sticky top-16 hidden h-[calc(100dvh-4rem)] w-64 shrink-0 overflow-y-auto border-r border-line px-3 py-6 lg:block">
           <Sidebar groups={groups} />

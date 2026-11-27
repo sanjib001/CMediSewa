@@ -1,6 +1,7 @@
 import type { Workspace } from "@/lib/nav";
 import { NavLink } from "./nav-link";
 import { TenantBar, type TenantBarProps } from "./tenant-bar";
+import { PullToRefresh } from "@/components/pwa/pull-to-refresh";
 
 /**
  * Employee area: the role workspaces (Registrar, OPD, Pharmacy; Lab in Phase 3), filtered to
@@ -12,6 +13,7 @@ export function EmployeeShell({
   return (
     <div className="min-h-dvh pb-20 sm:pb-0">
       <TenantBar {...bar} />
+      <PullToRefresh />
       {workspaces.length > 1 ? (
         <nav aria-label="Workspaces" className="hidden border-b border-line bg-surface sm:block">
           <ul className="mx-auto flex max-w-[1440px] gap-1 px-4 py-2 sm:px-6">
