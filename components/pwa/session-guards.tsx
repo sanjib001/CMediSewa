@@ -44,7 +44,7 @@ export function IdleLock({ minutes }: { minutes: number }) {
       if (idle < lockAt) { setLeft(null); return; }
       const remaining = Math.ceil(lockAt + GRACE_S - idle);
       if (remaining > 0) { setLeft(remaining); return; }
-      if (!signingOut.current) { signingOut.current = true; void signOutStaff(); }
+      if (!signingOut.current) { signingOut.current = true; void signOutStaff("idle"); }
     }, 1000);
     return () => { clearInterval(timer); for (const e of events) window.removeEventListener(e, mark); };
   }, [minutes]);

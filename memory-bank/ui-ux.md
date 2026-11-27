@@ -218,5 +218,18 @@ on the Registrar form preview, the marketing hero and the patient booking confir
 can filter it (navigation = guards).
 **Quality floor:** visible focus ring everywhere, reduced-motion respected, 44px controls,
 responsive down to phone width, an allergy banner as `role="alert"`.
-**Not yet:** dark mode, the nonce CSP, and a visual review in a browser (the U1 check was
-HTTP-level only; see current-task.md).
+**Patterns added in the UI upgrade (D-156):**
+- *Day flow* (`.day-flow` in globals.css): a real sequence drawn as numbers joined by a line, the
+  current stage in pine; on phones four even columns, number above label.
+- *Needs you*: one action list, counted by kind, coloured dot for severity (alert / warn / plain),
+  a verb link per line ("Reorder", "Collect"); "Nothing needs you right now." when empty.
+- *Sticky pay panel*: on the counter the money side stays in view (`lg:sticky lg:top-20`), the
+  total is the screen's one big number (2.25rem), the primary action is full width.
+- *Status chips* in lists: Paid (ok tint), Due Rs. X (warn tint), Void (sunken).
+- *Public site*: the clinic's colour is the only accent; today's OPD first; a week strip
+  (Sun–Sat) per doctor; a fixed Call / Book bar on phones (page gets bottom padding).
+- Fieldsets that hold scrolling strips get `min-w-0` (a fieldset otherwise widens the page).
+- Screenshots for UI review: `E2E_KEEP=1 E2E_SHOTS=<dir>` keeps a test clinic; `.local-tools/ui/shots.mjs`
+  re-shoots any page in seconds (owner / pharmacist / public). Purge the clinic afterwards.
+
+**Not yet:** dark mode and the nonce CSP.

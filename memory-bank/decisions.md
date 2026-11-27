@@ -1418,6 +1418,18 @@ forms for Enter, anything under [data-kbd="off"]. Boxes inside a closed <details
   "Issued by". Settings → Receipt paper is now used: 80 mm / 58 mm (narrow, rate under the item)
   or A5 / A4 (rate column, "Received by" / "For <clinic>" lines), with the matching @page. Print
   hides everything but .print-area (the shell used to print too).
+- **UI upgrade, step 1 (D-156, owner: "evolve the look"):** same tokens (pine, marigold, Mukta),
+  new layout and hierarchy on three areas. Dashboard: the BS date is the headline; patients as a
+  drawn sequence (.day-flow); "Needs you" = counted, actionable lines instead of one row per
+  batch; OPD queues with the marigold token being seen; setup list only until setup is complete.
+  Pharmacy: Sale is two panes, the cart left and a sticky pay panel right (customer, a 36 px
+  total, payment, full-width Issue bill, hold below); Dispense = one compact block per
+  prescription with the action in its header; Bills = headed table with Paid / Due / Void chips;
+  the Holds tab shows how many are waiting. Clinic website (owner: "today's OPD + Book"): sticky
+  header, "In OPD today" first (time window as the big figure, fee, Book that pre-selects the
+  doctor via #book-<id>), "No OPD today" names the next OPD day; each doctor's week as a Sun–Sat
+  strip with today outlined; services and prices; Visit us; a Call / Book bar pinned on phones.
+  Fixed: the booking form's fieldsets widened the page on phones (min-w-0).
 - The app's role on the dev database has an 8 s statement timeout; a few E2E runs hit it in
   the advance step (the call normally takes ~0.2 s, worst seen 2.9 s). Watch for it in production.
 

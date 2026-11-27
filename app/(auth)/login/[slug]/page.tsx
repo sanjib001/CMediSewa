@@ -11,8 +11,9 @@ export const dynamic = "force-dynamic";
 // L3/L4: the clinic link. The slug only selects branding; it never authorises anything.
 // The trusted-device cookie decides between the PIN picker and the password form, and an
 // untrusted device never receives the staff list.
-export default async function ClinicSignIn({ params }: { params: Promise<{ slug: string }> }) {
+export default async function ClinicSignIn({ params, searchParams }: { params: Promise<{ slug: string }>; searchParams: Promise<{ idle?: string }> }) {
   const { slug } = await params;
+  const idle = (await searchParams).idle === "1";
   const db = serviceClient();
   const { data: tenant } = await db.from("tenants").select("id, name, status").eq("slug", slug).neq("status", "closed").maybeSingle<{ id: string; name: string; status: string }>();
   if (!tenant) notFound();
@@ -42,6 +43,7 @@ export default async function ClinicSignIn({ params }: { params: Promise<{ slug:
         </div>
       }
     >
+      {idle ? <p role="status" className="mb-4 rounded-control bg-warn-tint px-3 py-2 text-sm text-warn">You were signed out because this screen was not used for a while (the clinic&apos;s screen-lock time). Sign in again to continue.</p> : null}
       <PinSignIn slug={slug} trusted={trusted} staff={staff} />
     </AuthFrame>
   );

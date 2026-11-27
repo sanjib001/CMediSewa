@@ -334,7 +334,7 @@ back to the search for the next medicine. When done, **Enter in the empty search
 
 | Menu | Use it to |
 |---|---|
-| **Dashboard** | Today: patients booked/registered/waiting/seen, cash and online received, owed by patients, owed to vendors, alerts. |
+| **Dashboard** | Today's date in BS first; patients booked → registered → waiting now → seen; sales today; **Needs you**: what to act on (booking requests, expired or recalled batches, medicines to reorder, money owed, a books-check problem) with a link for each; **OPD queues** with the token each doctor is seeing; **Money today**. Each part shows only to roles allowed to see it. |
 | **Patients** | Search, open a patient (visits, appointments, bills), edit details, resolve duplicate flags, **combine two records of the same person** (and undo it), the patient's **advance** (take, use, give back). |
 | **Appointments** | All bookings by day and doctor. |
 | **Purchases** | **New purchase**: enter the supplier's bill line by line, batch first (expiry, unit, qty, free, rate, discount, VAT, MRP); each line shows its amount and the **item cost** per unit, with the total under the items. A batch number already on file for that medicine fills its expiry (one batch has one expiry) and warns if the MRP changed. Bought again at the same cost and MRP from the same vendor, it is added to the batch already in Stock (one row per batch); a different cost or MRP is kept as its own row. Pay now in cash or online, or on credit. **Orders** (purchase orders), **Returns** to the vendor, void a purchase. An order above the approval limit (Settings) shows **Needs approval**: the owner opens it and approves or rejects it (with a reason); someone else must approve an order they raised. |

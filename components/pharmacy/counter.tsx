@@ -8,6 +8,7 @@ import type { CounterItem, CounterService } from "@/lib/pharmacy/data";
 import type { PatientLite } from "@/lib/desk/data";
 import { Button } from "@/components/ui/primitives";
 import { cn } from "@/lib/cn";
+import { normalizePhone, phoneProblem } from "@/lib/phone";
 
 const npr = (n: number) => `Rs. ${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const field = "w-full rounded-control border border-line-strong bg-surface px-3 py-2 text-[0.95rem]";
@@ -181,7 +182,7 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
       ? { kind: "service", service_id: r.serviceId, qty: Number(r.qty), discount_pct: Number(r.disc) || 0 }
       : { kind: "item", item_id: r.itemId, unit_id: r.unitId, qty: Number(r.qty), discount_pct: Number(r.disc) || 0, batch_id: r.batchId || null, prescription_item_id: r.rxItemId, hold_line_id: r.holdLineId ?? null, substitution_reason: needsReason(r) || r.holdLineId ? (r.subReason ?? "").trim() || null : null });
     start(async () => {
-      const res = await issueSale({ idempotencyKey: key.current, storeId, patientId: patient?.id ?? null, customerName: name, customerPhone: phone, lines,
+      const res = await issueSale({ idempotencyKey: key.current, storeId, patientId: patient?.id ?? null, customerName: patient ? "" : name, customerPhone: patient ? "" : phone, lines,
         externalRx: needsExt ? ext : null, cash: Number(cash) || 0, online: Number(online) || 0, channel: channel || null });
       if (res.ok) setDone(res); else setErr(res.error);
     });
@@ -198,7 +199,7 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
     if (!patient && name.trim().length < 2) { setErr("Link a patient, or enter the customer's name, to hold stock."); return; }
     if (ready.some((r) => needsReason(r) && (r.subReason ?? "").trim().length < 3)) { setErr("Give the reason for each brand that isn't the one prescribed."); return; }
     start(async () => {
-      const res = await holdStock({ idempotencyKey: key.current, storeId, patientId: patient?.id ?? null, customerName: name, customerPhone: phone, hours: Number(holdHours),
+      const res = await holdStock({ idempotencyKey: key.current, storeId, patientId: patient?.id ?? null, customerName: patient ? "" : name, customerPhone: patient ? "" : phone, hours: Number(holdHours),
         lines: ready.map((r) => ({ item_id: r.itemId, unit_id: r.unitId, qty: Number(r.qty), batch_id: r.batchId || null, prescription_item_id: r.rxItemId,
           substitution_reason: needsReason(r) ? (r.subReason ?? "").trim() : null })) });
       if (res.ok) setHeldDone({ no: res.no, until: new Date(res.expiresAt).toLocaleString("en-GB", { timeZone: "Asia/Kathmandu", dateStyle: "medium", timeStyle: "short" }) });
@@ -227,7 +228,8 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
   );
 
   return (
-    <form onSubmit={submit} className="space-y-5">
+    <form onSubmit={submit} className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_23rem]">
+      <div className="min-w-0 space-y-5">
       {hold ? <p className="rounded-control bg-pine/5 px-3 py-2 text-sm">Collecting hold {hold.holdNo}{hold.patient ? ` for ${hold.patient.full_name}` : hold.name ? ` for ${hold.name}` : ""}. Each line sells from the batch kept aside; reduce a quantity to take less, and the rest goes back to the shelf.</p> : null}
       {prefill ? <p className="rounded-control bg-pine/5 px-3 py-2 text-sm">Dispensing {prefill.rxNumber} for {prefill.patient.full_name}. Choose the medicine for each line; reduce a quantity to dispense part.</p> : null}
       <div className="relative">
@@ -329,11 +331,14 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
         </fieldset>
       ) : null}
 
-      <div className="grid gap-5 lg:grid-cols-2">
+      </div>
+
+      {/* The pay panel: who it's for, the total (the counter's one big number), how it's paid. */}
+      <aside aria-label="Customer and payment" className="space-y-5 rounded-panel border border-line bg-canvas p-4 lg:sticky lg:top-20">
         <fieldset className="space-y-3">
           <legend className="mb-1 text-sm font-medium">Customer</legend>
           {patient ? (
-            <div className="flex items-center justify-between rounded-control border border-line px-3 py-2"><span>{patient.full_name} <span className="text-sm text-ink-faint">{patient.mrn}, {patient.age}</span></span>
+            <div className="flex items-center justify-between rounded-control border border-line px-3 py-2"><span>{patient.full_name} <span className="text-sm text-ink-faint">{patient.mrn}, {patient.age}{patient.phone ? `, ${patient.phone}` : ""}</span></span>
               {!prefill && !hold ? <button type="button" onClick={() => setPatient(null)} className="text-sm text-pine">Change</button> : null}</div>
           ) : (
             <>
@@ -342,21 +347,26 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
                 {pres.length ? <ul className="absolute z-10 mt-1 w-full divide-y divide-line rounded-panel border border-line bg-surface shadow-sm">{pres.map((x) => (
                   <li key={x.id}><button type="button" onClick={() => { setPatient(x); setPres([]); setPq(""); }} className="w-full px-3 py-2 text-left hover:bg-pine/5">{x.full_name} <span className="text-sm text-ink-faint">{x.mrn} · {x.phone ?? ""}</span></button></li>))}</ul> : null}
               </div>
-              <div className="grid gap-3 sm:grid-cols-2">
+              <div className="grid grid-cols-2 gap-3">
                 <input value={name} onChange={(e) => setName(e.target.value)} className={field} placeholder="Name (optional)" />
-                <input value={phone} onChange={(e) => setPhone(e.target.value)} type="tel" className={field} placeholder="Phone (optional)" />
+                <input value={phone} onChange={(e) => setPhone(e.target.value)} onBlur={() => setPhone(normalizePhone(phone))} type="tel" inputMode="tel" aria-label="Customer phone"
+                  aria-invalid={Boolean(phoneProblem(normalizePhone(phone)))} className={cn(field, phoneProblem(normalizePhone(phone)) && "border-alert")} placeholder="Phone (optional)" />
               </div>
+              {phoneProblem(normalizePhone(phone)) ? <p role="alert" className="text-sm text-alert">{phoneProblem(normalizePhone(phone))}</p> : null}
             </>
           )}
         </fieldset>
-        <fieldset className="space-y-3">
-          <legend className="mb-1 text-sm font-medium">Payment</legend>
-          <div className="flex items-baseline justify-between"><span className="text-ink-soft">Total (estimate)</span><span className="text-2xl font-semibold tabular-nums">{npr(total)}</span></div>
+        <fieldset className="space-y-3 border-t border-line pt-4">
+          <legend className="sr-only">Payment</legend>
+          <div className="flex items-end justify-between gap-3">
+            <span className="text-ink-soft">Total<span className="block text-xs text-ink-faint">{rows.length ? `${rows.length} line${rows.length === 1 ? "" : "s"}, estimate` : "no lines yet"}</span></span>
+            <span className="text-[2.25rem] font-semibold leading-none tracking-[-0.01em] tabular-nums" data-testid="counter-total">{npr(total)}</span>
+          </div>
           {fromAdvance > 0 ? <div className="flex items-baseline justify-between text-sm"><span className="text-ink-soft">From the advance ({npr(held)} held)</span><span className="tabular-nums">− {npr(fromAdvance)}; take {npr(toTake)}</span></div> : null}
-          <div className="grid gap-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-3">
             <label><span className="block text-xs text-ink-faint">Cash</span><input ref={cashRef} type="number" min={0} step="0.01" value={cash} onChange={(e) => setCash(e.target.value)} aria-label="Cash" className={field} /></label>
             <label><span className="block text-xs text-ink-faint">Online</span><input type="number" min={0} step="0.01" value={online} onChange={(e) => setOnline(e.target.value)} className={field} /></label>
-            <label><span className="block text-xs text-ink-faint">Paid by</span><select value={channel} onChange={(e) => setChannel(e.target.value)} disabled={!Number(online)} className={field}><option value="">—</option>{CHANNELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
+            <label className="col-span-2"><span className="block text-xs text-ink-faint">Online paid by</span><select value={channel} onChange={(e) => setChannel(e.target.value)} disabled={!Number(online)} className={field}><option value="">—</option>{CHANNELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
           </div>
           <div className="flex flex-wrap gap-2 text-sm">
             <button type="button" onClick={() => { setCash(String(toTake)); setOnline(""); }} className="rounded-control border border-line px-2 py-1">All cash</button>
@@ -364,19 +374,18 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
             <span className="self-center text-ink-faint">{paid < toTake ? (allowCredit && patient ? `${npr(toTake - paid)} will be left as due` : `${npr(toTake - paid)} still to take`) : paid > toTake ? `Change ${npr(paid - toTake)}: enter only the amount to take` : "Paid in full"}</span>
           </div>
         </fieldset>
-      </div>
 
-      {err ? <p role="alert" className="text-alert">{err}</p> : null}
-      <div className="flex flex-wrap items-center justify-end gap-2">
+        {err ? <p role="alert" className="rounded-control bg-alert-tint px-3 py-2 text-sm text-alert">{err}</p> : null}
+        <Button type="submit" className="w-full text-base" disabled={pending || !rows.length}>{pending ? "Issuing…" : hold ? "Issue bill and hand over" : "Issue bill"}</Button>
         {!hold ? (
-          <span className="mr-auto flex flex-wrap items-center gap-2 text-sm">
-            <select value={holdHours} onChange={(e) => setHoldHours(e.target.value)} aria-label="Hold for" className="rounded-control border border-line-strong px-2 py-2">
+          <div className="flex items-center gap-2 border-t border-line pt-4 text-sm">
+            <span className="text-ink-soft">Or keep it aside for</span>
+            <select value={holdHours} onChange={(e) => setHoldHours(e.target.value)} aria-label="Hold for" className="rounded-control border border-line-strong bg-surface px-2 py-2">
               {HOLD_HOURS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select>
-            <Button type="button" tone="secondary" disabled={pending || !rows.length} onClick={holdForLater}>Hold for later</Button>
-          </span>
+            <Button type="button" tone="secondary" className="ml-auto" disabled={pending || !rows.length} onClick={holdForLater}>Hold for later</Button>
+          </div>
         ) : null}
-        <Button type="submit" disabled={pending || !rows.length}>{pending ? "Issuing…" : hold ? "Issue bill and hand over" : "Issue bill"}</Button>
-      </div>
+      </aside>
     </form>
   );
 }

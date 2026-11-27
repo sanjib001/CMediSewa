@@ -27,6 +27,20 @@ export function BookingForm({ slug, doctors, today, accent, onAccent }: { slug: 
   const slots = loaded?.key === key ? loaded.slots : null;
   const days = Array.from({ length: 14 }, (_, i) => addDays(today, i));
 
+  // A doctor's "Book" button links to #book-<id>: pick that doctor and bring the form into view.
+  useEffect(() => {
+    const pick = () => {
+      const m = /^#book-([0-9a-f-]{36})$/.exec(window.location.hash);
+      if (m && doctors.some((d) => d.id === m[1])) {
+        setDoctorId(m[1]!); setStart(null);
+        document.getElementById("book")?.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    };
+    pick();
+    window.addEventListener("hashchange", pick);
+    return () => window.removeEventListener("hashchange", pick);
+  }, [doctors]);
+
   useEffect(() => {
     if (!doctorId) return;
     let live = true;
@@ -57,7 +71,7 @@ export function BookingForm({ slug, doctors, today, accent, onAccent }: { slug: 
         else { setError(r.error); setLoaded(null); setStart(null); listPublicSlots(slug, doctorId, date).then((s) => setLoaded({ key, slots: s })); }
       });
     }}>
-      <fieldset>
+      <fieldset className="min-w-0">
         <legend className={lbl}>Doctor</legend>
         <div className="grid gap-2 sm:grid-cols-2">
           {doctors.map((d) => (
@@ -70,7 +84,7 @@ export function BookingForm({ slug, doctors, today, accent, onAccent }: { slug: 
       </fieldset>
 
       {doctorId ? (
-        <fieldset>
+        <fieldset className="min-w-0">
           <legend className={lbl}>Day</legend>
           <div className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
             {days.map((d) => (
@@ -98,7 +112,7 @@ export function BookingForm({ slug, doctors, today, accent, onAccent }: { slug: 
       ) : null}
 
       {start ? (
-        <fieldset className="grid gap-3 sm:grid-cols-2">
+        <fieldset className="grid min-w-0 gap-3 sm:grid-cols-2">
           <legend className="mb-2 font-medium">Patient details</legend>
           <label className="block sm:col-span-2"><span className={lbl}>Patient&apos;s full name</span><input name="name" required maxLength={120} autoComplete="name" className={field} /></label>
           <label className="block"><span className={lbl}>Phone</span><input name="phone" type="tel" autoComplete="tel" placeholder="98XXXXXXXX" className={field} /></label>

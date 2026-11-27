@@ -4,6 +4,7 @@ import { revalidatePath } from "next/cache";
 import { requireTenant } from "@/lib/auth/context";
 import { serviceClient } from "@/lib/supabase/service";
 import { toLite, type PatientLite } from "@/lib/desk/data";
+import { normalizePhone, phoneProblem } from "@/lib/phone";
 
 // Pharmacy counter actions (B7a). A PIN session is enough (pharmacy.counter, A1); the database
 // re-checks every key (pharmacy_sell, dispense_prescription, sell_prescription_only,
@@ -45,7 +46,7 @@ const ERRORS: [RegExp, string][] = [
   [/BAD_DISCOUNT/, "Discount is a percentage from 0 to 100."],
   [/NO_LINES/, "Add at least one item."],
   [/NO_PERMISSION/, "You don't have permission for this."],
-  [/customer_phone_check/, "Enter a valid phone number."],
+  [/customer_phone_check/, "The customer's phone number isn't valid: use 7 to 20 digits, e.g. 9841234567."],
   [/REAUTH_REQUIRED/, "Confirm your password again to do this."],
   [/NOT_SAME_DAY/, "Only today's bills can be voided. Use a return for older bills."],
   [/HAS_RETURNS/, "Items from this bill were already returned, so it can't be voided. Return the rest instead."],
@@ -83,6 +84,9 @@ export async function issueSale(input: SaleInput): Promise<{ ok: true; id: strin
   const ctx = await counter();
   if (!UUID.test(input.idempotencyKey ?? "") || !UUID.test(input.storeId ?? "")) return { ok: false, error: "Choose the store." };
   if (input.patientId && !UUID.test(input.patientId)) return { ok: false, error: "That patient wasn't found." };
+  const salePhone = normalizePhone(input.customerPhone);
+  const salePhoneProblem = phoneProblem(salePhone);
+  if (salePhoneProblem) return { ok: false, error: `Customer phone: ${salePhoneProblem}` };
   const lines = (input.lines ?? []).slice(0, 60).map((l) => l.kind === "service"
     ? { kind: "service", service_id: l.service_id, qty: Number(l.qty), discount_pct: Number(l.discount_pct ?? 0) }
     : { kind: "item", item_id: l.item_id, unit_id: l.unit_id, qty: Number(l.qty), discount_pct: Number(l.discount_pct ?? 0),
@@ -98,7 +102,7 @@ export async function issueSale(input: SaleInput): Promise<{ ok: true; id: strin
   } : null;
   const { data, error } = await serviceClient().rpc("issue_counter_sale", {
     p_tenant: ctx.tenantId, p_idempotency_key: input.idempotencyKey, p_store: input.storeId, p_patient: input.patientId || null,
-    p_customer_name: String(input.customerName ?? "").slice(0, 120), p_customer_phone: String(input.customerPhone ?? "").slice(0, 20),
+    p_customer_name: String(input.customerName ?? "").slice(0, 120), p_customer_phone: salePhone.slice(0, 20),
     p_lines: lines, p_external_rx: ext, p_cash: Number(input.cash) || 0, p_online: Number(input.online) || 0, p_channel: input.channel || null,
     p_reference: String(input.reference ?? "").slice(0, 60), p_by: ctx.memberId, p_session_level: ctx.level, p_device: ctx.deviceId,
   });
@@ -121,10 +125,13 @@ export async function holdStock(input: HoldInput): Promise<{ ok: true; id: strin
     substitution_reason: l.substitution_reason?.trim().slice(0, 200) || null }));
   if (!lines.length) return { ok: false, error: "Add the medicines to hold." };
   for (const l of lines) for (const v of [l.item_id, l.unit_id, l.batch_id, l.prescription_item_id]) if (v && !UUID.test(String(v))) return { ok: false, error: "Something in the list isn't valid. Reload the page." };
+  const holdPhone = normalizePhone(input.customerPhone);
+  const holdPhoneProblem = phoneProblem(holdPhone);
+  if (holdPhoneProblem) return { ok: false, error: `Customer phone: ${holdPhoneProblem}` };
   const hours = Math.round(Number(input.hours));
   const { data, error } = await serviceClient().rpc("create_stock_hold", {
     p_tenant: ctx.tenantId, p_key: input.idempotencyKey, p_store: input.storeId, p_patient: input.patientId || null,
-    p_name: String(input.customerName ?? "").trim().slice(0, 120), p_phone: String(input.customerPhone ?? "").trim().slice(0, 20),
+    p_name: String(input.customerName ?? "").trim().slice(0, 120), p_phone: holdPhone.slice(0, 20),
     p_hours: Number.isFinite(hours) ? hours : 0, p_note: String(input.note ?? "").slice(0, 300), p_lines: lines, p_by: ctx.memberId, p_session_level: ctx.level,
   });
   if (error) return { ok: false, error: friendly(error) };

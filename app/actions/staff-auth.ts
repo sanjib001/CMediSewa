@@ -258,12 +258,14 @@ export async function revokeDevice(input: { deviceId: string }): Promise<{ ok: t
 }
 
 // ── L8: sign out of this device ───────────────────────────────────────────────
-export async function signOutStaff(): Promise<void> {
+/** Sign out on this device. The idle lock passes "idle"; the Sign out button (a form) passes FormData. */
+export async function signOutStaff(why?: unknown): Promise<void> {
+  const reason = why === "idle" ? "idle" : "manual";
   const identity = await getAuthIdentity();
   const ctx = identity ? await getTenantContext().catch(() => null) : null;
   const supabase = await createSessionClient();
   if (identity?.sessionId) await serviceClient().from("session_assurance").delete().eq("session_id", identity.sessionId);
-  if (ctx) await audit({ tenantId: ctx.tenantId, actorKind: "member", actorId: ctx.memberId, action: "auth.staff_signout" }).catch(() => {});
+  if (ctx) await audit({ tenantId: ctx.tenantId, actorKind: "member", actorId: ctx.memberId, action: "auth.staff_signout", detail: { reason, idle_lock_minutes: ctx.idleLockMinutes, trusted_device: Boolean(ctx.deviceId) } }).catch(() => {});
   await supabase.auth.signOut({ scope: "local" });
-  redirect(await staffLoginPath());
+  redirect(`${await staffLoginPath()}${reason === "idle" ? "?idle=1" : ""}`);
 }
