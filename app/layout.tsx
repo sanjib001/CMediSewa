@@ -2,6 +2,7 @@ import type { Metadata, Viewport } from "next";
 import { Mukta } from "next/font/google";
 import "./globals.css";
 import { PwaRegister } from "@/components/pwa/pwa-register";
+import { KeyboardNav } from "@/components/ui/keyboard-nav";
 
 // Mukta: one family designed for Devanagari and Latin together, so Nepali names, BS dates
 // and English UI share a baseline and a voice (ui-ux.md §12).
@@ -29,7 +30,7 @@ export const viewport: Viewport = {
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={mukta.variable}>
-      <body className="min-h-dvh antialiased">{children}<PwaRegister /></body>
+      <body className="min-h-dvh antialiased">{children}<PwaRegister /><KeyboardNav /></body>
     </html>
   );
 }

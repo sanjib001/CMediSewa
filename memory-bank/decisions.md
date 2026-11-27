@@ -1398,6 +1398,21 @@ they saw things their role doesn't allow. Page guards were already right; the le
   the database.
 - Rule for new work: every menu entry and every dashboard part names the key its page needs.
 
+**D-154 Forms are filled with the keyboard (owner).** One global helper (components/ui/
+keyboard-nav.tsx, mounted in the root layout) works on every form: Enter = next box, and past
+the last box the form's submit button (or a [data-kbd-submit] button for forms that aren't a
+<form>, e.g. the vendor bill); → at the end of the text / ← at its start = next / previous box.
+Left alone: keys a page already handled (preventDefault: the counter's scan box, item search),
+textareas, buttons and links, date/number boxes and radios for arrows, search boxes and one-box
+forms for Enter, anything under [data-kbd="off"]. Boxes inside a closed <details> are skipped
+(Chrome gives them a size but they can't take focus). The listener is on window, after React's.
+- Pharmacy counter (owner): the search box is a combobox: ↑/↓ highlight a match (the hint under the
+  box names what Enter adds; none in stock → the first same medicine in stock, D-147), Enter adds
+  it and focuses its Qty (selected); Qty → Unit → Disc % by the global helper; Enter on Disc %
+  returns to the search; Enter in the empty search goes to Cash.
+- The app's role on the dev database has an 8 s statement timeout; a few E2E runs hit it in
+  the advance step (the call normally takes ~0.2 s, worst seen 2.9 s). Watch for it in production.
+
 ---
 
 ## Pending decisions

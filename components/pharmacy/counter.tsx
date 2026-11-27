@@ -7,6 +7,7 @@ import { getAdvance } from "@/app/actions/advances";
 import type { CounterItem, CounterService } from "@/lib/pharmacy/data";
 import type { PatientLite } from "@/lib/desk/data";
 import { Button } from "@/components/ui/primitives";
+import { cn } from "@/lib/cn";
 
 const npr = (n: number) => `Rs. ${n.toLocaleString("en-IN", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 const field = "w-full rounded-control border border-line-strong bg-surface px-3 py-2 text-[0.95rem]";
@@ -45,6 +46,13 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
           rxItemId: l.prescription_item_id, rxText: l.text, prescribedId: l.item_id ?? null, subReason: alt ? SUB_REASONS[0] : "" };
       }));
   const [q, setQ] = useState("");
+  // Keyboard selling (owner): ↑/↓ pick among the matches, Enter adds the picked one and moves to its
+  // Qty; Enter on Qty → Unit → Disc %, and Enter on Disc % comes back here for the next medicine.
+  // Enter in the empty search box goes on to the payment (Cash).
+  const [hi, setHi] = useState(0);
+  const searchRef = useRef<HTMLInputElement>(null);
+  const cashRef = useRef<HTMLInputElement>(null);
+  const focusQty = useRef<string | null>(null);
   const [patient, setPatient] = useState<PatientLite | null>(hold ? hold.patient : prefill?.patient ?? null);
   const [pq, setPq] = useState(""); const [pres, setPres] = useState<PatientLite[]>([]);
   const [name, setName] = useState(hold?.name ?? ""); const [phone, setPhone] = useState(hold?.phone ?? "");
@@ -122,8 +130,45 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
   const needsExt = rows.some((r) => r.kind === "item" && !r.rxItemId && item(r.itemId)?.rx_only);
 
   const set = (k: string, patch: Partial<Row>) => setRows((rs) => rs.map((r) => (r.key === k ? ({ ...r, ...patch } as Row) : r)));
-  const addItem = (it: CounterItem) => { setRows((rs) => [...rs, { key: nk(), kind: "item", itemId: it.id, unitId: it.units[0]?.id ?? "", qty: "1", disc: "0", batchId: "", rxItemId: null, rxText: null }]); setQ(""); };
-  const addService = (s: CounterService) => { setRows((rs) => [...rs, { key: nk(), kind: "service", serviceId: s.id, qty: "1", disc: "0" }]); setQ(""); };
+  const addItem = (it: CounterItem) => { const k = nk(); focusQty.current = k; setRows((rs) => [...rs, { key: k, kind: "item", itemId: it.id, unitId: it.units[0]?.id ?? "", qty: "1", disc: "0", batchId: "", rxItemId: null, rxText: null }]); setQ(""); setHi(0); };
+  const addService = (s: CounterService) => { const k = nk(); focusQty.current = k; setRows((rs) => [...rs, { key: k, kind: "service", serviceId: s.id, qty: "1", disc: "0" }]); setQ(""); setHi(0); };
+  // A line just added: put the cursor in its Qty, number selected, ready to type over.
+  useEffect(() => {
+    if (!focusQty.current) return;
+    const el = document.querySelector<HTMLInputElement>(`[data-qty-for="${focusQty.current}"]`);
+    if (el) { el.focus(); el.select(); focusQty.current = null; }
+  }, [rows]);
+  // What Enter adds for each match: the item, or for one with none in stock the first same medicine in stock.
+  const options: ({ label: string; add: () => void } | { label: string; add: null; why: string })[] = [
+    ...matches.map((i) => {
+      if (i.blocked) return { label: i.name, add: null, why: `${i.name} can't be sold here.` };
+      if (i.available > 0) return { label: i.name, add: () => addItem(i) };
+      const s = subsFor(i)[0];
+      return s ? { label: s.name, add: () => addItem(s) } : { label: i.name, add: null, why: `${i.name}: none in stock, and no other brand of the same medicine.` };
+    }),
+    ...svcMatches.map((s) => ({ label: s.name, add: () => addService(s) })),
+  ];
+  const onSearchKey = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key === "ArrowDown" || e.key === "ArrowUp") {
+      if (!options.length) return;
+      e.preventDefault();
+      setHi((h) => (h + (e.key === "ArrowDown" ? 1 : options.length - 1)) % options.length);
+      return;
+    }
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    if (scan(q)) return;
+    if (!q.trim()) { if (rows.length) cashRef.current?.focus(); return; }
+    const o = options[Math.min(hi, options.length - 1)];
+    if (!o) return;
+    if (o.add) { setErr(null); o.add(); } else setErr(o.why);
+  };
+  // Enter on a line's Disc % goes back to the search box for the next medicine.
+  const backToSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    searchRef.current?.focus();
+  };
   const searchPatient = (v: string) => { setPq(v); if (v.trim().length >= 2) start(async () => setPres(await findPatient(v))); else setPres([]); };
 
   function submit(e: React.FormEvent) {
@@ -187,12 +232,14 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
       {prefill ? <p className="rounded-control bg-pine/5 px-3 py-2 text-sm">Dispensing {prefill.rxNumber} for {prefill.patient.full_name}. Choose the medicine for each line; reduce a quantity to dispense part.</p> : null}
       <div className="relative">
         <label className="block"><span className="mb-1 block text-sm font-medium">Add medicine or service</span>
-          <input value={q} onChange={(e) => setQ(e.target.value)} className={field} placeholder="Scan a barcode, or type a brand, generic or code" autoFocus={!prefill}
-            onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); if (!scan(q) && matches.length === 1) addItem(matches[0]!); } }} aria-label="Add medicine or service" /></label>
+          <input ref={searchRef} value={q} onChange={(e) => { setQ(e.target.value); setHi(0); }} className={field} placeholder="Scan a barcode, or type a brand, generic or code" autoFocus={!prefill}
+            onKeyDown={onSearchKey} aria-label="Add medicine or service" role="combobox" aria-expanded={options.length > 0} aria-controls="counter-matches" /></label>
+        {options.length ? <p className="mt-1 text-xs text-ink-faint">↑ ↓ to choose, Enter to add{options[Math.min(hi, options.length - 1)] ? `: ${options[Math.min(hi, options.length - 1)]!.label}` : ""}</p>
+          : rows.length && !q ? <p className="mt-1 text-xs text-ink-faint">Enter here goes to the payment.</p> : null}
         {matches.length || svcMatches.length ? (
-          <ul className="absolute z-10 mt-1 w-full divide-y divide-line rounded-panel border border-line bg-surface shadow-sm">
-            {matches.map((i) => (
-              <li key={i.id}>{i.available <= 0 && !i.blocked ? (
+          <ul id="counter-matches" className="absolute z-10 mt-1 w-full divide-y divide-line rounded-panel border border-line bg-surface shadow-sm">
+            {matches.map((i, idx) => (
+              <li key={i.id} className={cn(idx === hi && "bg-pine/10")} data-active={idx === hi || undefined}>{i.available <= 0 && !i.blocked ? (
                 <div className="px-4 py-2">
                   <div className="flex justify-between gap-3"><span><span className="font-medium">{i.name}</span> <span className="text-sm text-ink-soft">{[i.generic, i.strength].filter(Boolean).join(" ")}</span></span><span className="text-sm text-alert">none in stock</span></div>
                   {subsFor(i).length ? <div className="mt-1 flex flex-wrap items-center gap-2 text-sm"><span className="text-ink-soft">Same medicine:</span>
@@ -204,7 +251,7 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
                 <span className="text-sm text-ink-faint">{i.available} {i.units[0]?.name}{i.lots[0]?.expiry_date ? `, exp ${i.lots[0].expiry_date.slice(0, 7)}` : ""}</span>
               </button>}</li>
             ))}
-            {svcMatches.map((s) => <li key={s.id}><button type="button" onClick={() => addService(s)} className="flex w-full justify-between px-4 py-2 text-left hover:bg-pine/5"><span>{s.name}</span><span className="text-sm text-ink-faint">{npr(s.price)}</span></button></li>)}
+            {svcMatches.map((s, j) => <li key={s.id} className={cn(matches.length + j === hi && "bg-pine/10")} data-active={matches.length + j === hi || undefined}><button type="button" onClick={() => addService(s)} className="flex w-full justify-between px-4 py-2 text-left hover:bg-pine/5"><span>{s.name}</span><span className="text-sm text-ink-faint">{npr(s.price)}</span></button></li>)}
           </ul>
         ) : null}
       </div>
@@ -218,8 +265,8 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
               return (
                 <li key={r.key} className="grid items-end gap-3 px-4 py-3 sm:grid-cols-[1fr_5rem_5rem_7rem_auto]">
                   <div className="font-medium">{s?.name}</div>
-                  <label><span className="block text-xs text-ink-faint">Qty</span><input type="number" min={1} step={1} value={r.qty} onChange={(e) => set(r.key, { qty: e.target.value })} className={field} /></label>
-                  <label><span className="block text-xs text-ink-faint">Disc. %</span><input type="number" min={0} max={100} value={r.disc} onChange={(e) => set(r.key, { disc: e.target.value })} className={field} /></label>
+                  <label><span className="block text-xs text-ink-faint">Qty</span><input type="number" min={1} step={1} value={r.qty} onChange={(e) => set(r.key, { qty: e.target.value })} data-qty-for={r.key} className={field} /></label>
+                  <label><span className="block text-xs text-ink-faint">Disc. %</span><input type="number" min={0} max={100} value={r.disc} onChange={(e) => set(r.key, { disc: e.target.value })} onKeyDown={backToSearch} className={field} /></label>
                   <div className="text-right tabular-nums">{npr(p.net)}</div>
                   <button type="button" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} className="text-sm text-alert">Remove</button>
                 </li>
@@ -236,10 +283,10 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
                         <option value="">Choose</option>{(r.prescribedId && item(r.prescribedId) ? [item(r.prescribedId)!, ...items.filter((x) => x.id !== r.prescribedId && item(r.prescribedId!)!.equiv && x.equiv === item(r.prescribedId!)!.equiv)] : items)
                           .filter((x) => !x.blocked).map((x) => <option key={x.id} value={x.id}>{x.name}{x.generic ? ` (${x.generic})` : ""}{x.id === r.prescribedId ? " · prescribed" : ""}{x.available <= 0 ? " · none in stock" : ""}</option>)}</select></label>
                   ) : <div><div className="font-medium">{it?.name}</div><div className="text-sm text-ink-soft">{[it?.generic, it?.strength].filter(Boolean).join(" ")}{it?.rx_only ? " · needs a prescription" : ""}</div></div>}
-                  <label><span className="block text-xs text-ink-faint">Qty</span><input type="number" min={0.001} step="any" value={r.qty} onChange={(e) => set(r.key, { qty: e.target.value })} className={field} /></label>
+                  <label><span className="block text-xs text-ink-faint">Qty</span><input type="number" min={0.001} step="any" value={r.qty} onChange={(e) => set(r.key, { qty: e.target.value })} data-qty-for={r.key} aria-label={`Quantity of ${it?.name ?? "medicine"}`} className={field} /></label>
                   <label><span className="block text-xs text-ink-faint">Unit</span>
                     <select value={r.unitId} onChange={(e) => set(r.key, { unitId: e.target.value })} disabled={Boolean(r.held)} className={field}>{it?.units.map((u) => <option key={u.id} value={u.id}>{u.name}</option>)}</select></label>
-                  <label><span className="block text-xs text-ink-faint">Disc. %</span><input type="number" min={0} max={100} value={r.disc} onChange={(e) => set(r.key, { disc: e.target.value })} className={field} /></label>
+                  <label><span className="block text-xs text-ink-faint">Disc. %</span><input type="number" min={0} max={100} value={r.disc} onChange={(e) => set(r.key, { disc: e.target.value })} onKeyDown={backToSearch} aria-label={`Discount on ${it?.name ?? "medicine"}`} className={field} /></label>
                   <div className="text-right tabular-nums">{npr(p.net + p.tax)}</div>
                   <button type="button" onClick={() => setRows((rs) => rs.filter((x) => x.key !== r.key))} className="text-sm text-alert">Remove</button>
                 </div>
@@ -307,7 +354,7 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
           <div className="flex items-baseline justify-between"><span className="text-ink-soft">Total (estimate)</span><span className="text-2xl font-semibold tabular-nums">{npr(total)}</span></div>
           {fromAdvance > 0 ? <div className="flex items-baseline justify-between text-sm"><span className="text-ink-soft">From the advance ({npr(held)} held)</span><span className="tabular-nums">− {npr(fromAdvance)}; take {npr(toTake)}</span></div> : null}
           <div className="grid gap-3 sm:grid-cols-3">
-            <label><span className="block text-xs text-ink-faint">Cash</span><input type="number" min={0} step="0.01" value={cash} onChange={(e) => setCash(e.target.value)} className={field} /></label>
+            <label><span className="block text-xs text-ink-faint">Cash</span><input ref={cashRef} type="number" min={0} step="0.01" value={cash} onChange={(e) => setCash(e.target.value)} aria-label="Cash" className={field} /></label>
             <label><span className="block text-xs text-ink-faint">Online</span><input type="number" min={0} step="0.01" value={online} onChange={(e) => setOnline(e.target.value)} className={field} /></label>
             <label><span className="block text-xs text-ink-faint">Paid by</span><select value={channel} onChange={(e) => setChannel(e.target.value)} disabled={!Number(online)} className={field}><option value="">—</option>{CHANNELS.map(([v, l]) => <option key={v} value={v}>{l}</option>)}</select></label>
           </div>

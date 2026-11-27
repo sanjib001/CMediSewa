@@ -229,7 +229,7 @@ export function PurchaseForm({ vendors, stores, defaultVendor, today, po }: { ve
       </section>
 
       {error ? <p role="alert" className="rounded-control bg-alert-tint px-3 py-2 text-sm text-alert">{error}</p> : null}
-      <Button type="button" disabled={pending} onClick={() => {
+      <Button type="button" data-kbd-submit disabled={pending} onClick={() => {
         setError(null); setBadLine(null);
         const missing = !billNo.trim() ? "Enter the vendor's bill number (top of the form)."
           : !rows.length ? "Add at least one item: type its name in \"Add an item\"."

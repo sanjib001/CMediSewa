@@ -282,6 +282,18 @@ nightly books check starts.
 Screens update by themselves: a check-in at reception appears in the doctor's queue, and an
 issued prescription appears in the pharmacy, within seconds.
 
+**Filling forms with the keyboard:** in every form, **Enter** moves to the next box; on the last
+box it moves to the Save / Submit button, and Enter there saves. **→** at the end of a box's text
+and **←** at its start move to the next / previous box (inside the text the arrows move the cursor
+as usual). Search and scan boxes, one-box searches and notes (Enter = new line) work as before.
+
+**Selling by keyboard (Pharmacy → Sale):** type part of a name (e.g. *ceta*); the matches show with
+the first one highlighted; **↑ / ↓** choose another (the line under the box says what Enter will
+add; a medicine with none in stock adds the same medicine that is in stock). **Enter** adds it and
+puts the cursor in its **Qty** (type over it); **Enter** → Unit → Disc %; **Enter** on Disc % comes
+back to the search for the next medicine. When done, **Enter in the empty search box** goes to
+**Cash**, and Enter from there through the payment to **Issue bill**.
+
 ### E1. Registrar desk (`/employee/registrar`)
 - **Find the patient** by name, phone or MRN, or **Register a new patient** (name, sex, age or
   date of birth, phone, email optional). Likely duplicates are flagged for the admin.
