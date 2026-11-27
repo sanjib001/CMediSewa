@@ -110,6 +110,8 @@ export type BillDetail = {
   external_rx: { prescriber_name: string; prescriber_reg_no: string | null; facility: string | null; rx_date: string } | null;
   patient_id: string | null; outstanding: number; same_day: boolean; void_reason: string | null;
   returns: { id: string; return_no: string; total: number; settlement: string; created_at: string; reason: string }[];
+  /** Printing: the clinic's receipt paper (Settings) and how the bill was paid. */
+  paper: "80mm" | "58mm" | "a5" | "a4"; paidBy: string[]; mrn: string | null; patientName: string | null;
 };
 export async function getBill(tenantId: string, id: string): Promise<BillDetail | null> {
   const db = serviceClient();
@@ -132,6 +134,17 @@ export async function getBill(tenantId: string, id: string): Promise<BillDetail 
   ]);
   const un = rows<{ id: string; name: string }>(units, "units"), bt = rows<{ id: string; batch_no: string; expiry_date: string | null }>(batches, "batches");
   const p = pt.data as { full_name: string; mrn: string; phone: string | null } | null;
+  // How it was paid (cash / online channel / from the advance), and the receipt paper.
+  const payIds = rows<{ amount: number; payment_id: string }>(await db.from("payment_allocations").select("amount, payment_id").eq("tenant_id", tenantId).eq("invoice_id", id), "allocations for print").map((x) => x.payment_id);
+  const [pays, setRow] = await Promise.all([
+    payIds.length ? db.from("payments").select("cash_amount, online_amount, online_channel, advance_amount").eq("tenant_id", tenantId).in("id", payIds) : Promise.resolve({ data: [] }),
+    db.from("tenant_settings").select("print_paper_width").eq("tenant_id", tenantId).maybeSingle(),
+  ]);
+  const CH: Record<string, string> = { esewa: "eSewa", khalti: "Khalti", fonepay: "Fonepay", bank_transfer: "Bank transfer", card: "Card", other: "Online" };
+  const paidBy = [...new Set(((pays.data ?? []) as { cash_amount: number; online_amount: number; online_channel: string | null; advance_amount: number | null }[])
+    .flatMap((x) => [Number(x.cash_amount) > 0 ? "Cash" : "", Number(x.online_amount) > 0 ? CH[x.online_channel ?? "other"] ?? "Online" : "", Number(x.advance_amount ?? 0) !== 0 ? "Advance" : ""]).filter(Boolean))];
+  const paperRaw = (setRow.data as { print_paper_width: string } | null)?.print_paper_width;
+  const paper = (["80mm", "58mm", "a5", "a4"].includes(paperRaw ?? "") ? paperRaw : "80mm") as BillDetail["paper"];
   const prof = bp.data as { name: string; legal_name: string; pan_vat_no: string | null; address: string | null; phone: string | null; receipt_footer: string | null } | null;
   return {
     id: h.id, invoice_no: h.invoice_no, fiscal_year: h.fiscal_year, issued_at: h.issued_at, status: h.status,
@@ -146,7 +159,7 @@ export async function getBill(tenantId: string, id: string): Promise<BillDetail 
       lots: allocs.filter((a) => a.invoice_line_id === x.id).map((a) => { const b = bt.find((y) => y.id === a.batch_id); return b ? `${b.batch_no}${b.expiry_date ? ` exp ${b.expiry_date.slice(0, 7)}` : ""}` : ""; }).join(", "),
     })),
     external_rx: ex.data as BillDetail["external_rx"],
-    patient_id: h.patient_id, void_reason: h.void_reason,
+    patient_id: h.patient_id, void_reason: h.void_reason, paper, paidBy, mrn: p?.mrn ?? null, patientName: p?.full_name ?? null,
     outstanding: Number((await db.rpc("invoice_outstanding", { p_invoice: id })).data ?? 0),
     same_day: await sameBusinessDay(tenantId, h.issued_at),
     returns: rows<{ id: string; return_no: string; total: number; settlement: string; created_at: string; reason: string }>(

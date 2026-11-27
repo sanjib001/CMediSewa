@@ -87,3 +87,46 @@ body {
   top: var(--ticket-cut, 62%);
   border-top: 2px dashed color-mix(in srgb, var(--color-marigold-ink) 30%, transparent);
 }
+
+/* ── Printed bills (BillView) ─────────────────────────────────────────────────
+   One look on screen and paper: plain black on white, a clinic header, a clear title, numbered
+   lines, right-aligned money. The width follows Settings → Receipt paper; on print only the
+   bill (.print-area) shows and @page (set by the bill) picks the paper size. */
+@layer components {
+  .bill { --bill-w: 148mm; width: 100%; max-width: var(--bill-w); margin-inline: auto; background: #fff; color: #111;
+    font-size: 13px; line-height: 1.4; font-variant-numeric: tabular-nums; }
+  .bill[data-paper="a4"] { --bill-w: 186mm; font-size: 13.5px; }
+  .bill[data-paper="80mm"] { --bill-w: 76mm; font-size: 11.5px; padding: 10px; }
+  .bill[data-paper="58mm"] { --bill-w: 54mm; font-size: 10.5px; padding: 8px; }
+  .bill-head { text-align: center; }
+  .bill-name { font-size: 1.35em; font-weight: 700; letter-spacing: 0.01em; text-transform: uppercase; }
+  .bill-title { margin: 0.7em 0 0.5em; padding: 0.25em 0; border-block: 1.5px solid #111; text-align: center;
+    font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+  .bill-void { color: #b42318; }
+  .bill-meta { display: grid; grid-template-columns: 1fr 1fr; gap: 0.15em 1.2em; }
+  .bill[data-paper="80mm"] .bill-meta, .bill[data-paper="58mm"] .bill-meta { grid-template-columns: 1fr; }
+  .bill-meta > div { display: flex; gap: 0.5em; }
+  .bill-meta dt { color: #555; min-width: 5.2em; }
+  .bill-meta .bill-wide { grid-column: 1 / -1; }
+  .bill-lines { width: 100%; margin-top: 0.7em; border-collapse: collapse; }
+  .bill-lines th { padding: 0.3em 0.25em; border-block: 1px solid #111; font-size: 0.85em; font-weight: 600; text-align: left; text-transform: uppercase; letter-spacing: 0.04em; }
+  .bill-lines td { padding: 0.35em 0.25em; border-bottom: 1px dashed #bbb; vertical-align: top; }
+  .bill-lines .num { text-align: right; white-space: nowrap; }
+  .bill-sub { display: block; font-size: 0.85em; color: #555; }
+  .bill-totals { margin: 0.5em 0 0 auto; width: min(100%, 22em); }
+  .bill-totals > div { display: flex; justify-content: space-between; gap: 1em; padding: 0.1em 0; }
+  .bill-totals dd { text-align: right; white-space: nowrap; }
+  .bill-grand { margin: 0.25em 0; padding: 0.3em 0 !important; border-block: 1.5px solid #111; font-size: 1.15em; font-weight: 700; }
+  .bill-words { margin-top: 0.5em; font-size: 0.9em; font-style: italic; }
+  .bill-returns { margin-top: 0.5em; padding-top: 0.4em; border-top: 1px dashed #bbb; font-size: 0.9em; }
+  .bill-foot { margin-top: 1em; text-align: center; font-size: 0.85em; color: #444; }
+  .bill-sign { display: flex; justify-content: space-between; margin: 2.2em 0 1em; }
+  .bill-sign span { min-width: 40%; padding-top: 0.3em; border-top: 1px solid #111; }
+}
+@media print {
+  html, body { background: #fff !important; }
+  body * { visibility: hidden !important; }
+  .print-area, .print-area * { visibility: visible !important; }
+  .print-area { position: absolute; left: 0; top: 0; margin: 0 !important; border: 0 !important; box-shadow: none !important; }
+  .print-area:not([data-paper="80mm"]):not([data-paper="58mm"]) { padding: 0 !important; }
+}

@@ -159,7 +159,7 @@ province, district, municipality, ward, street/tole.
 | Discount allowed without approval (%) | Bigger discounts need an admin |
 | Email a reminder (hours before) | Appointment reminder by email; 0 = off |
 | Warn about expiry / Urgent expiry (days before) | When medicines show as "expiring" and "urgent" |
-| **Receipt paper** | 80 mm thermal · 58 mm thermal · A5 · A4 |
+| **Receipt paper** | 80 mm thermal · 58 mm thermal · A5 · A4. Bills print on this paper: on thermal rolls a narrow receipt, on A5/A4 a full invoice with rate column and signature lines. Only the bill prints, never the menus |
 | Order enough for (days) | Reorder suggestions cover the vendor's delivery time plus this many days of sales (default 30) |
 | Orders above this need approval (Rs.) | Blank = no approval. A purchase order worth more (or with a line without an expected rate) waits for someone who manages the settings, and can't be received until approved |
 

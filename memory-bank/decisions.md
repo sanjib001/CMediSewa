@@ -1410,6 +1410,14 @@ forms for Enter, anything under [data-kbd="off"]. Boxes inside a closed <details
   box names what Enter adds; none in stock → the first same medicine in stock, D-147), Enter adds
   it and focuses its Qty (selected); Qty → Unit → Disc % by the global helper; Enter on Disc %
   returns to the search; Enter in the empty search goes to Cash.
+- **Printed bills (D-155):** BillView is a plain black-on-white invoice: clinic name, address,
+  phone, PAN; a ruled "Invoice" / "Tax invoice" title (· Void when void); bill no., date in BS
+  with AD and time, customer, MRN, phone (counter and FY on A5/A4); numbered lines with batch and
+  expiry; sub-total, discount, taxable amount and VAT (when VAT), a ruled Total, Paid (cash /
+  eSewa / … / advance), Due; the amount in words, Nepali grouping (lib/money-words.ts); footer and
+  "Issued by". Settings → Receipt paper is now used: 80 mm / 58 mm (narrow, rate under the item)
+  or A5 / A4 (rate column, "Received by" / "For <clinic>" lines), with the matching @page. Print
+  hides everything but .print-area (the shell used to print too).
 - The app's role on the dev database has an 8 s statement timeout; a few E2E runs hit it in
   the advance step (the call normally takes ~0.2 s, worst seen 2.9 s). Watch for it in production.
 

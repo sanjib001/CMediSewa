@@ -54,8 +54,10 @@ cashier shifts M-47 (D-137), advanced barcodes M-49 (D-146). Controlled/narcotic
 - The long-running `next dev` goes stale after many edits (saves fail, pages loop): verify on a
   production build (`npm run build` + `npx next start -p 3100`, stop it by port afterwards) and
   tell the owner to restart `next dev`.
-- Before calling a step done: `npm test`, `npm run test:db`, `node scripts/check-posture.mjs`,
-  typecheck, lint, build, and the E2E journey on a production build.
+- Before calling a big step done (database, money, stock, permissions): `npm test`, `npm run test:db`,
+  `node scripts/check-posture.mjs`, typecheck, lint, build, and the E2E journey on a production build.
+- **Small edits (owner, 2026-11-27):** labels, columns, layout, wording: typecheck, lint and a quick
+  check of that screen only; run the full E2E at the end of a batch of small edits or when asked.
 - When a step finishes, **update this section** and add decisions to `decisions.md`.
 
 ---
@@ -72,6 +74,7 @@ cashier shifts M-47 (D-137), advanced barcodes M-49 (D-146). Controlled/narcotic
 | Checks | DB **139/139** · posture ✓ · **E2E 319/319 on a production build** (one run hit a one-off DB statement timeout in the advance step; the rerun passed) · typecheck/lint/build ✓ · test clinics purged |
 | Fixed (owner: "unable to add a purchase", sanjib) | the DB posts a bill for that clinic fine (checked in a rolled-back transaction); the bill form was the problem: item search matched only the brand name and showed nothing when there was no match, the Post button was greyed out without saying why, and a medicine line without a batch failed with "Something went wrong". Now: search by name, generic or code, a "No item matches… Add it in Medicines" hint, Post explains what is missing (bill no., items, qty, rate, batch, expiry per line), and the batch error is worded. New browser check of the whole form: **E2E 326/326** |
 | Fixed (owner: "pay in cash and online don't seem to work") | the DB recorded them correctly; the form only changed one small "On credit" figure. Now: "Paying the vendor now?" with Cash now / Online now / Online via, Pay all in cash / Pay all online / All on credit, "Paid now" lines in the summary, a warning (and a block) when more is paid than the bill, and the form total uses the same per-line rounding as post_purchase_invoice so Pay all matches to the paisa. Browser check: full cash with VAT + bill discount, and part cash + part online + credit: **E2E 331/331** |
+| Changed (owner, D-155) | **printed bill**: professional, simple invoice (header with PAN, ruled title, BS date, numbered lines with batch, totals, paid by, amount in words, footer); prints on Settings → Receipt paper (80/58 mm or A5/A4, which was not used before) and only the bill prints. **E2E 369/369** |
 | Added (owner, D-154) | **selling by keyboard** at the pharmacy counter: type → matches with ↑/↓ highlight → Enter adds and goes to Qty → Unit → Disc % → back to search; Enter in the empty search → Cash. **E2E 365/365** |
 | Added (owner, D-154) | **keyboard form filling** everywhere: Enter = next box, last box → Save button, → / ← at the text's edge = next / previous box; search/scan boxes, notes and one-box forms unchanged. Browser check fills and saves a medicine by keyboard only. **E2E 357/357** (two earlier runs hit the dev DB's 8 s statement timeout in the advance step, unrelated) |
 | Changed (owner) | the top-right switch into the Admin area says **Purchase & management** for staff who aren't clinic admins (e.g. pharmacy); clinic admins keep "Admin" (tenantBarProps.adminLabel). **E2E 349/349** |
