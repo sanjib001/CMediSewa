@@ -49,14 +49,14 @@ export default async function Stock({ searchParams }: { searchParams: Promise<{ 
       <PageHeader title="Stock" subtitle={`${store.name}: ${rows.length} items, ${npr(value)} at cost, ${npr(saleValue)} at sale price${expired ? `, ${expired} expired lots` : ""}${near ? `, ${near} near expiry` : ""}.`} />
       <nav aria-label="Stores" className="mb-5 flex flex-wrap gap-2">
         {stores.map((s) => (
-          <Link key={s.id} href={`/admin/stock?store=${s.id}`} className={cn("rounded-control border px-3 py-1.5 text-sm", s.id === store.id ? "border-pine bg-pine-tint font-medium text-pine-deep" : "border-line-strong")}>
+          <Link key={s.id} href={`/admin/stock?store=${s.id}`} className={cn("rounded-control border px-3 py-2 text-sm", s.id === store.id ? "border-pine bg-pine-tint font-medium text-pine-deep" : "border-line-strong")}>
             {s.name}{(KIND[s.kind] ?? s.kind).toLowerCase() !== s.name.toLowerCase() ? <span className="text-ink-faint"> {KIND[s.kind] ?? s.kind}</span> : null}
           </Link>
         ))}
         <span className="mx-1 self-center text-line-strong" aria-hidden>|</span>
-        <Link href={`/admin/stock/counts?store=${store.id}`} className="rounded-control border border-line-strong px-3 py-1.5 text-sm">Stock count</Link>
-        <Link href="/admin/stock/reorder" className="rounded-control border border-line-strong px-3 py-1.5 text-sm">Reorder</Link>
-        <Link href="/admin/stock/recalls" className="rounded-control border border-line-strong px-3 py-1.5 text-sm">Recalls</Link>
+        <Link href={`/admin/stock/counts?store=${store.id}`} className="rounded-control border border-line-strong px-3 py-2 text-sm">Stock count</Link>
+        <Link href="/admin/stock/reorder" className="rounded-control border border-line-strong px-3 py-2 text-sm">Reorder</Link>
+        <Link href="/admin/stock/recalls" className="rounded-control border border-line-strong px-3 py-2 text-sm">Recalls</Link>
       </nav>
 
       <div className="space-y-6">

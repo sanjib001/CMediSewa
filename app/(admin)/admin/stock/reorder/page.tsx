@@ -57,7 +57,7 @@ export default async function Reorder({ searchParams }: { searchParams: Promise<
         <div className="flex flex-wrap items-center gap-2 text-sm">
           <span className="text-ink-soft">Sales speed from the last</span>
           {WINDOWS.map((w) => <Link key={w} href={`/admin/stock/reorder?days=${w}`} aria-current={w === days ? "page" : undefined}
-            className={`rounded-control border px-3 py-1 ${w === days ? "border-pine bg-pine text-white" : "border-line-strong hover:bg-sunken"}`}>{w} days</Link>)}
+            className={`rounded-control border px-3 py-2 ${w === days ? "border-pine bg-pine text-white" : "border-line-strong hover:bg-sunken"}`}>{w} days</Link>)}
           {plan.length ? <span className="ml-auto text-ink-faint">{plan.length} item{plan.length === 1 ? "" : "s"}, about {npr(total)} at the last cost</span> : null}
         </div>
 

@@ -228,7 +228,7 @@ export function CounterSale({ storeId, items, services, canOverride, canSellRx, 
   );
 
   return (
-    <form onSubmit={submit} className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_23rem]">
+    <form onSubmit={submit} className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_23rem]">
       <div className="min-w-0 space-y-5">
       {hold ? <p className="rounded-control bg-pine/5 px-3 py-2 text-[0.95rem]">Collecting hold {hold.holdNo}{hold.patient ? ` for ${hold.patient.full_name}` : hold.name ? ` for ${hold.name}` : ""}. Each line sells from the batch kept aside; reduce a quantity to take less, and the rest goes back to the shelf.</p> : null}
       {prefill ? <p className="rounded-control bg-pine/5 px-3 py-2 text-[0.95rem]">Dispensing {prefill.rxNumber} for {prefill.patient.full_name}. Choose the medicine for each line; reduce a quantity to dispense part.</p> : null}

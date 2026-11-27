@@ -1,7 +1,7 @@
 import { ADMIN_NAV, type NavGroup } from "@/lib/nav";
 import { NavLink } from "./nav-link";
 import { TenantBar, type TenantBarProps } from "./tenant-bar";
-import { Icon } from "@/components/ui/icon";
+import { MobileDrawer } from "./mobile-drawer";
 
 function Sidebar({ groups }: { groups: NavGroup[] }) {
   return (
@@ -32,16 +32,12 @@ export function AdminShell({
     items: g.items.filter((i) => (!i.module || modules.includes(i.module)) && (!i.permission || permissions.includes(i.permission))
       && (!i.anyOf || i.anyOf.some((k) => permissions.includes(k)))),
   })).filter((g) => g.items.length > 0);
-  // Mobile: the sidebar sits in a <details> disclosure, so it works before any JS loads.
+  // Phones and tablets: the same menu in a side drawer, with patient search and the area switch.
   const mobileMenu = (
-    <details className="group relative lg:hidden">
-      <summary className="grid size-10 cursor-pointer list-none place-items-center rounded-control text-ink-soft hover:bg-sunken [&::-webkit-details-marker]:hidden" aria-label="Menu">
-        <Icon name="Menu" className="size-5" />
-      </summary>
-      <div className="absolute left-0 top-12 z-40 max-h-[80dvh] w-72 overflow-y-auto rounded-panel border border-line bg-surface p-3 shadow-lg">
-        <Sidebar groups={groups} />
-      </div>
-    </details>
+    <MobileDrawer title={bar.tenantName} subtitle={bar.displayName} searchHref={bar.searchHref}
+      switchLink={bar.showAdminSwitch ? { href: "/employee", label: "Staff workspace" } : null}>
+      <Sidebar groups={groups} />
+    </MobileDrawer>
   );
   return (
     <div className="min-h-dvh">

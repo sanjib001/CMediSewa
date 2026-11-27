@@ -1430,6 +1430,10 @@ forms for Enter, anything under [data-kbd="off"]. Boxes inside a closed <details
   doctor via #book-<id>), "No OPD today" names the next OPD day; each doctor's week as a Sun–Sat
   strip with today outlined; services and prices; Visit us; a Call / Book bar pinned on phones.
   Fixed: the booking form's fieldsets widened the page on phones (min-w-0).
+- **Responsive (D-159, owner: whole system):** measured, not guessed: a responsive audit tool over every
+  staff and public screen at 390 / 768 / 1024 px. Global fixes in globals.css (scroll boxes anchor
+  absolute children; touch-screen control size and 16 px input text), per-screen fixes where the
+  audit found overflow. Rule: no screen may scroll sideways at 390 px.
 - **Other sales (D-158, owner: the pharmacy is also the billing counter):** new key `other_sales`
   (pharmacy section, store-scoped, in no role template: the admin grants it). Pharmacy tab "Other
   sales": a bill title (invoices.title, ≤ 60, printed "Invoice: Lab") and typed lines (description,

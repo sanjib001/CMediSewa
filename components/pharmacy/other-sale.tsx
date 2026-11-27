@@ -25,7 +25,7 @@ type Done = { id: string; no: string; total: number; due: number; fromAdvance: n
 export function OtherSale({ storeId, allowCredit }: { storeId: string; allowCredit: boolean }) {
   const key = useRef(crypto.randomUUID());
   const [title, setTitle] = useState("");
-  const [lines, setLines] = useState<Line[]>(() => [blank()]);
+  const [lines, setLines] = useState<Line[]>(() => [{ ...blank(), key: "first" }]);   // a fixed first key: server and browser render the same
   const [patient, setPatient] = useState<PatientLite | null>(null);
   const [pq, setPq] = useState(""); const [pres, setPres] = useState<PatientLite[]>([]);
   const [name, setName] = useState(""); const [phone, setPhone] = useState("");
@@ -80,7 +80,7 @@ export function OtherSale({ storeId, allowCredit }: { storeId: string; allowCred
   );
 
   return (
-    <form onSubmit={submit} className="grid items-start gap-6 lg:grid-cols-[minmax(0,1fr)_23rem]">
+    <form onSubmit={submit} className="grid grid-cols-[minmax(0,1fr)] items-start gap-6 lg:grid-cols-[minmax(0,1fr)_23rem]">
       <div className="min-w-0 space-y-5">
         <label className="block max-w-sm">
           <span className="mb-1 block text-[0.95rem] font-medium">Bill title</span>
@@ -91,28 +91,28 @@ export function OtherSale({ storeId, allowCredit }: { storeId: string; allowCred
 
         <fieldset className="min-w-0">
           <legend className="mb-2 text-lg font-semibold">Items</legend>
-          <div className="overflow-x-auto">
-            <table className="w-full min-w-[34rem] text-left">
-              <thead className="text-[0.95rem] text-ink-soft">
-                <tr><th className="pb-2 font-medium">Item</th><th className="w-24 pb-2 font-medium">Qty</th><th className="w-32 pb-2 font-medium">Rate (Rs.)</th><th className="w-32 pb-2 text-right font-medium">Amount</th><th className="w-10 pb-2"><span className="sr-only">Remove</span></th></tr>
-              </thead>
-              <tbody>
-                {lines.map((l, i) => (
-                  <tr key={l.key} className="align-top">
-                    <td className="py-1.5 pr-2"><input value={l.description} onChange={(e) => set(l.key, { description: e.target.value })} maxLength={120} data-desc-for={l.key}
-                      aria-label={`Item ${i + 1}`} className={field} placeholder="e.g. CBC test" /></td>
-                    <td className="py-1.5 pr-2"><input value={l.qty} onChange={(e) => set(l.key, { qty: e.target.value })} inputMode="decimal" aria-label={`Quantity of item ${i + 1}`} className={cn(field, "tabular-nums")} /></td>
-                    <td className="py-1.5 pr-2"><input value={l.rate} onChange={(e) => set(l.key, { rate: e.target.value })} inputMode="decimal" aria-label={`Rate of item ${i + 1}`} className={cn(field, "tabular-nums")} placeholder="0" /></td>
-                    <td className="py-1.5 pt-4 text-right tabular-nums">{npr(amount(l))}</td>
-                    <td className="py-1.5 pl-2 pt-3 text-right">
-                      {lines.length > 1 ? <button type="button" onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} aria-label={`Remove item ${i + 1}`}
-                        className="rounded-control px-2 py-1 text-ink-soft hover:bg-sunken hover:text-alert">✕</button> : null}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          {/* Wide screens: one row per line under column headings. Phones: each line is a small card. */}
+          <div className="hidden grid-cols-[minmax(0,1fr)_6rem_8rem_8rem_2.5rem] gap-2 pb-1 text-[0.95rem] text-ink-soft sm:grid" aria-hidden>
+            <span>Item</span><span>Qty</span><span>Rate (Rs.)</span><span className="text-right">Amount</span><span />
           </div>
+          <ol className="space-y-3 sm:space-y-1.5">
+            {lines.map((l, i) => (
+              <li key={l.key} className="grid grid-cols-[1fr_1fr_auto] items-center gap-2 rounded-control border border-line p-3 sm:grid-cols-[minmax(0,1fr)_6rem_8rem_8rem_2.5rem] sm:border-0 sm:p-0">
+                <label className="col-span-3 sm:col-span-1"><span className="mb-1 block text-[0.95rem] text-ink-soft sm:sr-only">Item {i + 1}</span>
+                  <input value={l.description} onChange={(e) => set(l.key, { description: e.target.value })} maxLength={120} data-desc-for={l.key}
+                    aria-label={`Item ${i + 1}`} className={field} placeholder="e.g. CBC test" /></label>
+                <label><span className="mb-1 block text-[0.95rem] text-ink-soft sm:sr-only">Qty</span>
+                  <input value={l.qty} onChange={(e) => set(l.key, { qty: e.target.value })} inputMode="decimal" aria-label={`Quantity of item ${i + 1}`} className={cn(field, "tabular-nums")} /></label>
+                <label><span className="mb-1 block text-[0.95rem] text-ink-soft sm:sr-only">Rate (Rs.)</span>
+                  <input value={l.rate} onChange={(e) => set(l.key, { rate: e.target.value })} inputMode="decimal" aria-label={`Rate of item ${i + 1}`} className={cn(field, "tabular-nums")} placeholder="0" /></label>
+                <span className="self-end pb-2.5 text-right font-medium tabular-nums sm:self-center sm:pb-0">{npr(amount(l))}</span>
+                <span className="col-span-3 text-right sm:col-span-1">
+                  {lines.length > 1 ? <button type="button" onClick={() => setLines((ls) => ls.filter((x) => x.key !== l.key))} aria-label={`Remove item ${i + 1}`}
+                    className="rounded-control px-2.5 py-2 text-ink-soft hover:bg-sunken hover:text-alert"><span aria-hidden>✕</span><span className="ml-1 sm:hidden">Remove</span></button> : null}
+                </span>
+              </li>
+            ))}
+          </ol>
           <Button type="button" tone="secondary" className="mt-3" onClick={add}>Add another line</Button>
         </fieldset>
       </div>

@@ -232,4 +232,6 @@ responsive down to phone width, an allergy banner as `role="alert"`.
 - Screenshots for UI review: `E2E_KEEP=1 E2E_SHOTS=<dir>` keeps a test clinic; `.local-tools/ui/shots.mjs`
   re-shoots any page in seconds (owner / pharmacist / public). Purge the clinic afterwards.
 
+**Responsive rules (D-159):** a wide table lives in `overflow-x-auto` (now the anchor for anything absolute inside it); two-pane forms use `grid-cols-[minmax(0,1fr)]` on phones; line editors become cards below `sm`; touch screens get 40 px controls and 16 px input text (globals.css, outside the layers). Check with `node --env-file=.env.local .local-tools/ui/responsive-audit.mjs <dir> 390,768,1024` on a kept E2E clinic.
+
 **Not yet:** dark mode and the nonce CSP.

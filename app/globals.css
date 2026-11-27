@@ -88,6 +88,36 @@ body {
   border-top: 2px dashed color-mix(in srgb, var(--color-marigold-ink) 30%, transparent);
 }
 
+/* ── Responsive groundwork (owner: "make whole system responsive") ─────────────
+   1. A horizontal scroll box is the anchor for anything positioned inside it: a hidden
+      screen-reader label (.sr-only is absolute) in a wide table otherwise measures against the
+      page and widened every phone screen with such a table. In the base layer, so an explicit
+      `absolute` utility still wins.
+   2. Touch screens: typing boxes at least 40 px tall, and 16 px text in them so iPhones don't
+      zoom the page in when a box is tapped. */
+@layer base {
+  .overflow-x-auto { position: relative; }
+}
+/* Outside the layers on purpose: it must beat text-sm / h-8 utilities on touch screens only. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="range"]):not([type="hidden"]), select, textarea {
+    min-height: 2.5rem; font-size: max(1rem, 1em);
+  }
+  /* every button a finger can hit, including text-style ones such as "Remove" or "Undo" */
+  button { min-height: 2.5rem; }
+}
+
+/* ── Mobile menu drawer (components/shell/mobile-drawer.tsx) ─────────────────── */
+@layer components {
+  dialog.drawer[open] { display: block; inset-block: 0; inset-inline-start: 0; inset-inline-end: auto; animation: drawer-in 180ms ease-out; }
+  dialog.drawer::backdrop { background: rgb(21 35 43 / 0.45); animation: drawer-fade 180ms ease-out; }
+  /* menu rows: full width and finger-sized in the drawer */
+  .drawer-nav a { min-height: 2.75rem; padding-block: 0.65rem; font-size: 1.0625rem; }
+  @keyframes drawer-in { from { transform: translateX(-100%); } to { transform: none; } }
+  @keyframes drawer-fade { from { opacity: 0; } to { opacity: 1; } }
+  @media (prefers-reduced-motion: reduce) { dialog.drawer[open], dialog.drawer::backdrop { animation: none; } }
+}
+
 /* ── Printed bills (BillView) ─────────────────────────────────────────────────
    One look on screen and paper: plain black on white, a clinic header, a clear title, numbered
    lines, right-aligned money. The width follows Settings → Receipt paper; on print only the

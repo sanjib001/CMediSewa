@@ -73,6 +73,12 @@ export function TenantBar({ area, tenantName, displayName, levelLabel, showAdmin
                 <div className="font-medium">{displayName}</div>
                 <div className="text-sm text-ink-faint">{levelLabel}</div>
               </div>
+              {/* Phones: the top-bar switch is hidden for lack of room, so it lives here. */}
+              {showAdminSwitch ? (
+                <Link href={area === "admin" ? "/employee" : "/admin"} className="block rounded-control px-3 py-2 text-[0.95rem] font-medium text-pine hover:bg-pine-tint sm:hidden">
+                  {area === "admin" ? "Staff workspace" : adminLabel}
+                </Link>
+              ) : null}
               <Link href="/employee/pin" className="block rounded-control px-3 py-2 text-[0.95rem] hover:bg-sunken">My PIN</Link>
               <form action={signOutStaff}>
                 <button type="submit" className="w-full rounded-control px-3 py-2 text-left text-[0.95rem] hover:bg-sunken">Sign out</button>
