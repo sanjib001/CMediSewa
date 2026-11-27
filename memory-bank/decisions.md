@@ -1430,6 +1430,15 @@ forms for Enter, anything under [data-kbd="off"]. Boxes inside a closed <details
   doctor via #book-<id>), "No OPD today" names the next OPD day; each doctor's week as a Sun–Sat
   strip with today outlined; services and prices; Visit us; a Call / Book bar pinned on phones.
   Fixed: the booking form's fieldsets widened the page on phones (min-w-0).
+- **Launch logo (D-161, owner: like HRestroSewa):** as HRestroSewa: per-device iOS launch images and the
+  manifest for Android, all from ONE mark drawn in code (lib/pwa/mark.ts), which now also draws the
+  app icons. Plus an in-app launch screen for the installed app while the first screen loads. The
+  installed-app check is a class set by an inline script before paint (display-mode standalone or
+  iOS navigator.standalone), not a CSS media query, so it can be tested and works on older iOS.
+- **Loading states (D-160, owner):** skeleton outlines (loading.tsx) inside the shells, and pull down to
+  refresh on touch screens (router.refresh, so typed form input survives). Trade-off accepted: with a
+  loading boundary, a refused page streams and redirects in the page (HTTP 200 +
+  __next-page-redirect) instead of a 307; the guard still runs before any content, so nothing leaks.
 - **Responsive (D-159, owner: whole system):** measured, not guessed: a responsive audit tool over every
   staff and public screen at 390 / 768 / 1024 px. Global fixes in globals.css (scroll boxes anchor
   absolute children; touch-screen control size and 16 px input text), per-screen fixes where the

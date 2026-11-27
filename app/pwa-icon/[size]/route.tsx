@@ -1,8 +1,11 @@
-import { ImageResponse } from "next/og";
+import sharp from "sharp";
+import { markSvg, PINE } from "@/lib/pwa/mark";
 
-// App icons for the web app manifest (U8), drawn in code so there are no image assets to keep
-// in sync: pine square, a white "C" with a marigold token dot. /pwa-icon/192, /pwa-icon/512, and
-// /pwa-icon/maskable-512 (extra padding so Android's mask never clips the mark).
+// App icons for the web app manifest (U8), drawn from the ONE mark (lib/pwa/mark.ts) that the
+// launch screens use too. Built once (force-static). /pwa-icon/192 and /512: the rounded tile as
+// is. /pwa-icon/maskable-512: pine to the edge with the mark inside Android's safe circle, so the
+// platform crop only ever eats pine. /pwa-icon/180: full-bleed for iOS, which masks its own
+// corners and doesn't honour transparency.
 export const dynamic = "force-static";
 const SIZES = ["192", "512", "maskable-512", "180"] as const;
 export function generateStaticParams() { return SIZES.map((size) => ({ size })); }
@@ -12,16 +15,13 @@ export async function GET(_req: Request, { params }: { params: Promise<{ size: s
   if (!SIZES.includes(size as (typeof SIZES)[number])) return new Response("Not found", { status: 404 });
   const maskable = size.startsWith("maskable");
   const px = Number(size.replace("maskable-", ""));
-  const mark = Math.round(px * (maskable ? 0.5 : 0.62));
-  return new ImageResponse(
-    (
-      <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", background: "#0f5c4d", borderRadius: maskable || px === 180 ? 0 : Math.round(px * 0.2) }}>
-        <div style={{ position: "relative", width: mark, height: mark, display: "flex", alignItems: "center", justifyContent: "center" }}>
-          <div style={{ color: "#ffffff", fontSize: Math.round(mark * 0.95), fontWeight: 700, lineHeight: 1, fontFamily: "sans-serif" }}>C</div>
-          <div style={{ position: "absolute", right: Math.round(mark * 0.02), top: Math.round(mark * 0.1), width: Math.round(mark * 0.22), height: Math.round(mark * 0.22), borderRadius: 9999, background: "#f2a93b" }} />
-        </div>
-      </div>
-    ),
-    { width: px, height: px },
-  );
+  let png: Buffer;
+  if (maskable) {
+    const inner = Math.round(px * 0.72);
+    png = await sharp({ create: { width: px, height: px, channels: 4, background: PINE } })
+      .composite([{ input: Buffer.from(markSvg(inner, false)), gravity: "centre" }]).png().toBuffer();
+  } else {
+    png = await sharp(Buffer.from(markSvg(px, px !== 180))).png().toBuffer();
+  }
+  return new Response(new Uint8Array(png), { headers: { "content-type": "image/png", "cache-control": "public, max-age=86400" } });
 }

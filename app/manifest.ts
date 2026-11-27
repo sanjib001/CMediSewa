@@ -12,7 +12,9 @@ export default function manifest(): MetadataRoute.Manifest {
     scope: "/",
     display: "standalone",
     orientation: "any",
-    background_color: "#ffffff",
+    // Android builds its launch screen from this colour and the icon: the app's own background,
+    // so the launch screen and the first page are one surface (D-161).
+    background_color: "#f5f8f7",
     theme_color: "#0f5c4d",
     categories: ["medical", "business"],
     icons: [
